@@ -723,14 +723,19 @@ describe("chat listener", () => {
             assert.ok(Logs.Lines.some((Line) => Line === `info chat: message room=${CITY} uid=${A} len=${[...Text].length} to=2`));
         });
 
-        it("rooms live on muc.<domain> from <open to>; conference. or another case is refused not-allowed", async () => {
+        it("rooms accept the 1.4.4 muc and legacy conference aliases for the authenticated domain", async () => {
             const Local = await Player(C, "Charlie", { OpenTo: "dauntless.local" });
 
             JoinAs(Local, CITY);
             await Settle(Local);
             assert.equal(Local.Model.RoomOf(CITY)!.State, JOINED, "joined on muc.dauntless.local");
 
-            for(const Domain of ["conference.dauntless.local", "MUC.dauntless.local", `muc.${DOMAIN}`]){
+            Local.Wire.Send(`<presence to="Hunt-legacy@conference.dauntless.local/${Local.Model.Nickname("Charlie")}"><x xmlns="http://jabber.org/protocol/muc"/></presence>`);
+            const [Legacy] = await Settle(Local);
+            assert.equal(Legacy.length, 1);
+            assert.match(Legacy[0], /^<presence xmlns="jabber:client" from="Hunt-legacy@conference\.dauntless\.local\//);
+
+            for(const Domain of [`conference.${DOMAIN}`, `muc.${DOMAIN}`]){
                 Local.Wire.Send(`<presence to="Hunt-1@${Domain}/${Local.Model.Nickname("Charlie")}"><x xmlns="http://jabber.org/protocol/muc"/></presence>`);
                 const [Frames] = await Settle(Local);
                 assert.equal(Frames.length, 1, Domain);
