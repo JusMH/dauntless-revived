@@ -237,10 +237,14 @@ describe("chat listener", () => {
             assert.ok(Logs.Lines.some((Line) => Line.includes(`chat: bound c=`) && Line.includes(`uid=${C} resource=${Resource} domain=${DOMAIN} sessions=1`)));
         });
 
-        it("takes the domain from <open to>, and falls back to the game's own when it is missing or not a host name", async () => {
+        it("takes a host or launcher host:port from <open to>, and falls back when it is missing or invalid", async () => {
             const Local = await SignedIn(D, { OpenTo: "dauntless.local" });
             assert.equal(Local.Domain, "dauntless.local");
             await Local.Logout();
+
+            const Launcher = await SignedIn(D, { OpenTo: "127.0.0.1:61000" });
+            assert.equal(Launcher.Domain, "127.0.0.1:61000");
+            await Launcher.Logout();
 
             const Missing = await SignedIn(D, { OpenTo: null });
             assert.equal(Missing.Domain, DOMAIN);

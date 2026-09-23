@@ -746,6 +746,9 @@ client's legacy `jabber:iq:auth` try after it gets an error and the connection i
 gets one login attempt and at most four frames before it is logged in, and must bind within 10 s of
 its login.
 
+The `<open to>` domain may be a hostname or the launcher's `host:port` endpoint. The latter is kept
+verbatim because 1.4.4 also uses it as the suffix in its room JIDs.
+
 **What the server answers:**
 
 | The client sends | The server |

@@ -190,7 +190,9 @@ nickname from its own account id (B `0x1408b5aeb`), so only a forged nickname fa
 
 The client names its rooms itself (B builders in parentheses). They live on `muc.<domain>` or the
 legacy `conference.<domain>` alias, where the suffix is the value the client sent in `<open to>`.
-The server accepts either alias only for that authenticated domain and echoes the exact room JID.
+That value may include a port: a launcher-directed client was captured sending `127.0.0.1:61000`,
+then joining `muc.127.0.0.1:61000`. The server preserves that endpoint, accepts either alias only for
+the authenticated domain and echoes the exact room JID.
 
 | Room | Chat channel | Who may join |
 |:-----|:-------------|:-------------|
