@@ -8,6 +8,7 @@ import { ConfirmRank, GetObjectiveRecord, GetObjectiveRecords, GetTrackRecord, G
 import { CallerOf } from "../controllers/progressionevents";
 import { RealProgressionOnly, RefuseForeignPlayer, SendRealReply } from "../middleware/RealProgressionOnly";
 import { HasUndauntedAdminApiKey } from "../middleware/HasUndauntedAdminApiKey";
+import { AdminMutationRateLimit } from "../middleware/RateLimits";
 import { Redact } from "../middleware/BodyLog";
 import { NoteRelayedAccountMismatch } from "../middleware/GameServerOnly";
 
@@ -361,7 +362,7 @@ progressionRouter.get("/progression/:userId/:progressionId", RealProgressionOnly
 
 // Resets one track. The game server only sends it from a debug command, so it needs
 // an admin key (x-undaunted-user-api-key), or PROGRESSION_ALLOW_DELETE=1 for game servers.
-progressionRouter.delete("/progression/:userId/:progressionId", RealProgressionOnly, async (req: any, res) => {
+progressionRouter.delete("/progression/:userId/:progressionId", AdminMutationRateLimit, RealProgressionOnly, async (req: any, res) => {
     if(req.headers["x-undaunted-user-api-key"] !== undefined){
         await HasUndauntedAdminApiKey(req, res, () => SendRealReply(res, ResetTrack(req.params.userId, req.params.progressionId, "admin")));
         return;

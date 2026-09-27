@@ -5,10 +5,11 @@ import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth
 import { DisplayNameForUserId, FindAccountByUsername, FindUsernameForUserId, FindUsernames } from "../controllers/login";
 import { SoftMetagameAuth, SoftPlayerOf } from "../middleware/PlayerAuth";
 import { VerifyStubAccount } from "../features";
+import { LoginRateLimit } from "../middleware/RateLimits";
 
 export const eosRouter = Router();
 
-eosRouter.post("/account/api/oauth/token", async (req, res) => {
+eosRouter.post("/account/api/oauth/token", LoginRateLimit, async (req, res) => {
     if(process.env.AUTH_MODE === "NONE" && process.env.NODE_ENV !== "production"){
         const UserId = req.body.exchange_code;
 

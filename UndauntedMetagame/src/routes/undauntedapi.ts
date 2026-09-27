@@ -19,6 +19,7 @@ import { SendOrAcceptFriendRequest } from "../controllers/friends";
 import { DisbandGuildAsAdmin, GuildNameOf, InviteToGuild, ListGuilds } from "../controllers/guild";
 import { RefuseAdminKeyThroughProxy } from "../middleware/RequestOrigin";
 import { IsSoftRegisteredCaller, SoftAccountAuth } from "../middleware/SoftAccountAuth";
+import { AdminMutationRateLimit } from "../middleware/RateLimits";
 
 export const undauntedApiRouter = Router();
 
@@ -160,7 +161,7 @@ undauntedApiRouter.get("/UsernameAvailable", (req, res) => {
 
 // Admin: {uses?: int (default 1), name?: string} -> {"code": "XXXX-XXXX-XXXX"}. The name is
 // a note for the host's log ("for Alex") and is not stored.
-undauntedApiRouter.post("/CreateInvite", HasUndauntedAdminApiKey, async (req: any, res) => {
+undauntedApiRouter.post("/CreateInvite", AdminMutationRateLimit, HasUndauntedAdminApiKey, async (req: any, res) => {
     const Body = req.body != null && typeof req.body === "object" ? req.body : {};
     const Uses = Body.uses ?? 1;
 
