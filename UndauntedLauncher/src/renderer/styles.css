@@ -1688,6 +1688,7 @@ img {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   background: linear-gradient(180deg, var(--glass), var(--glass-strong));
   border-left: 1px solid var(--line);
   padding: 22px 20px 18px;
@@ -1956,6 +1957,18 @@ img {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sp-foot-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sp-foot-row .link-btn {
+  max-width: 100%;
+  text-align: left;
+  white-space: normal;
 }
 
 /* ------------------------------------------------------------------ news, server, settings pages */
