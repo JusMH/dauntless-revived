@@ -397,8 +397,8 @@ account in the URL. The character must belong to that account (404 otherwise).
 |:-------|:-----|:-------|:-------------|
 | GET | `/loadout/:userId/:characterId/all` | token | Every loadout, the persistent data and the slot counts. |
 | POST | `/loadout/:userId/:characterId/:index` | token | Saves one loadout slot `{data}`. Real: any unlocked slot. Stub: only slot 0 and `persistent`. Every save goes into the save history. |
-| POST | `/loadout/:userId/:characterId/unlock/:numSlots` | real only, token, game server | Unlocks `numSlots` more slots. |
-| GET | `/loadout/:userId/:characterId/slotcount` | real only, token | The slot counts. |
+| POST | `/loadout/:userId/:characterId/unlock/:numSlots` | real only, token, game server | Unlocks `numSlots` more character slots, capped at 5 character slots plus the one account slot (6 combined). |
+| GET | `/loadout/:userId/:characterId/slotcount` | real only, token | The account and character slot counts; their combined client ceiling is 6. |
 | POST | `/loadout/:userId/:characterId/active/:index` | real only, token, game server | Sets the active slot. |
 
 ### Matchmaking

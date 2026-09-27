@@ -77,7 +77,7 @@ loadoutRouter.post("/loadout/:userId/:characterId/active/:index", RealProgressio
 // Real mode: the stored slot counts and active slot, one row for /all, /slotcount and unlock
 async function LoadoutPayload(RequestorAccountId: string, CharacterId: string){
     const Loadouts: any[] = await GetAllLoadoutsForUserIdAndCharacterId(RequestorAccountId, CharacterId);
-    const Persistent: any = await GetPersistentLoadoutForUserIdAndCharacterId(RequestorAccountId, CharacterId); // TODO: WARN: Ordering of this and the GetAllLoadoutsForUserIdAndCharacterId MUST NOT CHANGE until create-on-nonexistent is added in the loadout controller
+    const Persistent: any = await GetPersistentLoadoutForUserIdAndCharacterId(RequestorAccountId, CharacterId);
 
     logger.info(`Fetched ${Loadouts.length} loadout(s) for userId ${RequestorAccountId} and characterId ${CharacterId}`);
 

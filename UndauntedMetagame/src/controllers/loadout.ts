@@ -48,84 +48,88 @@ const DEFAULT_PERSISTENT = {
     quickwheel: [],
 };
 
+function MakeDefaultLoadoutSlot(SlotIndex: number){
+    return {
+        weapon: {
+            item_id: "WP_EB_TRAINING",
+            instance_id: "WP_EB_TRAINING",
+            instance_data: DEFAULT_INSTANCE_DATA
+        },
+        helmet: {
+            item_id: "AR_UNEQUIPPED_HELM",
+            instance_id: "AR_UNEQUIPPED_HELM",
+            instance_data: DEFAULT_INSTANCE_DATA
+        },
+        chest: {
+            item_id: "AR_BEGINNER_CHEST",
+            instance_id: "AR_BEGINNER_CHEST",
+            instance_data: DEFAULT_INSTANCE_DATA
+        },
+        arms: {
+            item_id: "AR_BEGINNER_ARMS",
+            instance_id: "AR_BEGINNER_ARMS",
+            instance_data: DEFAULT_INSTANCE_DATA
+        },
+        legs: {
+            item_id: "AR_BEGINNER_LEGS",
+            instance_id: "AR_BEGINNER_LEGS",
+            instance_data: DEFAULT_INSTANCE_DATA
+        },
+        lantern: {
+            item_id: "LT_BASIC",
+            instance_id: "LT_BASIC",
+            instance_data: DEFAULT_INSTANCE_DATA
+        },
+        player_role: {
+            item_id: "PR_DARKNESS",
+            instance_id: "PR_DARKNESS",
+            instance_data: DEFAULT_INSTANCE_DATA
+        },
+        subweapon: null,
+        appearance: "{\"CreationState\":\"EArchonCharacterCreationState::NewCharacter\",\"Data\":[],\"AssetReferences\":[],\"StringData\":[]}",
+        flask: "FL_HEALING_DEFAULT",
+        quick_items: [],
+        slot_index: SlotIndex,
+        update_version: 0,
+        custom_name: "",
+        persistent: DEFAULT_PERSISTENT
+    };
+}
+
+// A loadout save can race the initial /all read during login. Keep every entry point
+// self-contained instead of requiring callers to create the row in a particular order.
+function EnsureLoadoutRow(UserId: string, CharacterId: string){
+    let Row = GetDb().select().from(loadouts)
+        .where(and(eq(loadouts.characterId, CharacterId), eq(loadouts.userId, UserId))).get();
+
+    if(Row !== undefined){
+        return Row;
+    }
+
+    logger.info(`Creating new loadout set for userId ${UserId} and characterId ${CharacterId}`);
+    GetDb().insert(loadouts).values({
+        characterId: CharacterId,
+        userId: UserId,
+        loadouts: JSON.stringify([MakeDefaultLoadoutSlot(0)]),
+        persistent: JSON.stringify(DEFAULT_PERSISTENT)
+    }).onConflictDoNothing().run();
+
+    Row = GetDb().select().from(loadouts)
+        .where(and(eq(loadouts.characterId, CharacterId), eq(loadouts.userId, UserId))).get();
+
+    if(Row === undefined){
+        throw new Error(`Failed to create loadouts for userId ${UserId} and characterId ${CharacterId}`);
+    }
+
+    return Row;
+}
+
 export async function GetAllLoadoutsForUserIdAndCharacterId(UserId: string, CharacterId: string){
-    let LoadoutDbRow = await GetDb().query.loadouts.findFirst({where: and(eq(loadouts.characterId, CharacterId), eq(loadouts.userId, UserId))});
-
-    let Loadouts;
-
-    if(LoadoutDbRow == undefined){
-        logger.info(`Creating new loadout set for userId ${UserId} and characterId ${CharacterId}`);
-
-        const NewLoadoutSlot = {
-            weapon: {
-                item_id: "WP_EB_TRAINING",
-                instance_id: "WP_EB_TRAINING",
-                instance_data: DEFAULT_INSTANCE_DATA
-            },
-            helmet: {
-                item_id: "AR_UNEQUIPPED_HELM",
-                instance_id: "AR_UNEQUIPPED_HELM",
-                instance_data: DEFAULT_INSTANCE_DATA
-            },
-            chest: {
-                item_id: "AR_BEGINNER_CHEST",
-                instance_id: "AR_BEGINNER_CHEST",
-                instance_data: DEFAULT_INSTANCE_DATA
-            },
-            arms: {
-                item_id: "AR_BEGINNER_ARMS",
-                instance_id: "AR_BEGINNER_ARMS",
-                instance_data: DEFAULT_INSTANCE_DATA
-            },
-            legs: {
-                item_id: "AR_BEGINNER_LEGS",
-                instance_id: "AR_BEGINNER_LEGS",
-                instance_data: DEFAULT_INSTANCE_DATA
-            },
-            lantern: {
-                item_id: "LT_BASIC",
-                instance_id: "LT_BASIC",
-                instance_data: DEFAULT_INSTANCE_DATA
-            },
-            player_role: {
-                item_id: "PR_DARKNESS",
-                instance_id: "PR_DARKNESS",
-                instance_data: DEFAULT_INSTANCE_DATA
-            },
-            subweapon: null,
-            appearance: "{\"CreationState\":\"EArchonCharacterCreationState::NewCharacter\",\"Data\":[],\"AssetReferences\":[],\"StringData\":[]}",
-            flask: "FL_HEALING_DEFAULT",
-            quick_items: [],
-            slot_index: 0, // TODO: Support multi-loadout
-            update_version: 0,
-            custom_name: "",
-            persistent: DEFAULT_PERSISTENT
-        };
-
-        const NewLoadoutData = [NewLoadoutSlot];
-
-        await GetDb().insert(loadouts).values({
-            characterId: CharacterId,
-            userId: UserId,
-            loadouts: JSON.stringify(NewLoadoutData),
-            persistent: JSON.stringify(DEFAULT_PERSISTENT)
-        });
-
-        Loadouts = NewLoadoutData;
-    }
-    else{
-        Loadouts = JSON.parse(LoadoutDbRow.loadouts);
-    }
-
-    return Loadouts;
+    return JSON.parse(EnsureLoadoutRow(UserId, CharacterId).loadouts);
 }
 
 export async function GetPersistentLoadoutForUserIdAndCharacterId(UserId: string, CharacterId: string){
-    // TODO: This will break if it's not called AFTER the GetAllLoadouts call as it has no create-on-nonexistent functionality
-
-    const LoadoutDbRow = await GetDb().query.loadouts.findFirst({where: and(eq(loadouts.characterId, CharacterId), eq(loadouts.userId, UserId))});
-
-    return JSON.parse(LoadoutDbRow!.persistent);
+    return JSON.parse(EnsureLoadoutRow(UserId, CharacterId).persistent);
 }
 
 // A save that matches no row, or whose data isn't JSON, fails instead of being
@@ -161,13 +165,16 @@ export function SetLoadoutDataForUserIdAndCharacterId(UserId: string, CharacterI
 
 // Loadout slots of real-mode accounts (roadmap 2.4). The game server asks for
 // POST .../unlock/{n} with n = slots to ADD (1 + unlock conditions met - slots it
-// has), so the stored count only grows and never passes 1 + 5 conditions = 6.
+// has), so the stored count only grows and the account + character total never
+// passes the client's six-slot ceiling.
 // The four counts are stack memory in the client and are never zeroed, so every
 // reply carries all four as numbers, and max_character_slots is never below
 // num_character_slots (the loadout carousel would memmove a negative length).
 export const NUM_ACCOUNT_SLOTS = 1;
 export const MAX_ACCOUNT_SLOTS = 1;
-export const MAX_CHARACTER_SLOTS = 6;
+// The 1.4.4 client has six slots total. One is account-wide, leaving at most five
+// character slots; advertising six here made the combined count seven.
+export const MAX_CHARACTER_SLOTS = 5;
 
 export type LoadoutSlots = { NumCharacterSlots: number, ActiveIndex: number };
 
@@ -224,7 +231,8 @@ function ReadSlots(tx: Tx, CharacterId: string): LoadoutSlots{
     return {NumCharacterSlots: Row?.numCharacterSlots ?? 1, ActiveIndex: Row?.activeIndex ?? 0};
 }
 
-// POST /loadout/:uid/:cid/unlock/:n (no body). Reply = stored + n, capped at 6.
+// POST /loadout/:uid/:cid/unlock/:n (no body). Reply = stored + n, capped at 5
+// character slots (plus the one account slot).
 export function UnlockLoadoutSlots(UserId: string, CharacterId: string, NumSlotsRaw: string, Who: Caller): RealReply{
     const Route = "POST /loadout/:uid/:cid/unlock/:n";
     const NumSlots = ParsePathInteger(NumSlotsRaw);
@@ -290,6 +298,7 @@ export function SetActiveLoadoutSlot(UserId: string, CharacterId: string, IndexR
 // its slot_index (the element's own slot_index is set to the URL index)
 export function SetLoadoutSlotData(UserId: string, CharacterId: string, Index: string, Data: string, Reason: string = "save"){
     if(Index === "persistent"){
+        EnsureLoadoutRow(UserId, CharacterId);
         return SetLoadoutDataForUserIdAndCharacterId(UserId, CharacterId, Index, Data, Reason);
     }
 
@@ -326,6 +335,8 @@ export function SetLoadoutSlotData(UserId: string, CharacterId: string, Index: s
     Element.slot_index = SlotIndex;
 
     try{
+        EnsureLoadoutRow(UserId, CharacterId);
+
         return GetDb().transaction((tx) => {
             const Current = tx.select().from(loadouts).where(and(eq(loadouts.characterId, CharacterId), eq(loadouts.userId, UserId))).get();
 

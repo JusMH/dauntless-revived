@@ -84,7 +84,7 @@ The rows marked "(solo)" mean exactly that. A test with a second player is next.
 | Slayer Links | Built, on by default, awaiting a live test | The My Links tab: two friends link up for a week. From Harmonic's fork, corrected against the 1.4.4 executable (23 September 2026); not tried in game yet, and the game may keep the tab hidden ([details](https://mixutin.github.io/dauntless-revived/findings/social.html#slayer-links)) |
 | Escalation | Built, off by default | Real Escalation saves from Harmonic's fork: the season registry read from the client and its save rules (23 September 2026). Off (`ESCALATION_MODE=real`) because switching it on drops every player from the fake maximum to level 0; not tried in game ([details](https://mixutin.github.io/dauntless-revived/findings/escalation.html)) |
 | Store | Built, off by default | A free store from Harmonic's fork: 200 free cosmetics, bought with the game's own purchase flow (23 September 2026). Off (`STORE=free`) until the owner decides whether it stays free and it has been tried in game ([details](https://mixutin.github.io/dauntless-revived/findings/store.html)) |
-| Multiple loadouts | Not yet | Slot unlocks stored with real progression; the extra slots not yet tried in game |
+| Multiple loadouts | Backend complete, awaiting an in-game UI test | Unlocks, active-slot selection and independent saves for all six client slots are stored with real progression. The server never advertises the invalid seventh slot, and a save no longer depends on `/all` having run first. The extra slots have not yet been tried in the game UI |
 
 The live checklist, with every step and what "done" means for it, is [ROADMAP.md](ROADMAP.md).
 

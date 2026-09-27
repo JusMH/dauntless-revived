@@ -417,8 +417,8 @@ tilin puolesta. Hahmon on kuuluttava sille tilille (muuten 404).
 |:-------|:------|:------|:--------------|
 | GET | `/loadout/:userId/:characterId/all` | tunniste | Kaikki varustesarjat, pysyvät tiedot ja paikkamäärät. |
 | POST | `/loadout/:userId/:characterId/:index` | tunniste | Tallentaa yhden varustesarjapaikan `{data}`. Oikea: mikä tahansa avattu paikka. Tynkä: vain paikka 0 ja `persistent`. Jokainen tallennus menee tallennushistoriaan. |
-| POST | `/loadout/:userId/:characterId/unlock/:numSlots` | vain oikea, tunniste, pelipalvelin | Avaa `numSlots` paikkaa lisää. |
-| GET | `/loadout/:userId/:characterId/slotcount` | vain oikea, tunniste | Paikkamäärät. |
+| POST | `/loadout/:userId/:characterId/unlock/:numSlots` | vain oikea, tunniste, pelipalvelin | Avaa `numSlots` hahmopaikkaa lisää, enintään 5 hahmopaikkaa ja yksi tilipaikka (yhteensä 6). |
+| GET | `/loadout/:userId/:characterId/slotcount` | vain oikea, tunniste | Tili- ja hahmopaikkojen määrät; asiakasohjelman yhteisraja on 6. |
 | POST | `/loadout/:userId/:characterId/active/:index` | vain oikea, tunniste, pelipalvelin | Asettaa aktiivisen paikan. |
 
 ### Matchmaking {#matchmaking}

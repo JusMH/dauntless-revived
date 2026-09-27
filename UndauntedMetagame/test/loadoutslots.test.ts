@@ -20,11 +20,11 @@ async function AllPayload(UserId: string, CharacterId: string){
 const Counts = (Payload: any) => [Payload.num_account_slots, Payload.max_account_slots, Payload.num_character_slots, Payload.max_character_slots];
 
 describe("loadout slots (real mode)", () => {
-    it("starts at 1 character slot, max 6, all four counts numbers", async () => {
+    it("starts at 1 character slot, max 5 plus the account slot, all four counts numbers", async () => {
         const {UserId, CharacterId} = await MakePlayer();
         const Payload = await AllPayload(UserId, CharacterId);
 
-        assert.deepEqual(Counts(Payload), [1, 1, 1, 6]);
+        assert.deepEqual(Counts(Payload), [1, 1, 1, 5]);
         assert.equal(Payload.active_index, 0);
         assert.equal(Payload.needs_migration, false);
         assert.equal(Payload.loadouts.length, 1);
@@ -36,25 +36,25 @@ describe("loadout slots (real mode)", () => {
 
         const Reply = UnlockLoadoutSlots(UserId, CharacterId, "3", "gameserver");
         assert.equal(Reply.Status, 200);
-        assert.deepEqual(Reply.Body, {code: null, message: "OK", payload: {num_account_slots: 1, max_account_slots: 1, num_character_slots: 4, max_character_slots: 6}});
+        assert.deepEqual(Reply.Body, {code: null, message: "OK", payload: {num_account_slots: 1, max_account_slots: 1, num_character_slots: 4, max_character_slots: 5}});
         assert.deepEqual(GetSlotCountReply(CharacterId), Reply.Body);
-        assert.deepEqual(Counts(await AllPayload(UserId, CharacterId)), [1, 1, 4, 6]);
+        assert.deepEqual(Counts(await AllPayload(UserId, CharacterId)), [1, 1, 4, 5]);
 
         // What the client computes next: 1 + 3 conditions met - 4 = 0, so no more unlocks
         assert.equal(1 + 3 - (Reply.Body as any).payload.num_character_slots, 0);
     });
 
-    it("caps at 6 (never a count that would make the game server ask again), and refuses 0 or junk", async () => {
+    it("caps at 5 character slots so the account slot keeps the client total at 6", async () => {
         const {UserId, CharacterId} = await MakePlayer();
 
         UnlockLoadoutSlots(UserId, CharacterId, "4", "gameserver");
         const Capped = UnlockLoadoutSlots(UserId, CharacterId, "3", "gameserver");
-        assert.deepEqual((Capped.Body as any).payload, {num_account_slots: 1, max_account_slots: 1, num_character_slots: 6, max_character_slots: 6});
+        assert.deepEqual((Capped.Body as any).payload, {num_account_slots: 1, max_account_slots: 1, num_character_slots: 5, max_character_slots: 5});
 
         for(const Bad of ["0", "x", "-1", "1.5"]){
             assert.equal(UnlockLoadoutSlots(UserId, CharacterId, Bad, "gameserver").Status, 400, Bad);
         }
-        assert.equal((GetSlotCountReply(CharacterId).payload as any).num_character_slots, 6);
+        assert.equal((GetSlotCountReply(CharacterId).payload as any).num_character_slots, 5);
     });
 
     it("saves any unlocked slot by its slot index, refuses slots not unlocked yet", async () => {
@@ -79,6 +79,32 @@ describe("loadout slots (real mode)", () => {
 
         const [History] = await GetSaveHistory([CharacterId]);
         assert.ok(History.LoadoutVersions.length >= 5);
+    });
+
+    it("creates the loadout row when a valid slot save arrives before the initial /all read", async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+
+        assert.equal(SetLoadoutSlotData(UserId, CharacterId, "0", JSON.stringify({slot_index: 0, flask: "FL_EARLY"})), true);
+        assert.equal(SetLoadoutSlotData(UserId, CharacterId, "persistent", JSON.stringify({banner: "BN_EARLY"})), true);
+        const Payload = await AllPayload(UserId, CharacterId);
+
+        assert.equal(Payload.loadouts[0].flask, "FL_EARLY");
+        assert.equal(Payload.persistent.banner, "BN_EARLY");
+    });
+
+    it("supports all six client slots without advertising a seventh", async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+        await GetAllLoadoutsForUserIdAndCharacterId(UserId, CharacterId);
+        UnlockLoadoutSlots(UserId, CharacterId, "9", "gameserver");
+
+        for(let Index = 0; Index < 6; Index++){
+            assert.equal(SetLoadoutSlotData(UserId, CharacterId, String(Index), JSON.stringify({slot_index: Index, custom_name: `Slot ${Index + 1}`})), true);
+        }
+
+        assert.equal(SetLoadoutSlotData(UserId, CharacterId, "6", JSON.stringify({slot_index: 6})), false);
+        const Payload = await AllPayload(UserId, CharacterId);
+        assert.deepEqual(Counts(Payload), [1, 1, 5, 5]);
+        assert.deepEqual(Payload.loadouts.map((Element: any) => Element.slot_index), [0, 1, 2, 3, 4, 5]);
     });
 
     it("stores the active slot, only below the number of slots", async () => {

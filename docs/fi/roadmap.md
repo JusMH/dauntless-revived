@@ -366,7 +366,8 @@ omaa työtä sekä ryhmien (parties) parissa muualla tehtävä työ.
 
 Tällä hetkellä osa ansaitusta tallentuu ja osa ei. M2:n jälkeen myös Slayer-taso, aseiden ja
 hirviöiden mestaruus, Hunt Pass, palkkiotehtävät, päivittäiset ja viikoittaiset rajoitukset,
-Escalation ja useat varustesarjat tallentuvat oikeasti. Samalla varmistetaan, ettei esineitä voi
+Escalation ja useat varustesarjat tallentuvat oikeasti. Useiden varustesarjojen taustapalvelu tukee
+nyt kaikkia kuutta paikkaa, mutta lisäpaikkojen käyttöliittymätesti pelissä puuttuu. Samalla varmistetaan, ettei esineitä voi
 monistaa eikä kuluttaa enemmän kuin omistaa, tallennuksille tulee historia, jonka avulla pelaajan voi
 palauttaa aiempaan versioon, ja ylläpitäjä saa työkalut rikkoutuneen tallennuksen korjaamiseen
 minuuteissa. Ruudulla näkyvä rahamäärä korjataan vastaamaan sitä, mitä pelaajalla oikeasti on. Jokainen

@@ -137,7 +137,7 @@ What the 2026-09-21 session sent to the server (`metagame.log`, 09:38–10:50 UT
 | Weapons, armour, parts, cosmetic items | Yes | 36 items. Upgrades are version-checked. |
 | Equipped gear, emotes, banner, glider, flare (loadout slot 0) | Yes | The database shows `WP_MS_BEGINNER` equipped, not the default. |
 | Titles, pets, dyes, transmog, other cosmetics | Probably | Stored in the same records, but not verified (3.4). |
-| Extra loadout slots | No | The route is missing: 43 failed unlock attempts today. *Update: with real progression (now the default) the unlock, slot count and active slot are stored (2.4); the extra slots are still to be tried in the UI.* |
+| Extra loadout slots | Backend complete; UI test pending | The original route was missing and caused 43 failed unlock attempts. With real progression, unlocks, the active slot and six independent client slots are stored (2.4). A 2026-09-27 hardening pass removed the initial-read ordering dependency and fixed the advertised ceiling from seven combined slots to the client's six. The extra slots are still to be tried in the UI. |
 | "Seen" markers (NPCs, tutorial slates) | Yes | All 12 from today are in the database. |
 | "New" markers (breadcrumbs) | Yes, untested | The client hasn't written one yet. |
 | Slayer level | No, faked at 50 | 7 XP grants were refused (400) today. *Update: yes with real progression, now the default (2.8–2.10, tested in game). On the rented server (2026-09-22) the owner's new account reached Slayer level 3.* |
@@ -455,7 +455,7 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
   - **Why:** each system is stored as one big value per character. One bad write replaces a whole inventory, and an unreadable inventory makes the character unloadable.
   - **Done when:** a test character can be rolled back one version from the admin tool.
 
-- [ ] **2.4 Multiple loadouts** (M) — *Built (unlock, slotcount, active slot). *Tester play test 2026-09-21 (real mode on a throwaway account, then a full restart and relog):* a real low-level account made **no** `unlock/3` calls at all, so the retry loop came from the fake level 50. The extra slots themselves are still to be tried in the UI.*
+- [ ] **2.4 Multiple loadouts** (M) — *Backend complete (unlock, slotcount, active slot and independent saves for all six client slots). A 2026-09-27 hardening pass capped the combined account and character slots at the client's real ceiling of six, made first saves safe before the initial `/all` read, and added coverage for every slot. *Tester play test 2026-09-21 (real mode on a throwaway account, then a full restart and relog):* a real low-level account made **no** `unlock/3` calls at all, so the retry loop came from the fake level 50. The extra slots themselves are still to be tried in the UI.*
   - **What:**
     - Add routes: `POST /loadout/:uid/:cid/unlock/:n`, the account-level unlock, `slotcount` and `active/:index`.
     - Store the slot count and the active slot.

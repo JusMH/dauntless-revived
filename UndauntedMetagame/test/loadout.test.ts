@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import { GetDb } from "../src/db";
 import { loadouts } from "../src/db/schema";
-import { GetAllLoadoutsForUserIdAndCharacterId, SetLoadoutDataForUserIdAndCharacterId } from "../src/controllers/loadout";
+import { GetAllLoadoutsForUserIdAndCharacterId, GetPersistentLoadoutForUserIdAndCharacterId, SetLoadoutDataForUserIdAndCharacterId } from "../src/controllers/loadout";
 import { GetSaveHistory, RollbackLoadout } from "../src/controllers/savehistory";
 import { MakePlayer } from "./helpers";
 
@@ -61,6 +61,19 @@ describe("SetLoadoutDataForUserIdAndCharacterId", () => {
 
         const [History] = await GetSaveHistory([CharacterId]);
         assert.deepEqual(History.LoadoutVersions.map((Version) => [Version.Version, Version.Reason]), [[3, "save"], [2, "save"], [1, "baseline"]]);
+    });
+});
+
+describe("loadout initialization", () => {
+    it("can read persistent data before /all and creates one consistent row", async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+
+        const Persistent = await GetPersistentLoadoutForUserIdAndCharacterId(UserId, CharacterId);
+        const LoadoutData = await GetAllLoadoutsForUserIdAndCharacterId(UserId, CharacterId);
+
+        assert.equal(Persistent.banner, "BN_BEGINNER_00");
+        assert.equal(LoadoutData.length, 1);
+        assert.equal(ReadLoadoutRow(CharacterId)?.userId, UserId);
     });
 });
 
