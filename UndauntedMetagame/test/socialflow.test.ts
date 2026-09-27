@@ -35,7 +35,10 @@ type Reply = { status: number, text: string, json: any };
 type CallOptions = { as?: string, body?: unknown, emptyJson?: boolean, headers?: Record<string, string> };
 
 async function Call(Method: string, Path: string, Options: CallOptions = {}): Promise<Reply> {
-    const Headers: Record<string, string> = { ...(Options.headers ?? {}) };
+    // Give every test request its own connection. On slower CI runners Undici can otherwise
+    // race the server's keep-alive timeout and reuse a socket just as it is being closed,
+    // producing an unrelated ECONNRESET in the middle of this long end-to-end suite.
+    const Headers: Record<string, string> = { connection: "close", ...(Options.headers ?? {}) };
 
     if(Options.as !== undefined) Headers["authorization"] = `bearer ${Tokens[Options.as]}`;
     if(Options.body !== undefined || Options.emptyJson) Headers["content-type"] = "application/json; charset=utf-8";
