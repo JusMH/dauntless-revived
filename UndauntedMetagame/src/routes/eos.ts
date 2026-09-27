@@ -5,7 +5,7 @@ import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth
 import { DisplayNameForUserId, FindAccountByUsername, FindUsernameForUserId, FindUsernames } from "../controllers/login";
 import { SoftMetagameAuth, SoftPlayerOf } from "../middleware/PlayerAuth";
 import { VerifyStubAccount } from "../features";
-import { LoginRateLimit } from "../middleware/RateLimits";
+import { LoginRateLimit, TokenVerifyRateLimit } from "../middleware/RateLimits";
 
 export const eosRouter = Router();
 
@@ -78,7 +78,7 @@ const VERIFY_STUB_ACCOUNT_ID = "9626f441055349ce8cb7d7d5a483eaa2";
 // (Harmonic's fork did the same). It never answers 401: after the token's 24 hours a refusal here could log
 // the player out mid-session, so a missing, bad or expired token still gets the old stub, and expires_at
 // stays far off. VERIFY_STUB_ACCOUNT=1 answers the stub to everyone again.
-eosRouter.get("/account/api/oauth/verify", SoftMetagameAuth, (req: any, res) => {
+eosRouter.get("/account/api/oauth/verify", TokenVerifyRateLimit, SoftMetagameAuth, (req: any, res) => {
     logger.info("Verifying token");
 
     const Caller = VerifyStubAccount() ? undefined : SoftPlayerOf(req);

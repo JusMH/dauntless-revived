@@ -13,6 +13,16 @@ export const LoginRateLimit = rateLimit({
     message: Reply
 });
 
+// The 1.4.4 client verifies its token about once every 30 seconds. Keep ample room for reconnects
+// and multiple local clients while still bounding unauthenticated polling of the authorization route.
+export const TokenVerifyRateLimit = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: "draft-8",
+    legacyHeaders: false,
+    message: Reply
+});
+
 // Direct host/admin mutations get a deliberately generous ceiling. This prevents an accidentally
 // looping or brute-force caller without changing normal administration and migration workflows.
 export const AdminMutationRateLimit = rateLimit({
