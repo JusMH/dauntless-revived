@@ -1333,6 +1333,7 @@ function renderRail(): void {
 }
 
 function setView(v: View): void {
+  const changed = state.view !== v;
   if (v === "credits" && state.view !== "credits") {
     const from = document.activeElement;
     state.creditsReturn = { view: state.view, focus: from instanceof HTMLElement && from !== document.body ? from : null };
@@ -1345,6 +1346,13 @@ function setView(v: View): void {
   // page is long lists of names and gets the room too.
   $(".world").classList.toggle("no-panel", v === "server" || v === "credits");
   renderAll();
+  if (changed && !reducedMotion.matches) {
+    const selected = $(`#view-${v}`);
+    selected.classList.remove("view-entering");
+    void selected.offsetWidth;
+    selected.classList.add("view-entering");
+    window.setTimeout(() => selected.classList.remove("view-entering"), 520);
+  }
   const heading = document.querySelector<HTMLElement>(`#view-${v} h1`);
   heading?.setAttribute("tabindex", "-1");
   if (v !== "play") heading?.focus({ preventScroll: true });

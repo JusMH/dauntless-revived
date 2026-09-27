@@ -291,10 +291,29 @@ img {
   border-radius: 0 3px 3px 0;
   background: var(--dr-ice);
   box-shadow: 0 0 12px color-mix(in srgb, var(--dr-ice) 80%, transparent);
+  animation: nav-marker-in 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 
 .nav-item[aria-current="page"] .icon {
   color: var(--dr-glow);
+  animation: nav-icon-in 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes nav-marker-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.25);
+  }
+}
+
+@keyframes nav-icon-in {
+  0% {
+    opacity: 0.45;
+    transform: translateX(-4px) scale(0.88);
+  }
+  70% {
+    transform: translateX(1px) scale(1.05);
+  }
 }
 
 .nav-badge {
@@ -794,6 +813,47 @@ img {
   min-height: 0;
   overflow-y: auto;
   padding: 30px 40px 24px;
+}
+
+/* A page change gets one short transition. The class is applied only by setView, so polling and
+   ordinary status redraws do not repeatedly animate content the player is already reading. */
+.view.view-entering > .page,
+.view.view-entering > .play-content {
+  animation: view-enter 0.34s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+
+.view.view-entering > .page > *,
+.view.view-entering > .play-content > * {
+  animation: content-enter 0.32s cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+
+.view.view-entering > .page > :nth-child(2),
+.view.view-entering > .play-content > :nth-child(2) {
+  animation-delay: 35ms;
+}
+
+.view.view-entering > .page > :nth-child(3),
+.view.view-entering > .play-content > :nth-child(3) {
+  animation-delay: 70ms;
+}
+
+.view.view-entering > .page > :nth-child(n + 4),
+.view.view-entering > .play-content > :nth-child(n + 4) {
+  animation-delay: 105ms;
+}
+
+@keyframes view-enter {
+  from {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+}
+
+@keyframes content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 #view-play {
@@ -2294,6 +2354,14 @@ img {
   box-shadow: 0 30px 80px var(--shadow);
   display: grid;
   gap: 12px;
+  animation: modal-enter 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.975);
+  }
 }
 
 .modal-title {
