@@ -1,7 +1,7 @@
 {
   "name": "dauntless-revived-launcher",
   "productName": "Dauntless Revived Launcher",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Windows launcher for Dauntless Revived: join a friend's server (private over Tailscale or public over pinned TLS), download and verify the Dauntless 1.4.4 client, and play.",
   "main": ".vite/build/main.js",
   "private": true,
