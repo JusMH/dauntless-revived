@@ -837,6 +837,11 @@ saa vastaukseksi `<message type="error">` ja `<not-acceptable/>`; yhteys pysyy a
 
 ## Deploy-palvelin {#deploy-server}
 
+Muistin tai porttien loppuminen vastaa HTTP 503:
+`{"error":"capacity_unavailable","reason":"memory"}` (tai `"ports"`) ja `Retry-After: 10`.
+Metagame pitää tilan MATCHING ja yrittää tilakyselyillä uudelleen enintään viisi minuuttia.
+Varsinainen käynnistysvirhe on edelleen HTTP 500 `no_game_server`.
+
 Deploy-palvelin käynnistää ja valvoo pelipalvelinprosesseja. Sillä on kaksi reittiä eikä **lainkaan
 tunnistautumista**. Kumpikin vastaa 403 jokaiselle kutsujalle, joka ei ole loopbackissa tai jonka
 pyynnössä on välitysotsake, ja palvelu sitoutuu oletuksena osoitteeseen `127.0.0.1`. Yhdyskäytävällä

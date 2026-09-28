@@ -9,6 +9,7 @@ import TrialsHardHuntTable from "../vendor/trials_hard_table.json";
 import TrialsEliteHuntTable from "../vendor/trials_elite_table.json";
 import { kill } from "node:process";
 import { logger } from "../logger";
+import { CapacityUnavailable, memoryAdmission } from './capacity';
 
 const RAMSGATE_MAP_PATH = "/Game/Maps/ramsgate/ramsgate_01_persistent";
 const TRAINING_DOJO_MAP_PATH = "/Game/Maps/islands/dojo/training_dojo_persistent";
@@ -157,6 +158,9 @@ async function StartServer(Map: string, Behemoth: string | undefined, Matchmaker
     ServerLaunchQueue = ServerLaunchQueue.catch(() => {}).then(async () => await setTimeout(SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP * 1000));
 
     await LaunchProc;
+
+    if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
+    const ReleaseReservation = memoryAdmission.reserve();
     
     let Port;
 
@@ -173,7 +177,8 @@ async function StartServer(Map: string, Behemoth: string | undefined, Matchmaker
     const Id = crypto.randomUUID();
 
     if(Port == undefined){
-        throw new Error("No free ports left!");
+        ReleaseReservation();
+        throw new CapacityUnavailable('ports');
     }
 
     const IsHunt = !IsRamsgate && !IsTrainingDojo;
@@ -196,6 +201,7 @@ async function StartServer(Map: string, Behemoth: string | undefined, Matchmaker
         });
     }
     catch(error){
+        ReleaseReservation();
         if(IsHunt){
             FreePorts.push(Port);
         }
@@ -206,8 +212,9 @@ async function StartServer(Map: string, Behemoth: string | undefined, Matchmaker
 
     // A process that cannot be started (a wrong GAMESERVER_BINARY_PATH, a missing file) reports it
     // as an "error" event. Without a listener that event took the whole deploy server down.
-    Child.on("error", (error) => logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`));
+    Child.on("error", (error) => { ReleaseReservation(); logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`); });
     Child.on("exit", (Code, Signal) => {
+        ReleaseReservation();
         const Line = `Game server on port ${Port} (pid ${Child.pid}) exited ${Signal != null ? `on ${Signal}` : `with code ${Code}`}`;
 
         if(Code === 0){
@@ -224,6 +231,7 @@ async function StartServer(Map: string, Behemoth: string | undefined, Matchmaker
     // hunt's port goes back to the pool and the caller (the matchmaking call) gets an error, which the
     // metagame reports to the player as FAILED instead of an address nothing listens on.
     if(Child.pid === undefined){
+        ReleaseReservation();
         if(IsHunt){
             FreePorts.push(Port);
         }

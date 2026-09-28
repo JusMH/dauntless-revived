@@ -49,6 +49,7 @@ beforeEach(() => {
     ResetMatchmakingForTests();
     Deploy.Calls.length = 0;
     Deploy.Fail = false;
+    Deploy.Capacity = false;
     Deploy.DelayMs = 0;
     Deploy.NextHuntPort = 8775;
 });
@@ -67,6 +68,21 @@ async function FormParty(Leader: string, ...Members: string[]){
 }
 
 describe("a party of one (every player on their own)", () => {
+    it('a whole party waits for capacity and retries once with members still present', async () => {
+        await FormParty(B, A, C);
+        Deploy.Capacity = true;
+        await HandlePlayerMatchmaking('ISLAND', '', HUNT, B);
+        assert.equal((await CheckAndUpdateQueueStatus(A))?.Ready, false);
+        assert.equal(Deploy.Calls.length, 1);
+        LeaveParty(C);
+        Advance(11);
+        Deploy.Capacity = false;
+        await Promise.all([CheckAndUpdateQueueStatus(A), CheckAndUpdateQueueStatus(B)]);
+        assert.equal(Deploy.Calls.length, 2);
+        assert.deepEqual([...Deploy.Calls[1].ExpectedPlayers].sort(), [A, B].sort());
+        assert.equal((await CheckAndUpdateQueueStatus(A))?.Ready, true);
+        assert.equal((await CheckAndUpdateQueueStatus(B))?.Ready, true);
+    });
     it("answers the old stub's reply, with a UUID party id and the account's name", async () => {
         const Reply = await PollParty(A) as any;
 

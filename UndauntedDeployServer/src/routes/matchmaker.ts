@@ -4,6 +4,7 @@ import { HandleMatchmakingRequest } from "../controllers/matchmaker";
 import { CheckMatchmakingRequest } from "../controllers/matchmakinginput";
 import { IsDirectLoopbackRequest } from "./gameservers";
 import express from "express";
+import { CapacityUnavailable } from '../controllers/capacity';
 
 export const matchmakingRouter = Router();
 
@@ -39,6 +40,11 @@ matchmakingRouter.post("/handle-matchmaking-for-player", express.json(), async (
         MatchmakingResult = await HandleMatchmakingRequest(GameMode, GameArgs, HuntId, ExpectedPlayers);
     }
     catch(error){
+        if (error instanceof CapacityUnavailable) {
+            res.setHeader('Retry-After', '10');
+            res.status(503).json({error: 'capacity_unavailable', reason: error.reason});
+            return;
+        }
         // No free port, or a game server that could not be started: the metagame answers the player FAILED
         logger.error(`Matchmaking for ${GameMode} ${HuntId ?? ""} failed: ${error instanceof Error ? error.message : String(error)}`);
 

@@ -377,6 +377,28 @@ reason every 10 minutes. Message text, tokens, login payloads and request header
 
 ## Deploy server (`UndauntedDeployServer/`) {#deploy-server}
 
+### Memory admission
+
+Before starting any new game process, the deploy server requires free physical RAM for both
+`GAMESERVER_MIN_FREE_MB` (default 3072 MiB of headroom) and `GAMESERVER_STARTUP_MB` (default
+1536 MiB estimated startup memory). Each successful admission reserves that allowance for
+`GAMESERVER_RESERVATION_SECONDS` (default 60), so simultaneous launches cannot all claim it.
+Reservations end early if spawning fails or the process exits. Values must be positive integers;
+invalid values refuse the launch. `GAMESERVER_MEMORY_GUARD=0` disables the check for rollback.
+Defaults require at least 4608 MiB free with no reservations. These are conservative estimates,
+not a guarantee against later memory growth; tune from measured VPS usage. During startup the
+reservation can overlap memory already charged by Windows, deliberately erring toward waiting.
+Existing worlds are never killed by this guard and can still be joined. A missing Ramsgate or
+Dojo also waits for memory before it can be restarted.
+
+Capacity shortages (RAM or hunt ports) return a distinct 503 to the metagame. Active matchmaking
+status polls retry at most once every ten seconds per candidate/queue, for up to five minutes,
+then report FAILED. There are no background launches or guaranteed FIFO ordering. A full four-player
+hunt queue refuses further joins until resolved. Normal startup failures still fail immediately.
+The existing `MATCHMAKING_CANCEL` switch still controls in-game cancellation; this change does not
+enable it because the client also emits automatic cancel requests during normal joins.
+Update both server packages together. No database migration is involved.
+
 Starts and watches the game-server processes when the metagame asks. A worked `.env` is in
 [Host a server]({{ host_page.url | relative_url }}#deploy-server).
 

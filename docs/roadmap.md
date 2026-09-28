@@ -721,6 +721,7 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
   - **Done when:** a week of logs fits in a few MB and the report fits on one screen.
 
 - [ ] **4.3 Memory and capacity guards** (M)
+  - **Update 2026-09-28:** memory admission now runs before every new world process, default on. It keeps 3072 MiB headroom plus a 1536 MiB startup reservation held for 60 seconds (configurable). Existing worlds remain running and joinable. RAM/port shortages give active candidates a ten-second retry cadence, up to five minutes, rather than an invalid destination. Solo, tutorial, hunt-queue and party paths are covered by automated tests, including a departing party member. This is not yet verified in game on the VPS. Runtime process-killing thresholds below are still unimplemented; no running world is killed by the admission guard. Cancellation still depends on the existing `MATCHMAKING_CANCEL` switch. Capacity ordering is not FIFO.
   - **What:**
     - Kill a hunt server over about 2.5 GB, or Ramsgate over about 3 GB, after two readings in a row.
     - Refuse to start a new server when free memory is under 3 GB or no port is free.

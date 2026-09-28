@@ -4184,6 +4184,28 @@ reason every 10 minutes. Message text, tokens, login payloads and request header
 
 ## Deploy server (`UndauntedDeployServer/`)
 
+### Memory admission
+
+Before starting any new game process, the deploy server requires free physical RAM for both
+`GAMESERVER_MIN_FREE_MB` (default 3072 MiB of headroom) and `GAMESERVER_STARTUP_MB` (default
+1536 MiB estimated startup memory). Each successful admission reserves that allowance for
+`GAMESERVER_RESERVATION_SECONDS` (default 60), so simultaneous launches cannot all claim it.
+Reservations end early if spawning fails or the process exits. Values must be positive integers;
+invalid values refuse the launch. `GAMESERVER_MEMORY_GUARD=0` disables the check for rollback.
+Defaults require at least 4608 MiB free with no reservations. These are conservative estimates,
+not a guarantee against later memory growth; tune from measured VPS usage. During startup the
+reservation can overlap memory already charged by Windows, deliberately erring toward waiting.
+Existing worlds are never killed by this guard and can still be joined. A missing Ramsgate or
+Dojo also waits for memory before it can be restarted.
+
+Capacity shortages (RAM or hunt ports) return a distinct 503 to the metagame. Active matchmaking
+status polls retry at most once every ten seconds per candidate/queue, for up to five minutes,
+then report FAILED. There are no background launches or guaranteed FIFO ordering. A full four-player
+hunt queue refuses further joins until resolved. Normal startup failures still fail immediately.
+The existing `MATCHMAKING_CANCEL` switch still controls in-game cancellation; this change does not
+enable it because the client also emits automatic cancel requests during normal joins.
+Update both server packages together. No database migration is involved.
+
 Starts and watches the game-server processes when the metagame asks. A worked `.env` is in
 [Host a server](https://mixutin.github.io/dauntless-revived/setup/host.html#deploy-server).
 
@@ -5673,6 +5695,11 @@ messages) gets `<message type="error">` with `<not-acceptable/>`; the connection
 [Login and accounts](https://mixutin.github.io/dauntless-revived/reference/api.html#login-and-accounts)).
 
 ## Deploy server
+
+Allocation capacity shortages now return HTTP 503 with
+`{"error":"capacity_unavailable","reason":"memory"}` (or `"ports"`) and `Retry-After: 10`.
+The metagame keeps the candidate MATCHING and retries on active status polls with a five-minute
+limit. This response is distinct from HTTP 500 `no_game_server` for an actual launch failure.
 
 The deploy server starts and watches the game-server processes. It has two routes and **no
 authentication**. Both answer 403 to any caller that is not on loopback or that carries a proxy
@@ -15073,6 +15100,7 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
   - **Done when:** a week of logs fits in a few MB and the report fits on one screen.
 
 - [ ] **4.3 Memory and capacity guards** (M)
+  - **Update 2026-09-28:** memory admission now runs before every new world process, default on. It keeps 3072 MiB headroom plus a 1536 MiB startup reservation held for 60 seconds (configurable). Existing worlds remain running and joinable. RAM/port shortages give active candidates a ten-second retry cadence, up to five minutes, rather than an invalid destination. Solo, tutorial, hunt-queue and party paths are covered by automated tests, including a departing party member. This is not yet verified in game on the VPS. Runtime process-killing thresholds below are still unimplemented; no running world is killed by the admission guard. Cancellation still depends on the existing `MATCHMAKING_CANCEL` switch. Capacity ordering is not FIFO.
   - **What:**
     - Kill a hunt server over about 2.5 GB, or Ramsgate over about 3 GB, after two readings in a row.
     - Refuse to start a new server when free memory is under 3 GB or no port is free.

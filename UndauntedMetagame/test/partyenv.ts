@@ -30,6 +30,7 @@ export function UsePartyEnv(DeployPort: number){
 export type RecordingDeploy = {
     Calls: any[],
     Fail: boolean,
+    Capacity?: boolean,
     DelayMs: number,
     NextHuntPort: number,
     Close: () => Promise<void>
@@ -53,6 +54,11 @@ export function StartRecordingDeploy(Port: number): Promise<RecordingDeploy> {
             Deploy.Calls.push(Parsed);
 
             setTimeout(() => {
+                if (Deploy.Capacity) {
+                    res.writeHead(503, {'content-type': 'application/json'});
+                    res.end(JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}));
+                    return;
+                }
                 if(Deploy.Fail){
                     res.writeHead(500);
                     res.end();

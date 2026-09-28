@@ -795,6 +795,11 @@ messages) gets `<message type="error">` with `<not-acceptable/>`; the connection
 
 ## Deploy server {#deploy-server}
 
+Allocation capacity shortages now return HTTP 503 with
+`{"error":"capacity_unavailable","reason":"memory"}` (or `"ports"`) and `Retry-After: 10`.
+The metagame keeps the candidate MATCHING and retries on active status polls with a five-minute
+limit. This response is distinct from HTTP 500 `no_game_server` for an actual launch failure.
+
 The deploy server starts and watches the game-server processes. It has two routes and **no
 authentication**. Both answer 403 to any caller that is not on loopback or that carries a proxy
 header, and the service binds `127.0.0.1` by default. The gateway has no route to it. **Never open

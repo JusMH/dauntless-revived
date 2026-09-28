@@ -393,6 +393,23 @@ Viestien tekstiä, tunnisteita, kirjautumistietoja tai pyyntöjen otsakkeita ei 
 
 ## Deploy-palvelin (`UndauntedDeployServer/`) {#deploy-server}
 
+### Muistin tarkistus ennen käynnistystä
+
+Uusi peliprosessi vaatii vapaata fyysistä RAM-muistia vähintään `GAMESERVER_MIN_FREE_MB`
+(oletus 3072 MiB) sekä `GAMESERVER_STARTUP_MB` (1536 MiB käynnistysvaraus).
+Varaus kestää `GAMESERVER_RESERVATION_SECONDS` sekuntia (60), jotta rinnakkaiset käynnistykset
+eivät varaa samaa muistia. Virhe tai prosessin poistuminen vapauttaa varauksen aikaisemmin.
+Arvojen on oltava positiivisia kokonaislukuja. `GAMESERVER_MEMORY_GUARD=0` poistaa tarkistuksen.
+Oletuksena tarvitaan 4608 MiB vapaata ilman muita varauksia. Rajat ovat varovaisia arvioita;
+ne eivät estä myöhempää muistinkulutuksen kasvua. Käynnistyksen aikana varaus voi laskea jo
+käytetyn muistin toistamiseen. Käynnissä olevia maailmoja ei lopeteta ja niihin voi liittyä.
+
+Muistin tai porttien loppuminen tuottaa metagamelle erillisen 503-vastauksen. Odottavien pelaajien
+tilakysely yrittää uudelleen enintään kymmenen sekunnin välein, viiden minuutin ajan; sitten FAILED.
+Taustakäynnistyksiä tai taattua FIFO-järjestystä ei ole. Neljän pelaajan täysi jono torjuu lisäliittyjät.
+`MATCHMAKING_CANCEL` ohjaa edelleen peruutusta; sitä ei oteta automaattisesti käyttöön.
+Päivitä molemmat palvelinpaketit yhdessä. Tietokantamuutoksia ei tarvita.
+
 Käynnistää ja valvoo pelipalvelinprosesseja, kun metagame pyytää. Valmis `.env` on sivulla
 [Pystytä palvelin]({{ host_page.url | relative_url }}#deploy-server).
 

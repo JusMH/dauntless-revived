@@ -89,6 +89,18 @@ after(() => {
 });
 
 describe("Ramsgate", () => {
+    it('low memory blocks new worlds before spawn without consuming hunt ports or stopping Ramsgate', async () => {
+        await Startup();
+        process.env.GAMESERVER_MEMORY_GUARD = '1';
+        process.env.GAMESERVER_MIN_FREE_MB = '999999999';
+        try {
+            assert.deepEqual(await GetRamsgateConnectionDetails(), {host: '127.0.0.1', port: 8777});
+            await assert.rejects(GetTrainingDojoConnectionDetails(), /capacity unavailable: memory/);
+            await assert.rejects(StartupGameserverWithArgs(TUTORIAL_ARGS), /capacity unavailable: memory/);
+            assert.equal(Spawned.length, 1);
+            assert.deepEqual(GameserverStateForTests().FreePorts, HUNT_POOL);
+        } finally { process.env.GAMESERVER_MEMORY_GUARD = '0'; delete process.env.GAMESERVER_MIN_FREE_MB; }
+    });
     it("starts once at boot and is handed out without another start while it runs", async () => {
         await Startup();
 

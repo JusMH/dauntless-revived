@@ -22,6 +22,8 @@ const QUEUE_WAIT_MS = 20 * 1000;
 const QUEUE_FULL_PLAYERS = 4;
 
 type MatchmakingQueueData = {
+    RetryAfter?: number,
+    CapacityDeadline?: number,
     Players: string[],         // distinct account ids, in join order: a player is in at most one queue
     LastPlayerAddedTime: number, // PartyNow(), the clock the rest of matchmaking uses
     Resolved: boolean
@@ -40,6 +42,7 @@ export type MatchmakingResult = {
 };
 
 type LaunchResult = {
+    capacity?: boolean,
     succeeded: boolean,
     readyNow: boolean,
     host: string,
@@ -50,6 +53,24 @@ let MatchmakingQueueMap: Map<string, MatchmakingQueueData> = new Map<string, Mat
 let MatchmakingResultMap: Map<string, MatchmakingResult> = new Map<string, MatchmakingResult>(); // Key is PlayerID
 // The server each player was last told to travel to (the status poll's IN_PROGRESS)
 const LastSentMap = new Map<string, { Host: string, Port: number, HuntId: string, At: number }>();
+
+type CapacityWait = { next: number, deadline: number, busy: boolean, retry: () => Promise<boolean> };
+const CapacityWaits = new Map<string, CapacityWait>();
+function ParkCapacity(CandidateId: string, retry: () => Promise<boolean>) {
+    // No background launches: only an active candidate's status poll can retry.
+    for (const [id, wait] of CapacityWaits) {
+        const entries = [...MatchmakingResultMap.entries()].filter(([, entry]) => entry.CandidateId === id && !entry.Failed && !entry.Ready);
+        if (wait.deadline < PartyNow()) for (const [player, entry] of entries) {
+            entry.Failed = true;
+            const party = GetPartyOf(player);
+            if (party) ClearPartyCandidate(party, id, 'capacity wait expired');
+        }
+        if (wait.deadline < PartyNow() || entries.length === 0) CapacityWaits.delete(id);
+    }
+    if (CapacityWaits.size >= 1000) return false;
+    CapacityWaits.set(CandidateId, {next: PartyNow() + 10000, deadline: PartyNow() + 300000, busy: false, retry});
+    return true;
+}
 
 function HuntIdRequiresMatchmaking(HuntId: string){
     return !HuntId.includes("Ramsgate") && !HuntId.includes("Dojo");
@@ -98,6 +119,13 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
         return Failed;
     }
 
+    if (MatchmakingResult.status === 503) {
+        try {
+            const body = await MatchmakingResult.json();
+            if (body?.error === 'capacity_unavailable' && ['memory', 'ports'].includes(body.reason)) return {...Failed, capacity: true};
+        } catch {}
+        return Failed;
+    }
     if(MatchmakingResult.status === 200){
         let MatchmakingData: any;
 
@@ -141,13 +169,24 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
 async function PopQueue(HuntId: string){
     const MatchmakingQueue = MatchmakingQueueMap.get(HuntId);
 
-    if(MatchmakingQueue == undefined || MatchmakingQueue.Resolved){
+    if(MatchmakingQueue == undefined || MatchmakingQueue.Resolved || (MatchmakingQueue.RetryAfter ?? 0) > PartyNow()){
         return;
     }
 
     MatchmakingQueue.Resolved = true;
 
-    const GameOnDeployServer = await LaunchGameOnDeployserver("ISLAND", "", HuntId, MatchmakingQueue.Players);
+    const GameOnDeployServer: LaunchResult = MatchmakingQueue.CapacityDeadline !== undefined && PartyNow() >= MatchmakingQueue.CapacityDeadline
+        ? {succeeded: false, readyNow: false, host: '', port: 0}
+        : await LaunchGameOnDeployserver("ISLAND", "", HuntId, MatchmakingQueue.Players);
+
+    if (GameOnDeployServer.capacity) {
+        MatchmakingQueue.CapacityDeadline ??= PartyNow() + 300000;
+        if (PartyNow() < MatchmakingQueue.CapacityDeadline) {
+            MatchmakingQueue.Resolved = false;
+            MatchmakingQueue.RetryAfter = PartyNow() + 10000;
+            return;
+        }
+    }
 
     for(const Player of MatchmakingQueue.Players){
         const PlayerMatchmakingResultToUpdate = MatchmakingResultMap.get(Player);
@@ -181,6 +220,22 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
         return undefined;
     }
 
+    const waiting = CapacityWaits.get(PlayerMatchmakingResult.CandidateId);
+    if (waiting) {
+        if (PartyNow() >= waiting.deadline) {
+            CapacityWaits.delete(PlayerMatchmakingResult.CandidateId);
+            for (const entry of MatchmakingResultMap.values()) if (entry.CandidateId === PlayerMatchmakingResult.CandidateId) entry.Failed = true;
+            const party = GetPartyOf(PlayerId);
+            if (party) ClearPartyCandidate(party, PlayerMatchmakingResult.CandidateId, 'capacity wait expired');
+        } else if (!waiting.busy && PartyNow() >= waiting.next) {
+            waiting.busy = true;
+            waiting.next = PartyNow() + 10000;
+            try { if (await waiting.retry()) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }
+            finally { waiting.busy = false; }
+        }
+        return PlayerMatchmakingResult;
+    }
+
     // Party candidates have no queue: the leader's join started their server already
     if(!PlayerMatchmakingResult.Ready && !PlayerMatchmakingResult.Failed && !PlayerMatchmakingResult.PartyCandidate){
         const MatchmakingQueue = MatchmakingQueueMap.get(PlayerMatchmakingResult.HuntId);
@@ -192,7 +247,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
             return PlayerMatchmakingResult;
         }
 
-        if(PartyNow() - MatchmakingQueue.LastPlayerAddedTime > QUEUE_WAIT_MS){
+        if(PartyNow() - MatchmakingQueue.LastPlayerAddedTime > QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
             await PopQueue(PlayerMatchmakingResult.HuntId);
         }
     }
@@ -204,7 +259,8 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
 // Right now we handle this by failing all new players until the old party is cleared out
 // This can be MUCH better in the future
 async function QueuePlayer(HuntId: string, PlayerId: string){
-    if(MatchmakingQueueMap.get(HuntId)?.Resolved){
+    const ExistingQueue = MatchmakingQueueMap.get(HuntId);
+    if(ExistingQueue?.Resolved || (ExistingQueue && ExistingQueue.Players.length >= QUEUE_FULL_PLAYERS && !ExistingQueue.Players.includes(PlayerId))){
         return false;
     }
 
@@ -508,8 +564,16 @@ async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: st
 
     logger.info(`mm: party P=${TheParty.PartyId} candidate ${CandidateId} mode=${GameMode} hunt=${HuntId} members=${Members.join(",")} by=${LeaderId}`);
 
-    const Launch = LaunchGameOnDeployserver(GameMode, "", HuntId, GameMode === "ISLAND" ? Members : undefined)
-        .then((Game) => FinishPartyCandidate(TheParty, CandidateId, Members, Game))
+    const TryLaunch = async () => {
+        const Active = Members.filter(member => MatchmakingResultMap.get(member)?.CandidateId === CandidateId && TheParty.Members.includes(member));
+        if (TheParty.Candidate?.CandidateId !== CandidateId || Active.length === 0) return true;
+        const Game = await LaunchGameOnDeployserver(GameMode, '', HuntId, GameMode === 'ISLAND' ? Active : undefined);
+        if (Game.capacity) return false;
+        await FinishPartyCandidate(TheParty, CandidateId, Active, Game);
+        return true;
+    };
+    const Launch = TryLaunch()
+        .then(async done => { if (!done && !ParkCapacity(CandidateId, TryLaunch)) await FinishPartyCandidate(TheParty, CandidateId, Members, {succeeded: false, readyNow: false, host: '', port: 0}); })
         .catch((error) => logger.error(`mm: party candidate ${CandidateId} launch failed: ${(error as Error)?.message}`));
 
     let Timer: NodeJS.Timeout | undefined;
@@ -700,14 +764,25 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
 
             const GameOnDeployServer = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined);
 
-            MatchmakingResultMap.set(PlayerId, {
+            const Entry: MatchmakingResult = {
                 Ready: GameOnDeployServer.succeeded,
                 CandidateId: crypto.randomUUID(),
                 HuntId: HuntId,
                 Host: GameOnDeployServer.host,
                 Port: GameOnDeployServer.port,
-                Failed: GameOnDeployServer.succeeded ? undefined : true
-            });
+                Failed: GameOnDeployServer.succeeded || GameOnDeployServer.capacity ? undefined : true
+            };
+            MatchmakingResultMap.set(PlayerId, Entry);
+            if (GameOnDeployServer.capacity) {
+                const parked = ParkCapacity(Entry.CandidateId, async () => {
+                    if (MatchmakingResultMap.get(PlayerId) !== Entry) return true;
+                    const result = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined);
+                    if (result.capacity) return false;
+                    if (MatchmakingResultMap.get(PlayerId) === Entry) Object.assign(Entry, {Ready: result.succeeded, Host: result.host, Port: result.port, Failed: !result.succeeded});
+                    return true;
+                });
+                if (!parked) Entry.Failed = true;
+            }
 
             return true;
         }
@@ -724,6 +799,7 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
 
 // Tests only
 export function ResetMatchmakingForTests(){
+    CapacityWaits.clear();
     MatchmakingQueueMap.clear();
     MatchmakingResultMap.clear();
     LastSentMap.clear();

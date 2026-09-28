@@ -152,6 +152,49 @@ async function JoinAll(ThePath: Path){
 }
 
 describe("matchmaking when the deploy server starts no game server", () => {
+    it('capacity waits retry once after ten seconds and reach the same server on every path', async () => {
+        const { SetPartyClockForTests } = await import('../src/controllers/party');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            for (const path of PATHS) {
+                Calls.length = 0;
+                CurrentMode = {Name: 'memory full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))};
+                const players = await JoinAll(path);
+                for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'MATCHING');
+                assert.equal(Calls.length, 1);
+                if (path.Players === 4) {
+                    const { HandlePlayerMatchmaking } = await import('../src/controllers/matchmaking');
+                    assert.equal(await HandlePlayerMatchmaking('ISLAND', '', Calls[0].HuntId, 'UID-fifth-capacity'), false);
+                }
+                CurrentMode = WORKING;
+                now += 10001;
+                for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'IN_PROGRESS');
+                assert.equal(Calls.length, 2);
+            }
+        } finally { SetPartyClockForTests(); }
+    });
+    it('a waiting solo candidate can be cancelled without launching when capacity returns', async () => {
+        const { CancelMatchmaking } = await import('../src/controllers/matchmaking');
+        CurrentMode = {Name: 'ports full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'ports'}))};
+        const [player] = await JoinAll(PATHS[1]);
+        CancelMatchmaking(player.UserId);
+        const { CheckAndUpdateQueueStatus } = await import('../src/controllers/matchmaking');
+        assert.equal(await CheckAndUpdateQueueStatus(player.UserId), undefined);
+        assert.equal(Calls.length, 1);
+    });
+    it('capacity waiting is bounded at five minutes', async () => {
+        const { SetPartyClockForTests } = await import('../src/controllers/party');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            CurrentMode = {Name: 'memory full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))};
+            const [player] = await JoinAll(PATHS[1]);
+            now += 300001;
+            assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'FAILED');
+            assert.equal(Calls.length, 1);
+        } finally { SetPartyClockForTests(); }
+    });
     // from Harmonicrain/Undaunted test/matchmaking.test.js:37
     it("a successful start sends every player to the returned address (IN_PROGRESS)", async () => {
         for(const ThePath of PATHS){
