@@ -4033,6 +4033,11 @@ could not be loaded: <reason>`, exit code 1), before the database is opened.
 
 ### Logging
 
+`BACKEND_HEALTH=1` enables optional aggregate request metrics and a 20 ms event-loop-delay monitor.
+Default off; restart the metagame after changing it. The owner-only `/undaunted/api/BackendHealth`
+route returns 404 when disabled. Memory is bounded to 60 one-second request buckets; no request
+URLs, bodies or account identifiers are retained. See `tools/DASHBOARD.md` for dashboard setup.
+
 | Name | Default | Values | What it does | Set by |
 |:-----|:--------|:-------|:-------------|:-------|
 | `LOG_LEVEL` | `info` (also when empty) | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | Log threshold. | Nobody by default |
@@ -5821,6 +5826,17 @@ gateway. The connection is pinned to the certificate fingerprint from the invite
 public-mode path, from the game to the relay, the gateway and the game ports.
 
 ## Examples
+
+### Owner backend health
+
+`GET /undaunted/api/BackendHealth` requires the direct administrator key; forwarded requests are
+refused. Separate limit: 120 calls per minute per address. It returns 404 unless `BACKEND_HEALTH=1`.
+The no-store response includes uptime, RSS/heap MB, completed requests, 4xx/5xx errors, aborted
+responses, requests/second and approximate p50/p95 latency upper bounds over 60 second buckets.
+Empty percentiles are null; values above the histogram ceiling are `">5000"`. Dashboard polls are
+excluded. Event-loop p50/p95/max milliseconds cover the time since monitoring started, sampled
+at 20 ms resolution. `bans: {supported: false, count: null}` means banning is not implemented.
+Database timing is not included. The dashboard uses this endpoint every five seconds when available.
 
 Put a time limit on every call, so a wrong listener fails fast (see
 [Troubleshooting](https://mixutin.github.io/dauntless-revived/setup/troubleshooting.html#invoke-restmethod-hangs)).
@@ -15191,6 +15207,12 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
 - [ ] **4.18 Owner dashboard** — *Built 2026-09-28 as a separate opt-in Node process (`tools/dashboard.mjs`): five-second CPU/RAM and player graphs, protected player/world lists, account totals, newly observed accounts since startup, and bounded on-demand log tails. Loopback only; owner key required for data; remote access through SSH. One hour of memory-only history. See `tools/DASHBOARD.md`. Not yet tried on the VPS. Historical registrations, persistent metrics and actual game ping remain future work.*
 
 - [ ] **4.19 Multi-region server coordination** — *Deferred until additional hosts are needed. Design authenticated communication between regional deploy servers and matchmaking, shared account/save ownership, region selection, host health/capacity reporting, and routing players to available game instances. Establish database consistency, outage handling and deployment boundaries before adding regional hosts; a web load balancer alone cannot distribute existing game sessions. No runtime changes enabled.*
+
+Dashboard update, 2026-09-28 (4.12/4.18): optional `BACKEND_HEALTH=1` now supplies aggregate
+60-second request/error/latency metrics and event-loop delay, plus backend memory and uptime.
+The dashboard separates host/backend/dashboard uptime and Ramsgate/hunt/Dojo/tutorial/menu counts.
+Banning is not implemented and is labeled unavailable. Database timing, persistent history and
+live VPS validation remain open.
 
 ## Decisions only you can make
 

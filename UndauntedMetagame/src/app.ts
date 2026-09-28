@@ -1,4 +1,5 @@
 import express from "express";
+import { TrackBackendHealth } from './middleware/BackendHealth';
 import { loginRouter } from "./routes/login.js";
 import { logger } from "./logger.js";
 import { eosRouter } from "./routes/eos.js";
@@ -20,6 +21,7 @@ import { DescribeOrigin, RefuseProxiedInDevAuthMode } from "./middleware/Request
 import { BodyLog, Redact } from "./middleware/BodyLog.js";
 
 export const app = express();
+app.use(TrackBackendHealth);
 
 // Development logins (AUTH_MODE=NONE) never answer anything relayed by the gateway or
 // another proxy; a no-op with AUTH_MODE=APIKEY. See middleware/RequestOrigin.ts.

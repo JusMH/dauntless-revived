@@ -19,9 +19,16 @@ import { SendOrAcceptFriendRequest } from "../controllers/friends";
 import { DisbandGuildAsAdmin, GuildNameOf, InviteToGuild, ListGuilds } from "../controllers/guild";
 import { RefuseAdminKeyThroughProxy } from "../middleware/RequestOrigin";
 import { IsSoftRegisteredCaller, SoftAccountAuth } from "../middleware/SoftAccountAuth";
-import { AdminMutationRateLimit } from "../middleware/RateLimits";
+import { AdminMutationRateLimit, HealthReadRateLimit } from "../middleware/RateLimits";
+import { BackendHealthEnabled, BackendRuntimeHealth } from '../middleware/BackendHealth';
 
 export const undauntedApiRouter = Router();
+
+undauntedApiRouter.get('/BackendHealth', HealthReadRateLimit, HasUndauntedAdminApiKey, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!BackendHealthEnabled()) { res.status(404).json({error: 'health_disabled'}); return; }
+    res.json(BackendRuntimeHealth());
+});
 
 function StatusForRollbackError(Error: RollbackError){
     switch(Error){

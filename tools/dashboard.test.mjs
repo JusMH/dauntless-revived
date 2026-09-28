@@ -22,7 +22,9 @@ test('dashboard isolates owner data and only polls read routes', async () => {
     assert.equal(data.sample.players[0].name, 'Tester');
     assert.equal(JSON.stringify(data).includes(key), false);
     assert.equal((await fetch(base + '/api/log?name=../../secrets', {headers: {'x-dashboard-key': key}})).status, 404);
-    assert.deepEqual(routes.sort(), ['/undaunted/api/GetAllUsers', '/undaunted/api/ServerStatus']);
+    assert.equal(data.sample.locations.city, 1);
+    assert.equal(data.sample.locations.hunt, 0);
+    assert.deepEqual(routes.sort(), ['/undaunted/api/BackendHealth', '/undaunted/api/GetAllUsers', '/undaunted/api/ServerStatus']);
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
 test('redacts credential lines and caps log line count', () => {

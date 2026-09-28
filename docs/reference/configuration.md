@@ -226,6 +226,11 @@ could not be loaded: <reason>`, exit code 1), before the database is opened.
 
 ### Logging {#metagame-logging}
 
+`BACKEND_HEALTH=1` enables optional aggregate request metrics and a 20 ms event-loop-delay monitor.
+Default off; restart the metagame after changing it. The owner-only `/undaunted/api/BackendHealth`
+route returns 404 when disabled. Memory is bounded to 60 one-second request buckets; no request
+URLs, bodies or account identifiers are retained. See `tools/DASHBOARD.md` for dashboard setup.
+
 | Name | Default | Values | What it does | Set by |
 |:-----|:--------|:-------|:-------------|:-------|
 | `LOG_LEVEL` | `info` (also when empty) | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | Log threshold. | Nobody by default |

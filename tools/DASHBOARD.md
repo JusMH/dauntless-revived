@@ -26,6 +26,19 @@ only the VPS owner should use this page. The dashboard is not automatically star
 
 ## Readings
 
+For backend metrics set `BACKEND_HEALTH=1` in the metagame's private `.env`, then restart the
+metagame during a maintenance window. The default is off. The dashboard keeps working with
+an older backend or disabled health route, labeling those readings unavailable.
+The owner-only `GET /undaunted/api/BackendHealth` supplies backend uptime, RSS/heap memory,
+completed responses per second, 4xx/5xx counts, aborted responses and latency percentiles.
+Request figures cover the last 60 one-second buckets; percentile values are approximate histogram
+upper bounds, with `>5000` for the overflow bucket. Monitoring polls are excluded. Event-loop
+delay is sampled at 20 ms resolution, with percentiles since monitoring started (not a rolling minute).
+No URL, body, token or player identifier is retained by this instrumentation. Database query timing
+is not yet instrumented. VPS, backend and dashboard uptimes are shown separately.
+Player counts split Ramsgate, hunts, Dojo, tutorial, menu and unknown locations. Bans display
+**not implemented** because there is no backend ban model or enforcement; no ban actions are added.
+
 CPU and used/total physical RAM describe the machine running the dashboard. Samples arrive every
 five seconds. The process holds at most 720 samples (one hour), shared by every open browser.
 It skips overlapping backend polls, uses three-second request timeouts and does not retry rapidly.

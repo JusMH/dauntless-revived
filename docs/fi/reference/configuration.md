@@ -238,6 +238,12 @@ ennen kuin tietokanta avataan.
 
 ### Lokit {#metagame-logging}
 
+`BACKEND_HEALTH=1` ottaa käyttöön pyyntöjen koontimittarit ja tapahtumasilmukan viiveen mittauksen
+20 ms tarkkuudella. Oletus pois; käynnistä metagame uudelleen muutoksen jälkeen.
+Ylläpitäjän `/undaunted/api/BackendHealth` vastaa 404, kun mittaus on pois.
+Muistiin jää enintään 60 sekuntikohtaista laskuria, ei URL-osoitteita, pyyntöjen sisältöä tai tilitunnuksia.
+Näkymän ohje: `tools/DASHBOARD.md`.
+
 | Nimi | Oletus | Arvot | Mitä se tekee | Kuka asettaa |
 |:-----|:-------|:------|:--------------|:-------------|
 | `LOG_LEVEL` | `info` (myös tyhjänä) | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | Lokitaso. | Oletuksena ei kukaan |

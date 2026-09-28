@@ -948,6 +948,17 @@ public-mode path, from the game to the relay, the gateway and the game ports.
 
 ## Examples {#examples}
 
+### Owner backend health
+
+`GET /undaunted/api/BackendHealth` requires the direct administrator key; forwarded requests are
+refused. Separate limit: 120 calls per minute per address. It returns 404 unless `BACKEND_HEALTH=1`.
+The no-store response includes uptime, RSS/heap MB, completed requests, 4xx/5xx errors, aborted
+responses, requests/second and approximate p50/p95 latency upper bounds over 60 second buckets.
+Empty percentiles are null; values above the histogram ceiling are `">5000"`. Dashboard polls are
+excluded. Event-loop p50/p95/max milliseconds cover the time since monitoring started, sampled
+at 20 ms resolution. `bans: {supported: false, count: null}` means banning is not implemented.
+Database timing is not included. The dashboard uses this endpoint every five seconds when available.
+
 Put a time limit on every call, so a wrong listener fails fast (see
 [Troubleshooting]({{ trouble_page.url | relative_url }}#invoke-restmethod-hangs)).
 

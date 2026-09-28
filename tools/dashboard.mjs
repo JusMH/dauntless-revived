@@ -53,6 +53,8 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, fet
         return response.json();
       };
       const [accounts, status] = await Promise.all([get('/undaunted/api/GetAllUsers'), get('/undaunted/api/ServerStatus')]);
+      let health = null;
+      try { health = await get('/undaunted/api/BackendHealth'); } catch { /* Older/disabled backends still show host readings. */ }
       if (!Array.isArray(accounts.Users) || !Array.isArray(status.players) || !Array.isArray(status.instances)) throw new Error('Unexpected backend response');
       const ids = new Set(accounts.Users.map(user => user.UserId));
       if (known) for (const id of ids) if (!known.has(id)) added++;
@@ -60,10 +62,13 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, fet
       const current = cpuTimes(), elapsed = current.total - previous.total;
       const cpu = elapsed > 0 ? 100 * (1 - (current.idle - previous.idle) / elapsed) : null;
       previous = current;
-      const point = {at: new Date().toISOString(), cpu, ramUsedMB: (os.totalmem() - os.freemem()) / 1048576, ramTotalMB: os.totalmem() / 1048576, players: status.playersOnline, accounts: ids.size, newAccountsObserved: added, backendMs: performance.now() - started};
+      const locations = {city: 0, hunt: 0, dojo: 0, tutorial: 0, menu: 0, unknown: 0};
+      for (const player of status.players) locations[Object.hasOwn(locations, player.where) ? player.where : 'unknown']++;
+      const point = {at: new Date().toISOString(), cpu, ramUsedMB: (os.totalmem() - os.freemem()) / 1048576, ramTotalMB: os.totalmem() / 1048576, players: status.playersOnline, accounts: ids.size, newAccountsObserved: added, backendMs: performance.now() - started,
+        requestsPerSecond: health?.requests?.requestsPerSecond ?? null, errorPercent: health?.requests?.serverErrorPercent ?? null, eventLoopP95Ms: health?.eventLoop?.p95Ms ?? null};
       history.push(point);
       if (history.length > 720) history.shift();
-      sample = { ...point, players: status.players, instances: status.instances, history, uptimeSeconds: status.uptimeSeconds, name: status.name };
+      sample = { ...point, players: status.players, instances: status.instances, history, uptimeSeconds: status.uptimeSeconds, hostUptimeSeconds: os.uptime(), dashboardUptimeSeconds: process.uptime(), locations, health, name: status.name };
       failure = null;
     } catch { failure = 'Backend unavailable or owner key rejected; last readings are stale.'; }
     finally { polling = false; }

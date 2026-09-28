@@ -998,6 +998,17 @@ julkisen tilan polun pelistä välittimen ja yhdyskäytävän kautta peliporttei
 
 ## Esimerkkejä {#examples}
 
+### Ylläpitäjän backend-mittarit
+
+`GET /undaunted/api/BackendHealth` vaatii suoran ylläpitoavaimen; välitetyt pyynnöt torjutaan.
+Erillinen raja: 120 pyyntöä minuutissa osoitetta kohti. Ilman `BACKEND_HEALTH=1` vastaus on 404.
+Vastaus sisältää käyntiajan, RSS-/heap-muistin, 60 sekunnin vastausmäärät, 4xx/5xx-virheet,
+keskeytykset, pyynnöt sekunnissa ja viiveen likimääräiset p50/p95-ylärajat millisekunteina.
+Tyhjä persentiili on null; yli 5000 ms on merkkijono `">5000"`. Näkymän kyselyjä ei lasketa.
+Tapahtumasilmukan p50/p95/maksimi kattaa mittauksen alusta kuluneen ajan, 20 ms tarkkuudella.
+`bans: {supported: false, count: null}` tarkoittaa, ettei porttikieltoja ole toteutettu.
+Tietokantakyselyjen ajoitusta ei vielä mitata. Näkymä kysyy mittarit viiden sekunnin välein.
+
 Aseta jokaiselle kutsulle aikaraja, jotta väärä kuuntelija epäonnistuu nopeasti (katso
 [Vianetsintä]({{ trouble_page.url | relative_url }}#invoke-restmethod-hangs)).
 
