@@ -833,6 +833,10 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
 
 ---
 
+- [ ] **4.18 Owner dashboard** — *Built 2026-09-28 as a separate opt-in Node process (`tools/dashboard.mjs`): five-second CPU/RAM and player graphs, protected player/world lists, account totals, newly observed accounts since startup, and bounded on-demand log tails. Loopback only; owner key required for data; remote access through SSH. One hour of memory-only history. See `tools/DASHBOARD.md`. Not yet tried on the VPS. Historical registrations, persistent metrics and actual game ping remain future work.*
+
+- [ ] **4.19 Multi-region server coordination** — *Deferred until additional hosts are needed. Design authenticated communication between regional deploy servers and matchmaking, shared account/save ownership, region selection, host health/capacity reporting, and routing players to available game instances. Establish database consistency, outage handling and deployment boundaries before adding regional hosts; a web load balancer alone cannot distribute existing game sessions. No runtime changes enabled.*
+
 ## Decisions only you can make
 
 1. **Owner's progression when it becomes real (2.13).** ✅ **Decided: fresh start.** A new player account with the owner's own username, registered through the launcher on the rented server, and a separate admin account for administration.

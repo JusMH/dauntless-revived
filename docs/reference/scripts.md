@@ -793,6 +793,23 @@ game's command line (`-AUTH_PASSWORD=<key>`), where other programs on the same P
 
 ## tools/
 
+### dashboard.mjs
+
+Optional owner dashboard, run on the VPS with Node.js 24: `node tools/dashboard.mjs`.
+Set `DASHBOARD_OWNER_KEY_FILE` to the existing owner key file; `DASHBOARD_BACKEND` defaults to
+`http://127.0.0.1:61000`, `DASHBOARD_PORT` to `61110`, and `DASHBOARD_LOG_FILES` to `{}`
+(an explicit JSON map of labels to log paths). The listener is loopback-only. Open it through
+an SSH tunnel and enter the owner key. See the repository's `tools/DASHBOARD.md` for commands.
+No installer or game service changes are required; this process is started separately.
+
+Live five-second CPU/RAM, player counts and local backend response graphs retain one hour in memory.
+Account totals include admins; newly observed accounts are counted since the first poll, because
+historical registration dates do not exist. Logs refresh on demand, capped at 32 KB / 150 lines,
+with credential-bearing lines omitted. Backend latency is not game ping. The dashboard reads only
+`GetAllUsers` and `ServerStatus`; it performs no writes. History resets on restart.
+
+Tests: `node --test tools/dashboard.test.mjs`.
+
 ### summarize-performance.mjs
 
 Run `node tools/summarize-performance.mjs "C:\DauntlessRevived\data\logs\performance\performance-2026-09-28.csv"`

@@ -827,6 +827,21 @@ Jokaisella käynnistyksellä se kirjoittaa uudelleen tiedoston
 
 ## tools/ {#tools}
 
+### dashboard.mjs
+
+Valinnainen ylläpitäjän näkymä: aja VPS:llä Node.js 24:llä `node tools/dashboard.mjs`.
+`DASHBOARD_OWNER_KEY_FILE` on nykyisen ylläpitoavaimen tiedosto, `DASHBOARD_BACKEND` oletuksena
+`http://127.0.0.1:61000`, `DASHBOARD_PORT` oletuksena `61110` ja `DASHBOARD_LOG_FILES` oletuksena
+`{}` (JSON-olio: nimi ja lokitiedoston polku). Kuuntelu on vain loopback-osoitteessa.
+Avaa SSH-tunnelin kautta ja syötä ylläpitoavain. Komennot: repositorion `tools/DASHBOARD.md`.
+Prosessi käynnistetään erikseen; pelipalvelun asetuksia tai tietokantaa ei muuteta.
+
+CPU-, RAM-, pelaajamäärä- ja paikallisen HTTP-viiveen kuvaajat päivittyvät viiden sekunnin välein.
+Muistissa säilyy tunti historiaa. Tilimäärä sisältää ylläpitäjät; uusien tilien laskuri kertoo vain
+ensimmäisen mittauksen jälkeen havaitut lisäykset, koska rekisteröintipäiviä ei tallenneta.
+Lokit päivitetään painikkeella, enintään 32 KB / 150 riviä; tunnistetietoja sisältävät rivit poistetaan.
+HTTP-viive ei ole pelin ping. Käynnistys nollaa historian. Testit: `node --test tools/dashboard.test.mjs`.
+
 ### summarize-performance.mjs
 
 Aja repositorion juuressa Node.js 24:llä:
