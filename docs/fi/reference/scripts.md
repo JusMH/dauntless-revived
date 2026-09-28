@@ -827,6 +827,24 @@ Jokaisella käynnistyksellä se kirjoittaa uudelleen tiedoston
 
 ## tools/ {#tools}
 
+### summarize-performance.mjs
+
+Aja repositorion juuressa Node.js 24:llä:
+`node tools/summarize-performance.mjs "C:\DauntlessRevived\data\logs\performance\performance-2026-09-28.csv"`.
+Voit antaa useita saman palvelimen CSV-tiedostoja. Työkalu lukee tiedostot ja tulostaa JSON-raportin;
+se ei ota yhteyttä palvelimeen eikä muuta tiedostoja. Virheellinen rivi keskeyttää ajon virhekoodiin.
+Syötteen on oltava palvelinpaketin mittaajan tuottamaa lainausmerkitöntä CSV:tä.
+
+Raportti näyttää rooleittain havaintojen määrän, mediaanin, p95:n ja maksimin: prosessin CPU,
+muisti, pelaajat, koneen CPU, vapaa RAM ja online-pelaajat. Puuttuvat arvot ohitetaan, nollat lasketaan.
+Persentiilit käyttävät nearest-rank-menetelmää; jokaisella prosessihavainnolla on sama paino.
+Prosessin CPU on prosenttia yhdestä ytimestä, koneen CPU koko koneesta. Metsästyksen luvut koskevat
+yhtä prosessia. Ramsgaten peruskulut estävät laskemasta lisäpelaajan hintaa jakamalla muistin
+pelaajamäärällä. Turvallista kapasiteettia ei vielä arvioida: tarvitaan vertailukelpoisia pelisessioita
+eri pelaajamäärillä. Pidä raportit paikallisina kuten muutkin palvelinlokit.
+
+Testit: `node --test tools/summarize-performance.test.mjs`.
+
 Aja nämä repositoriokopiosta Node.js:llä tai Windows PowerShellillä, kuten kunkin kohdalla
 kerrotaan.
 

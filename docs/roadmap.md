@@ -797,6 +797,7 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
       - for the metagame: request latency (p50 and p95), event-loop lag and time spent in the database
     - Files rotated daily, under the server's logs folder. Counts only: no player names.
     - A summary tool that reports what one hunt and one player in Ramsgate cost, and estimates how many players a given machine can host.
+    - **Update 2026-09-28:** `node tools/summarize-performance.mjs <csv> [more.csv ...]` now reports per-role sample counts, median, p95 and maximum for CPU, memory and player counts. Missing readings are excluded. It reads existing kit logs without contacting the server. Marginal per-player cost and safe capacity still require sessions at different player counts; this first report does not estimate them. Request latency, event-loop lag and database timing remain open.
   - **Why:** the only figures today are one player's, on the owner's PC (Ramsgate about 1.1 GB and 0.2 of a core, a hunt server about 0.9 GB). How many friends the rented server can carry is a guess.
   - **You'll notice:** nothing in game. The host sees a machine filling up before the players do.
   - **Needs:** nothing. It replaces the CSV in 1.15 and feeds 4.3, 4.9, 4.13 and 4.14.

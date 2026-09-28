@@ -7886,6 +7886,23 @@ game's command line (`-AUTH_PASSWORD=<key>`), where other programs on the same P
 
 ## tools/
 
+### summarize-performance.mjs
+
+Run `node tools/summarize-performance.mjs "C:\DauntlessRevived\data\logs\performance\performance-2026-09-28.csv"`
+from a checkout with Node.js 24. Pass additional CSV paths to combine days from the same host.
+The tool only reads files and prints JSON; it does not contact or modify the server. Invalid rows
+fail with a nonzero exit code. Input must use the kit sampler's unquoted CSV format.
+
+For each role, the report gives the number of available readings, median, p95 and maximum for
+process CPU, working-set memory, players, host CPU, free RAM and online players. Empty readings
+are excluded, while measured zeroes count. Percentiles use nearest rank and weight each process
+sample equally. Process CPU is percent of one core; host CPU is percent of the machine.
+Hunt figures describe one process. Ramsgate's fixed overhead prevents interpreting memory divided
+by players as the cost of adding a player. No safe capacity estimate is made yet; collect comparable
+sessions at different player counts. Keep reports local with the other operational logs.
+
+Tests: `node --test tools/summarize-performance.test.mjs`.
+
 Run these from a checkout, with Node.js or Windows PowerShell as noted.
 
 ### make-friend-kit.ps1
@@ -15099,6 +15116,7 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
       - for the metagame: request latency (p50 and p95), event-loop lag and time spent in the database
     - Files rotated daily, under the server's logs folder. Counts only: no player names.
     - A summary tool that reports what one hunt and one player in Ramsgate cost, and estimates how many players a given machine can host.
+    - **Update 2026-09-28:** `node tools/summarize-performance.mjs <csv> [more.csv ...]` now reports per-role sample counts, median, p95 and maximum for CPU, memory and player counts. Missing readings are excluded. It reads existing kit logs without contacting the server. Marginal per-player cost and safe capacity still require sessions at different player counts; this first report does not estimate them. Request latency, event-loop lag and database timing remain open.
   - **Why:** the only figures today are one player's, on the owner's PC (Ramsgate about 1.1 GB and 0.2 of a core, a hunt server about 0.9 GB). How many friends the rented server can carry is a guess.
   - **You'll notice:** nothing in game. The host sees a machine filling up before the players do.
   - **Needs:** nothing. It replaces the CSV in 1.15 and feeds 4.3, 4.9, 4.13 and 4.14.

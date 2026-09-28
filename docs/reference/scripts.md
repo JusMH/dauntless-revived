@@ -793,6 +793,23 @@ game's command line (`-AUTH_PASSWORD=<key>`), where other programs on the same P
 
 ## tools/
 
+### summarize-performance.mjs
+
+Run `node tools/summarize-performance.mjs "C:\DauntlessRevived\data\logs\performance\performance-2026-09-28.csv"`
+from a checkout with Node.js 24. Pass additional CSV paths to combine days from the same host.
+The tool only reads files and prints JSON; it does not contact or modify the server. Invalid rows
+fail with a nonzero exit code. Input must use the kit sampler's unquoted CSV format.
+
+For each role, the report gives the number of available readings, median, p95 and maximum for
+process CPU, working-set memory, players, host CPU, free RAM and online players. Empty readings
+are excluded, while measured zeroes count. Percentiles use nearest rank and weight each process
+sample equally. Process CPU is percent of one core; host CPU is percent of the machine.
+Hunt figures describe one process. Ramsgate's fixed overhead prevents interpreting memory divided
+by players as the cost of adding a player. No safe capacity estimate is made yet; collect comparable
+sessions at different player counts. Keep reports local with the other operational logs.
+
+Tests: `node --test tools/summarize-performance.test.mjs`.
+
 Run these from a checkout, with Node.js or Windows PowerShell as noted.
 
 ### make-friend-kit.ps1

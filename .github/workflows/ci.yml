@@ -218,6 +218,9 @@ jobs:
           node-version: 24
 
       # sync-roadmap first: build-llms reads the roadmap page it writes.
+      - name: Performance report tests
+        run: node --test tools/summarize-performance.test.mjs
+
       - name: Generated files are current (docs/roadmap.md, docs/llms.txt, docs/llms-full.txt)
         run: |
           node tools/sync-roadmap.js
