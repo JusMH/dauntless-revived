@@ -28,7 +28,10 @@ type Reply = { status: number, text: string, json: any };
 type CallOptions = { as?: string, token?: string, gs?: boolean, key?: string, raw?: string, body?: unknown, emptyJson?: boolean, headers?: Record<string, string> };
 
 async function Call(Method: string, Path: string, Options: CallOptions = {}): Promise<Reply> {
-    const Headers: Record<string, string> = { ...(Options.headers ?? {}) };
+    // Keep requests independent of idle pooled sockets while slow CI creates test accounts.
+    // Otherwise Undici can reuse a connection as the server's keep-alive timeout closes it.
+    // Do not retry mutations: that could replay an invite and hide a real assertion failure.
+    const Headers: Record<string, string> = { connection: "close", ...(Options.headers ?? {}) };
 
     if(Options.as !== undefined) Headers["authorization"] = `bearer ${Tokens[Options.as]}`;
     if(Options.token !== undefined) Headers["authorization"] = `bearer ${Options.token}`;
