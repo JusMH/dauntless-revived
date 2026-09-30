@@ -92,7 +92,7 @@
     On or Off: the in-game text chat (roadmap 3.10), the metagame's chat listener on 127.0.0.1:61099
     that the gateway forwards the game's chat connection to. Public mode only for now; no firewall
     rule is needed. Kept in server.json ("Chat"); a re-run without -Chat keeps it, a new install is
-    Off. Set-Chat.ps1 -On / -Off switches it later without the installer.
+    On in public mode. Set-Chat.ps1 -On / -Off switches it later without the installer.
 
 .EXAMPLE
     .\Install-DauntlessServer.ps1 -Mode Public -GameZip D:\BaseGame144.zip -PublicHost 203.0.113.7 -AdminIp 198.51.100.20 -RestoreFrom D:\backups\2026-10-01_200000
@@ -405,11 +405,11 @@ try {
     $AdminIp = @($AdminIp | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     foreach ($a in @($AdminIp)) { if ($a -and -not (Test-DRIPv4Cidr $a)) { Stop-DR "-AdminIp '$a' must be an IPv4 address or IPv4/prefix." } }
     if (-not $AdminIp -and $existingCfg) { $AdminIp = @(Get-DRConfigValue $existingCfg 'AdminIp' @()) | Where-Object { $_ } }
-    # Text chat: -Chat, else what server.json has, else Off. Public mode only until private mode gets it.
+    # Text chat: -Chat, else what server.json has, else On. Private mode stays off.
     $ChatSetting = Resolve-DRChat $Chat $existingCfg
     if (-not $Public -and $ChatSetting -eq 'On') {
         if ($Chat -eq 'On') { Stop-DR 'Chat works in public mode only for now (private mode comes later, roadmap 3.10). Leave out -Chat On, or use -Mode Public.' }
-        Write-DRInfo 'chat was on in server.json; private mode has no chat yet, so it is off'
+        Write-DRInfo 'private mode has no remote chat yet, so it is off'
         $ChatSetting = 'Off'
     }
 
@@ -1016,7 +1016,7 @@ try {
         $meta['LOG_BODIES'] = '0'
     } elseif ($meta.Contains('GATEWAY_SECRET')) { $meta.Remove('GATEWAY_SECRET') }
     # Text chat: on loopback, on the port the gateway forwards WebSocket upgrades to.
-    if ($Public) { Set-DRChatEnv $meta $ChatSetting ([bool]$Sandbox) } elseif ($meta.Contains('CHAT')) { $meta['CHAT'] = '0' }
+    if ($Public) { Set-DRChatEnv $meta $ChatSetting ([bool]$Sandbox) } else { $meta['CHAT'] = '0' }
     if ($components -contains 'content') { $meta['CONTENT_PORT'] = "$($ports.content)" } elseif ($meta.Contains('CONTENT_PORT')) { $meta.Remove('CONTENT_PORT') }
 
     $deploy['PORT'] = "$($ports.deploy)"

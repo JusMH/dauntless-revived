@@ -353,7 +353,8 @@ From your PC, `Deploy-Remote.ps1 -Server <address> -Status` shows the status wit
 The game's text chat (Ramsgate and hunt chat, party chat, guild chat and whispers, with usernames) is
 a listener inside the metagame on `127.0.0.1:61099`. The gateway already forwards the game's chat
 connection to it, so there is **no firewall rule to open**, and friends need no new launcher. It is
-off on a new install. How it works: [Text chat]({{ chat_page.url | relative_url }}).
+on by default on a new public install. Existing saved Off settings remain off; use `Set-Chat.ps1 -On`
+once to enable an older install. How it works: [Text chat]({{ chat_page.url | relative_url }}).
 
 **Switch it when nobody is playing.** Turning chat on or off restarts the stack, and a restart drops
 the parties and matchmaking queues, which live in memory.

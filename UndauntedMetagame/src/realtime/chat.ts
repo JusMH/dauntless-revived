@@ -376,6 +376,7 @@ export class ChatServer {
         // An oversized frame (1009), invalid UTF-8 in a text frame (1007) or a bad opcode: ws emits this
         // and closes the socket. Without a listener Node would throw and stop the whole metagame.
         Socket.on("error", (error: Error & { code?: string }) => {
+            if(!Session.Ended) logger.warn(`chat: socket error c=${Session.Id} (${ErrorName(error)})`);
             if(error.code === "WS_ERR_UNSUPPORTED_MESSAGE_LENGTH"){
                 this.countFailure(Session.Address, this.clock());
                 this.end(Session, "size");
@@ -978,7 +979,7 @@ function StatusTextOf(Node: Element): string {
 
 export type ChatConfig = { Enabled: boolean, Port: number, Host: string, NickCheck: NickCheckMode, Trace: boolean, Errors: string[], Warnings: string[] };
 
-// CHAT=1 turns the listener on (off by default until the live two-player test passes). CHAT_PORT (61099)
+// Chat is on when CHAT is unset/empty or 1; CHAT=0 explicitly disables it. CHAT_PORT (61099)
 // and CHAT_BIND_HOST (127.0.0.1) say where; in public mode (GATEWAY_SECRET set) the gateway forwards to
 // 127.0.0.1 and nothing else is accepted. CHAT_NICK_CHECK=log admits room nicknames that fail the
 // resource, format or name rule with a warning instead of refusing them (a rollback switch only); another
@@ -986,7 +987,8 @@ export type ChatConfig = { Enabled: boolean, Port: number, Host: string, NickChe
 export function ReadChatConfig(Env: NodeJS.ProcessEnv = process.env): ChatConfig {
     const Errors: string[] = [];
     const Warnings: string[] = [];
-    const Enabled = Env.CHAT === "1";
+    const ChatSetting = (Env.CHAT ?? "").trim();
+    const Enabled = ChatSetting === "" || ChatSetting === "1";
     const PortText = Env.CHAT_PORT || "61099";
     const Port = Number(PortText);
     const Host = Env.CHAT_BIND_HOST || "127.0.0.1";
@@ -996,8 +998,8 @@ export function ReadChatConfig(Env: NodeJS.ProcessEnv = process.env): ChatConfig
         Warnings.push("EXPERIMENTAL_CHAT is no longer read; the switch is now CHAT=1");
     }
 
-    if(Env.CHAT !== undefined && Env.CHAT !== "0" && Env.CHAT !== "1"){
-        Warnings.push(`CHAT=${Env.CHAT.slice(0, 16)} is not 0 or 1; chat stays off`);
+    if(ChatSetting !== "" && ChatSetting !== "0" && ChatSetting !== "1"){
+        Warnings.push("CHAT is not 0 or 1; chat stays off. Unset it or use CHAT=1 to enable in-game chat.");
     }
 
     if(!Enabled && ParseOnOff((Env.CHAT_PRESENCE ?? "").trim()) === true){
@@ -1027,7 +1029,7 @@ export function ReadChatConfig(Env: NodeJS.ProcessEnv = process.env): ChatConfig
     return { Enabled, Port, Host, NickCheck, Trace: Env.CHAT_TRACE === "1", Errors, Warnings };
 }
 
-// Starts chat when CHAT=1. Never throws and never stops the metagame: a bad setting or a port in use is
+// Starts chat by default. Never throws and never stops the metagame: a bad setting or a port in use is
 // one error line, and the metagame serves on without chat.
 export async function StartChat(Env: NodeJS.ProcessEnv = process.env): Promise<ChatServer | undefined> {
     const Config = ReadChatConfig(Env);
@@ -1037,6 +1039,7 @@ export async function StartChat(Env: NodeJS.ProcessEnv = process.env): Promise<C
     }
 
     if(!Config.Enabled){
+        logger.info("chat: disabled by CHAT setting; use CHAT=1 and restart to enable in-game chat");
         return undefined;
     }
 

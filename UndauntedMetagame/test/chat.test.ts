@@ -612,8 +612,21 @@ describe("chat listener", () => {
     });
 
     describe("settings and start", () => {
+        it("starts a loopback listener with CHAT unset and can close it cleanly", async () => {
+            const Probe = net.createServer();
+            await new Promise<void>((Resolve) => Probe.listen(0, "127.0.0.1", () => Resolve()));
+            const Port = (Probe.address() as net.AddressInfo).port;
+            await new Promise<void>((Resolve) => Probe.close(() => Resolve()));
+            const Started = await StartChat({ CHAT_PORT: String(Port) });
+            try { assert.ok(Started); }
+            finally { await Started?.close(); }
+        });
         it("reads CHAT, CHAT_PORT and CHAT_BIND_HOST, with 127.0.0.1 the only host in public mode", () => {
-            assert.equal(ReadChatConfig({}).Enabled, false);
+            assert.equal(ReadChatConfig({}).Enabled, true);
+            assert.equal(ReadChatConfig({ CHAT: " " }).Enabled, true);
+            assert.equal(ReadChatConfig({ CHAT: "0" }).Enabled, false);
+            assert.equal(ReadChatConfig({ CHAT: "wrong" }).Enabled, false);
+            assert.equal(ReadChatConfig({ CHAT: "wrong" }).Warnings.length, 1);
             assert.deepEqual(ReadChatConfig({ CHAT: "1" }), { Enabled: true, Port: 61099, Host: "127.0.0.1", NickCheck: "enforce", Trace: false, Errors: [], Warnings: [] });
             assert.equal(ReadChatConfig({ CHAT: "1", CHAT_NICK_CHECK: "log" }).NickCheck, "log");
             assert.equal(ReadChatConfig({ CHAT: "1", CHAT_NICK_CHECK: "off" }).NickCheck, "enforce");
@@ -635,10 +648,11 @@ describe("chat listener", () => {
                 assert.equal(await StartChat({ CHAT: "1", CHAT_PORT: String(Taken) }), undefined);
                 assert.ok(Logs.Lines.some((Line) => Line === `error chat: not started: could not listen on 127.0.0.1:${Taken} (EADDRINUSE). The metagame runs without chat.`));
                 assert.equal(await StartChat({ CHAT: "1", CHAT_BIND_HOST: "0.0.0.0" }), undefined);
-                assert.equal(await StartChat({}), undefined);
+                assert.equal(await StartChat({ CHAT: "0" }), undefined);
+                assert.ok(Logs.Lines.some((Line) => Line.includes("chat: disabled by CHAT setting")));
 
                 // The real metagame process with chat on and its port taken: it still serves
-                const Output = await RunMetagame({ CHAT: "1", CHAT_PORT: String(Taken) });
+                const Output = await RunMetagame({ CHAT_PORT: String(Taken) });
                 assert.match(Output, /chat: not started: could not listen on 127\.0\.0\.1:\d+ \(EADDRINUSE\)/);
                 assert.match(Output, /Clear Skies, Slayer\./);
             }

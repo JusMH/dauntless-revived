@@ -316,7 +316,7 @@ swaps it in, keeping the old build as `app.prev`.
 
 | Parameter | Type | Default | What it does |
 |:----------|:-----|:--------|:-------------|
-| `-Chat` | `On` or `Off` | The stored `"Chat"` in `server.json`, else `Off` | The in-game text chat. Public mode writes `CHAT=1` or `0`, `CHAT_BIND_HOST=127.0.0.1` and `CHAT_PORT` (61099, or 62099 in a sandbox, the same port as the gateway's `GATEWAY_WS_URL`) into `metagame.env`, and saves the choice. No firewall rule is added. `-Chat On` in private mode stops the installer: private mode has no chat yet. |
+| `-Chat` | `On` or `Off` | The stored `"Chat"` in `server.json`, else `On` (public mode) | The in-game text chat. Public mode writes `CHAT=1` or `0`, `CHAT_BIND_HOST=127.0.0.1` and `CHAT_PORT` (61099, or 62099 in a sandbox, the same port as the gateway's `GATEWAY_WS_URL`) into `metagame.env`, and saves the choice. No firewall rule is added. `-Chat On` in private mode stops the installer: private mode has no chat yet. |
 
 **Private mode (Tailscale)**
 

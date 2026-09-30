@@ -390,6 +390,12 @@ Aether Caster -aseita luvata.
 
 ### M4: Vakaa ja helppo ylläpitää {#m4-solid-to-run}
 
+Chat-päivitys 30.9.2026 (3.10): pelin tekstichat on nyt oletuksena päällä, kun `CHAT` puuttuu tai
+on tyhjä. `CHAT=0` säilyy opt-out-asetuksena. Uusi julkinen asennus käyttää On-oletusta; vanha Off
+säilytetään. Ota vanhan VPS:n chat käyttöön kerran komennolla `Set-Chat.ps1 -On`, kun kukaan ei pelaa.
+Päivitys näyttää kuuntelijan tilan ja virheet kirjataan ilman viestien sisältöä tai tunnisteita.
+Yksityinen paketti ja kavereiden läsnäolotieto pysyvät ennallaan. VPS-pelikoe on vielä tekemättä.
+
 Viimeinen välitavoite tekee palvelimen pyörittämisestä helppoa ja turvallista. Kaatunut palvelu
 käynnistyy itsestään uudelleen, ja kokonaisuus käynnistyy, kun omistaja kirjautuu koneelle. Lokit
 pysyvät siisteinä, ja muistisuojat estävät karkaavaa palvelinta jumittamasta koko konetta.

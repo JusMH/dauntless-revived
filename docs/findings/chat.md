@@ -23,8 +23,13 @@ chat, party chat, guild chat and whispers. It explains why the first chat server
 as `UID-...`, what the client needs to show usernames, how the server keeps anyone from posing as
 another player, and what is still unconfirmed.
 
-**Status (22 September 2026): built and tested without the game, off by default, not yet tried by two
-players.** The chat listener runs inside the metagame when `CHAT=1`
+**Update (30 September 2026): in-game text chat is on by default.** Unset/empty `CHAT` or `CHAT=1`
+starts the listener; `CHAT=0` explicitly disables it. New public kit installs default to On;
+existing saved Off settings are preserved. On an older VPS, run `bin\Set-Chat.ps1 -On` once when
+nobody is playing. The updater now reports listener status and warns when chat is off or unavailable.
+Startup/bind errors and socket errors are logged without tokens or message bodies; a chat failure
+does not stop the HTTP backend. Friends' presence remains separately opt-in. This default change
+has automated coverage, not a new two-player VPS play test. The chat listener runs inside the metagame
 ([Configuration]({{ config_page.url | relative_url }}#metagame-chat)). Every rule below is covered by
 tests that feed the server's replies to a model of the client, read from the executable. The live
 two-player test on the rented server confirms or corrects them.

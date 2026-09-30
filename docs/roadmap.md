@@ -56,6 +56,14 @@ This page is generated from [`ROADMAP.md`]({% endraw %}{{ site.github.repository
 
 ## Where we are (updated 2026-09-23)
 
+**Chat default update, 2026-09-30 (3.10):** in-game text chat now defaults on (unset/empty `CHAT`
+or `CHAT=1`); `CHAT=0` remains an explicit opt-out. New public kit installs default On, private kit
+installs stay Off. Existing saved Off settings are preserved: enable older installs once with
+`Set-Chat.ps1 -On` while empty. Updates report the listener's state; failures are logged without
+tokens/message contents and do not stop the HTTP backend. Presence remains opt-in. Automated
+coverage includes default startup, explicit disable and an occupied port; VPS play verification
+remains pending. This supersedes older "off by default" chat notes below.
+
 > **Update, 2026-09-23 (the port of Harmonic's 1.4.4 fork):**
 > - **Harmonic's fork of Undaunted for 1.4.4** ([github.com/Harmonicrain/Undaunted](https://github.com/Harmonicrain/Undaunted), commit `895f7c7`, AGPL-3.0) was compared with ours feature by feature. What adds something is in, rewritten on our code, apart from a few platform items left out with their reasons (the DLL-side ones, the server-mode hook with `METAGAME_ADDRESS` and HuntDiag, wait for the decision on shipping a DLL we build; the deploy server's port wait and game-server log files were skipped); where that fork rewrote something we had already built and tried in game, we kept ours, and each such choice is written down with its reason on [The Harmonic port](https://mixutin.github.io/dauntless-revived/findings/harmonic-fork.html).
 > - **New, off by default until a decision or an in-game test:** real Escalation saves (2.16; `ESCALATION_MODE=real` drops every player from the fake maximum to level 0), a free in-game store (3.7; `STORE=free`, waiting for the free-or-priced decision), friends' online status inside our chat server (3.10; `CHAT_PRESENCE=1`), and granting the Elite ranks' entitlements on confirm (`PROGRESSION_CONFIRM_ENTITLEMENTS=1`).

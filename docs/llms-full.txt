@@ -3237,7 +3237,8 @@ From your PC, `Deploy-Remote.ps1 -Server <address> -Status` shows the status wit
 The game's text chat (Ramsgate and hunt chat, party chat, guild chat and whispers, with usernames) is
 a listener inside the metagame on `127.0.0.1:61099`. The gateway already forwards the game's chat
 connection to it, so there is **no firewall rule to open**, and friends need no new launcher. It is
-off on a new install. How it works: [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html).
+on by default on a new public install. Existing saved Off settings remain off; use `Set-Chat.ps1 -On`
+once to enable an older install. How it works: [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html).
 
 **Switch it when nobody is playing.** Turning chat on or off restarts the stack, and a restart drops
 the parties and matchmaking queues, which live in memory.
@@ -4137,7 +4138,7 @@ one `chat: not started ...` error line, and the metagame runs on without chat.
 
 | Name | Default | Values | What it does | Set by |
 |:-----|:--------|:-------|:-------------|:-------|
-| `CHAT` | off | `1` turns it on; `0` or unset is off, anything else is off with a warning | Starts the chat listener. The startup line is `chat: listening on 127.0.0.1:61099 (nick check enforce)`. It replaces `EXPERIMENTAL_CHAT` from the first prototype, which is no longer read (a warning says so). | Kit: always in public mode (`CHAT=1` or `0` from `-Chat On` or `Off`, else `server.json`) |
+| `CHAT` | on | unset/empty or `1` is on; `0` is off; other values are off with a warning | Starts loopback in-game chat. Bind/startup/socket failures are logged without message text or tokens; the HTTP backend stays up. Replaces the ignored `EXPERIMENTAL_CHAT`. Existing `CHAT=0` is preserved on update: run `Set-Chat.ps1 -On` once when the server is empty. | Kit: public installs use `-Chat`, else saved `Chat`, else On. Private kit installs explicitly set `0`. |
 | `CHAT_PORT` | `61099` | 1-65535 | The listener's port. Must be the port in the gateway's `GATEWAY_WS_URL`. | Kit: always in public mode (61099; 62099 in sandbox) |
 | `CHAT_BIND_HOST` | `127.0.0.1` | `127.0.0.1` or `::1`; with `GATEWAY_SECRET` set (public mode) only `127.0.0.1` | The listener's address. Anything else, `0.0.0.0` included, keeps chat off. Private mode (Tailscale) is not supported yet. | Kit: always `127.0.0.1` in public mode |
 | `CHAT_NICK_CHECK` | `enforce` | `enforce` or `log`; anything else counts as `enforce` with a warning | `enforce` refuses a room join whose nickname is not `<the account's username>:<its account id>:<its resource>` ([why](https://mixutin.github.io/dauntless-revived/findings/chat.html#nickname-check)). `log` admits a nickname that fails the resource, format or name rule, with one warning line per connection and room: a rollback switch in case the live test shows a real client being refused. A nickname with another account's id is refused in both modes (a real client never builds one). | Nobody by default |
@@ -4380,7 +4381,7 @@ Other rules:
   [Ports and network](https://mixutin.github.io/dauntless-revived/reference/ports.html).
 - `NODE_ENV=production` is written into all five files. Only the metagame and the deploy server read
   it.
-- Chat: `-Chat On` or `-Chat Off`, else the existing install's `server.json` (`"Chat"`), else Off. The
+- Chat: `-Chat On` or `-Chat Off`, else the existing install's `server.json` (`"Chat"`), else On. The
   choice is saved in `server.json`. `Set-Chat.ps1 -On` or `-Off` changes it later, in both
   `metagame.env` and `server.json`. Private mode has no chat yet.
 - The installer writes none of the switches added with the port of Harmonic's fork (`ESCALATION_*`,
@@ -7452,7 +7453,7 @@ swaps it in, keeping the old build as `app.prev`.
 
 | Parameter | Type | Default | What it does |
 |:----------|:-----|:--------|:-------------|
-| `-Chat` | `On` or `Off` | The stored `"Chat"` in `server.json`, else `Off` | The in-game text chat. Public mode writes `CHAT=1` or `0`, `CHAT_BIND_HOST=127.0.0.1` and `CHAT_PORT` (61099, or 62099 in a sandbox, the same port as the gateway's `GATEWAY_WS_URL`) into `metagame.env`, and saves the choice. No firewall rule is added. `-Chat On` in private mode stops the installer: private mode has no chat yet. |
+| `-Chat` | `On` or `Off` | The stored `"Chat"` in `server.json`, else `On` (public mode) | The in-game text chat. Public mode writes `CHAT=1` or `0`, `CHAT_BIND_HOST=127.0.0.1` and `CHAT_PORT` (61099, or 62099 in a sandbox, the same port as the gateway's `GATEWAY_WS_URL`) into `metagame.env`, and saves the choice. No firewall rule is added. `-Chat On` in private mode stops the installer: private mode has no chat yet. |
 
 **Private mode (Tailscale)**
 
@@ -13338,8 +13339,13 @@ chat, party chat, guild chat and whispers. It explains why the first chat server
 as `UID-...`, what the client needs to show usernames, how the server keeps anyone from posing as
 another player, and what is still unconfirmed.
 
-**Status (22 September 2026): built and tested without the game, off by default, not yet tried by two
-players.** The chat listener runs inside the metagame when `CHAT=1`
+**Update (30 September 2026): in-game text chat is on by default.** Unset/empty `CHAT` or `CHAT=1`
+starts the listener; `CHAT=0` explicitly disables it. New public kit installs default to On;
+existing saved Off settings are preserved. On an older VPS, run `bin\Set-Chat.ps1 -On` once when
+nobody is playing. The updater now reports listener status and warns when chat is off or unavailable.
+Startup/bind errors and socket errors are logged without tokens or message bodies; a chat failure
+does not stop the HTTP backend. Friends' presence remains separately opt-in. This default change
+has automated coverage, not a new two-player VPS play test. The chat listener runs inside the metagame
 ([Configuration](https://mixutin.github.io/dauntless-revived/reference/configuration.html#metagame-chat)). Every rule below is covered by
 tests that feed the server's replies to a model of the client, read from the executable. The live
 two-player test on the rented server confirms or corrects them.
@@ -14434,6 +14440,14 @@ This page is generated from [`ROADMAP.md`](https://github.com/mixutin/dauntless-
 - [x] Rebrand, part 1: the launcher, the in-game welcome text and the server's messages say Dauntless Revived, and the credits name Undaunted. Folders, the server DLL's file name (`UndauntedInternalServer.dll`), API routes and headers keep the Undaunted names for now (part 2 is 4.15).
 
 ## Where we are (updated 2026-09-23)
+
+**Chat default update, 2026-09-30 (3.10):** in-game text chat now defaults on (unset/empty `CHAT`
+or `CHAT=1`); `CHAT=0` remains an explicit opt-out. New public kit installs default On, private kit
+installs stay Off. Existing saved Off settings are preserved: enable older installs once with
+`Set-Chat.ps1 -On` while empty. Updates report the listener's state; failures are logged without
+tokens/message contents and do not stop the HTTP backend. Presence remains opt-in. Automated
+coverage includes default startup, explicit disable and an occupied port; VPS play verification
+remains pending. This supersedes older "off by default" chat notes below.
 
 > **Update, 2026-09-23 (the port of Harmonic's 1.4.4 fork):**
 > - **Harmonic's fork of Undaunted for 1.4.4** ([github.com/Harmonicrain/Undaunted](https://github.com/Harmonicrain/Undaunted), commit `895f7c7`, AGPL-3.0) was compared with ours feature by feature. What adds something is in, rewritten on our code, apart from a few platform items left out with their reasons (the DLL-side ones, the server-mode hook with `METAGAME_ADDRESS` and HuntDiag, wait for the decision on shipping a DLL we build; the deploy server's port wait and game-server log files were skipped); where that fork rewrote something we had already built and tried in game, we kept ours, and each such choice is written down with its reason on [The Harmonic port](https://mixutin.github.io/dauntless-revived/findings/harmonic-fork.html).

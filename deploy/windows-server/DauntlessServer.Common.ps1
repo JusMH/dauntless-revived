@@ -193,11 +193,11 @@ function Get-DRChatPort([bool]$Sandbox) {
 
 function Get-DRGatewayWsUrl([bool]$Sandbox) { return "http://127.0.0.1:$(Get-DRChatPort $Sandbox)" }
 
-# The chat setting of an install: -Chat when given, else "Chat" in server.json, else Off.
+# The chat setting of an install: -Chat when given, else "Chat" in server.json, else On.
 function Resolve-DRChat([string]$Requested, $Config) {
     if ($Requested -eq 'On' -or $Requested -eq 'Off') { return $Requested }
-    if ([string](Get-DRConfigValue $Config 'Chat' '') -eq 'On') { return 'On' }
-    return 'Off'
+    if ([string](Get-DRConfigValue $Config 'Chat' '') -eq 'Off') { return 'Off' }
+    return 'On'
 }
 
 # The chat keys of metagame.env (public mode): CHAT=1|0, always on 127.0.0.1, on the gateway's port.
@@ -214,7 +214,9 @@ function Get-DRChatState($Paths, $Config) {
     try { $envMap = Read-DREnv $Paths.MetaEnv } catch { return 'unknown (run this elevated to read metagame.env)' }
     $port = Get-DRChatPort ([bool](Get-DRConfigValue $Config 'Sandbox' $false))
     if ($envMap['CHAT_PORT'] -match '^\d{1,5}$') { $port = [int]$envMap['CHAT_PORT'] }
-    if ($envMap['CHAT'] -ne '1') { return 'off' }
+    if (-not (Test-Path -LiteralPath $Paths.MetaEnv)) { return 'unknown (metagame.env missing)' }
+    $chatValue = ([string]$envMap['CHAT']).Trim()
+    if ($chatValue -ne '' -and $chatValue -ne '1') { return 'off (CHAT setting; use Set-Chat.ps1 -On)' }
     $listening = @(Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue | Where-Object { $_.LocalAddress -eq '127.0.0.1' }).Count -gt 0
     if ($listening) { return "listening 127.0.0.1:$port" }
     return 'on in metagame.env but not listening (see the metagame log)'

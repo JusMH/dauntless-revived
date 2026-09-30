@@ -345,7 +345,7 @@ metagame jatkaa ilman chattia.
 
 | Nimi | Oletus | Arvot | Mitä se tekee | Kuka asettaa |
 |:-----|:-------|:------|:--------------|:-------------|
-| `CHAT` | pois | `1` kytkee päälle; `0` tai asettamaton on pois, muu arvo on pois ja kirjoittaa varoituksen | Käynnistää chat-kuuntelijan. Käynnistysrivi on `chat: listening on 127.0.0.1:61099 (nick check enforce)`. Se korvaa ensimmäisen kokeiluversion kytkimen `EXPERIMENTAL_CHAT`, jota ei enää lueta (varoitus kertoo sen). | Paketti: aina julkisessa tilassa (`CHAT=1` tai `0` valinnasta `-Chat On` tai `Off`, muuten `server.json`) |
+| `CHAT` | päällä | asettamaton/tyhjä tai `1` on päällä; `0` pois; muu arvo pois ja varoitus | Käynnistää loopback-pelichatin. Käynnistys-, portti- ja socket-virheet kirjataan ilman tunnisteita tai viestejä; HTTP jatkaa toimintaansa. Korvaa ohitetun `EXPERIMENTAL_CHAT`-asetuksen. Vanha `CHAT=0` säilyy päivityksessä: aja `Set-Chat.ps1 -On`, kun palvelin on tyhjä. | Julkinen paketti: `-Chat`, tallennettu `Chat`, muuten On. Yksityinen paketti asettaa `0`. |
 | `CHAT_PORT` | `61099` | 1-65535 | Kuuntelijan portti. Sen on oltava sama kuin yhdyskäytävän `GATEWAY_WS_URL`-osoitteen portti. | Paketti: aina julkisessa tilassa (61099; hiekkalaatikossa 62099) |
 | `CHAT_BIND_HOST` | `127.0.0.1` | `127.0.0.1` tai `::1`; kun `GATEWAY_SECRET` on asetettu (julkinen tila), vain `127.0.0.1` | Kuuntelijan osoite. Mikä tahansa muu, myös `0.0.0.0`, pitää chatin pois päältä. Yksityistä tilaa (Tailscale) ei vielä tueta. | Paketti: aina `127.0.0.1` julkisessa tilassa |
 | `CHAT_NICK_CHECK` | `enforce` | `enforce` tai `log`; muu arvo lasketaan arvoksi `enforce` ja kirjoittaa varoituksen | `enforce` hylkää huoneeseen liittymisen, jos nimimerkki ei ole `<tilin käyttäjänimi>:<sen tilitunnus>:<sen resurssi>` ([miksi]({{ '/fi/findings/chat.html' | relative_url }}#nickname-check)). `log` päästää sisään nimimerkin, joka rikkoo resurssi-, muoto- tai nimisääntöä, ja kirjoittaa yhden varoitusrivin yhteyttä ja huonetta kohden: paluukytkin siltä varalta, että oikea peliohjelma hylätään. Nimimerkki, jossa on toisen tilin tunnus, hylätään molemmissa tiloissa (oikea peliohjelma ei koskaan rakenna sellaista). | Oletuksena ei kukaan |
@@ -590,7 +590,7 @@ Muut säännöt:
 - `NODE_ENV=production` kirjoitetaan kaikkiin viiteen tiedostoon. Vain metagame ja deploy-palvelin
   lukevat sen.
 - Chat: `-Chat On` tai `-Chat Off`, muuten olemassa olevan asennuksen `server.json` (`"Chat"`), muuten
-  pois. Valinta tallennetaan tiedostoon `server.json`. `Set-Chat.ps1 -On` tai `-Off` muuttaa sitä
+  On. Valinta tallennetaan tiedostoon `server.json`. `Set-Chat.ps1 -On` tai `-Off` muuttaa sitä
   myöhemmin sekä tiedostossa `metagame.env` että `server.json`. Yksityisessä tilassa chattia ei vielä
   ole.
 - Asennusohjelma ei kirjoita yhtään Harmonicin forkin siirron mukana tullutta kytkintä

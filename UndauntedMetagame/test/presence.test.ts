@@ -473,7 +473,7 @@ describe("friends' online status (CHAT_PRESENCE=1)", () => {
         }
     });
 
-    it("the switch: CHAT_PRESENCE=1 turns it on for a new chat server, and alone (without CHAT=1) is a warning", async () => {
+    it("the switch: CHAT_PRESENCE=1 enables presence; explicitly disabled chat produces a warning", async () => {
         const Saved = process.env.CHAT_PRESENCE;
         process.env.CHAT_PRESENCE = "1";
 
@@ -487,7 +487,8 @@ describe("friends' online status (CHAT_PRESENCE=1)", () => {
             if(Saved === undefined) delete process.env.CHAT_PRESENCE; else process.env.CHAT_PRESENCE = Saved;
         }
 
-        assert.deepEqual(ReadChatConfig({ CHAT_PRESENCE: "1" }).Warnings, ["CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online"]);
+        assert.deepEqual(ReadChatConfig({ CHAT: "0", CHAT_PRESENCE: "1" }).Warnings, ["CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online"]);
+        assert.deepEqual(ReadChatConfig({ CHAT_PRESENCE: "1" }).Warnings, []);
         assert.deepEqual(ReadChatConfig({ CHAT: "1", CHAT_PRESENCE: "1" }).Warnings, []);
         assert.deepEqual(ReadChatConfig({ CHAT_PRESENCE: "0" }).Warnings, []);
     });

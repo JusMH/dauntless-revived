@@ -354,7 +354,8 @@ $m = [ordered]@{}; Set-DRChatEnv $m 'Off' $false
 Check 'Off writes CHAT=0 and keeps the address and port' ($m['CHAT'] -eq '0' -and $m['CHAT_BIND_HOST'] -eq '127.0.0.1' -and $m['CHAT_PORT'] -eq '61099')
 Check '-Chat wins over server.json' ((Resolve-DRChat 'On' ([pscustomobject]@{ Chat = 'Off' })) -eq 'On' -and (Resolve-DRChat 'Off' ([pscustomobject]@{ Chat = 'On' })) -eq 'Off')
 Check 'without -Chat, server.json''s "Chat" is kept' ((Resolve-DRChat '' ([pscustomobject]@{ Chat = 'On' })) -eq 'On')
-Check 'a new install is Off' ((Resolve-DRChat '' $null) -eq 'Off' -and (Resolve-DRChat '' ([pscustomobject]@{ Mode = 'Public' })) -eq 'Off')
+Check 'a new public install defaults On' ((Resolve-DRChat '' $null) -eq 'On' -and (Resolve-DRChat '' ([pscustomobject]@{ Mode = 'Public' })) -eq 'On')
+Check 'an explicit saved Off remains Off' ((Resolve-DRChat '' ([pscustomobject]@{ Chat = 'Off' })) -eq 'Off')
 $chatEnv = Join-Path $WorkDir 'chat-metagame.env'
 $first = [ordered]@{ PORT = '61000'; PROGRESSION_MODE = 'real' }
 Set-DRChatEnv $first 'On' $false
@@ -369,11 +370,13 @@ try {
     $freePort = $listener.LocalEndpoint.Port
     [void](Write-DREnv $chatEnv ([ordered]@{ CHAT = '1'; CHAT_BIND_HOST = '127.0.0.1'; CHAT_PORT = "$freePort" }) @('test'))
     Check 'status: listening' ((Get-DRChatState $chatPaths $null) -eq "listening 127.0.0.1:$freePort") (Get-DRChatState $chatPaths $null)
+    [void](Write-DREnv $chatEnv ([ordered]@{ CHAT_PORT = "$freePort" }) @('test'))
+    Check 'status: unset CHAT is on by default' ((Get-DRChatState $chatPaths $null) -eq "listening 127.0.0.1:$freePort")
 } finally { $listener.Stop() }
 Check 'status: on but not listening' ((Get-DRChatState $chatPaths $null) -eq 'on in metagame.env but not listening (see the metagame log)') (Get-DRChatState $chatPaths $null)
 [void](Write-DREnv $chatEnv ([ordered]@{ CHAT = '0'; CHAT_PORT = '61099' }) @('test'))
-Check 'status: off' ((Get-DRChatState $chatPaths $null) -eq 'off')
-Check 'status: off without a metagame.env' ((Get-DRChatState ([pscustomobject]@{ MetaEnv = (Join-Path $WorkDir 'none.env') }) $null) -eq 'off')
+Check 'status: off' ((Get-DRChatState $chatPaths $null) -like 'off (CHAT setting*')
+Check 'status: unknown without a metagame.env' ((Get-DRChatState ([pscustomobject]@{ MetaEnv = (Join-Path $WorkDir 'none.env') }) $null) -eq 'unknown (metagame.env missing)')
 
 # Set-Chat.ps1 on an install whose metagame.env the installer or an update wrote (their header, other keys
 # changed since): the setting is already as asked, so nothing is written and the stack is not touched

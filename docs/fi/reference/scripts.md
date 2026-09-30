@@ -329,7 +329,7 @@ vaihtaa sen sitten käyttöön. Vanha käännös jää talteen nimellä `app.pre
 
 | Parametri | Tyyppi | Oletus | Mitä se tekee |
 |:----------|:-------|:-------|:--------------|
-| `-Chat` | `On` tai `Off` | Tiedostoon `server.json` tallennettu `"Chat"`, muuten `Off` | Pelin tekstichat. Julkisessa tilassa kirjoittaa tiedostoon `metagame.env` asetukset `CHAT=1` tai `0`, `CHAT_BIND_HOST=127.0.0.1` ja `CHAT_PORT` (61099, hiekkalaatikossa 62099, sama portti kuin yhdyskäytävän `GATEWAY_WS_URL`) ja tallentaa valinnan. Palomuurisääntöä ei lisätä. `-Chat On` yksityisessä tilassa pysäyttää asennuksen: yksityisessä tilassa ei vielä ole chattia. |
+| `-Chat` | `On` tai `Off` | Tiedostoon `server.json` tallennettu `"Chat"`, muuten `On` (julkinen tila) | Pelin tekstichat. Julkisessa tilassa kirjoittaa tiedostoon `metagame.env` asetukset `CHAT=1` tai `0`, `CHAT_BIND_HOST=127.0.0.1` ja `CHAT_PORT` (61099, hiekkalaatikossa 62099, sama portti kuin yhdyskäytävän `GATEWAY_WS_URL`) ja tallentaa valinnan. Palomuurisääntöä ei lisätä. `-Chat On` yksityisessä tilassa pysäyttää asennuksen: yksityisessä tilassa ei vielä ole chattia. |
 
 **Yksityinen tila (Tailscale)**
 

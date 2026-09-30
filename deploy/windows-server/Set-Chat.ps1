@@ -53,6 +53,9 @@ try {
     # updates write metagame.env too, and a change anywhere else in it is not a chat change
     if ((& $chatKeys $envMap) -ceq $before -and $previousChat -eq $want) {
         Write-DROk "chat is already $($want.ToLowerInvariant())"
+        if ($On -and (Get-DRChatState $paths $config) -notlike 'listening *') {
+            Write-DRWarn 'The saved setting is on, but chat is not listening. When nobody is playing, restart the metagame with Stack.ps1 restart -Only metagame and check its chat: log lines.'
+        }
         exit 0
     }
     Set-DRConfigValue $config 'Chat' $want

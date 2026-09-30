@@ -224,6 +224,11 @@ try {
     $why = Test-Healthy
     if (-not $why) {
         Write-DROk "the server is up on $commit"
+        # Code updates preserve explicit opt-outs, including CHAT=0 written by older installers.
+        # A working HTTP backend is not proof that in-game chat started.
+        $chatState = Get-DRChatState $P $Cfg
+        if ($chatState -like 'listening *') { Write-DROk "chat: $chatState (listener only; test an in-game message)" }
+        else { Write-DRWarn "chat: $chatState. When nobody is playing, run $($P.Bin)\Set-Chat.ps1 -On; if settings already say on, restart the metagame and check its chat: log lines." }
         Show-ProgressionUpgradeNotice $P.MetaEnv (Join-Path $P.Logs 'metagame.out.log')
     } else {
         Write-DRWarn "the new code did not come up ($why); switching back to $prevCommit"

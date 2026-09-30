@@ -26,8 +26,13 @@ ensimmäinen chat-palvelin näytti jokaisen lähettäjän muodossa `UID-...`, mi
 näyttääkseen käyttäjänimet, miten palvelin estää ketään esiintymästä toisena pelaajana ja mikä on
 vielä vahvistamatta.
 
-**Tilanne 22.9.2026: rakennettu ja testattu ilman peliä, oletuksena pois päältä, kaksi pelaajaa ei ole
-vielä kokeillut.** Chat-kuuntelija toimii metagamen sisällä, kun `CHAT=1`
+**Päivitys 30.9.2026: pelin tekstichat on oletuksena päällä.** Asettamaton/tyhjä `CHAT` tai `CHAT=1`
+käynnistää kuuntelijan; `CHAT=0` poistaa sen käytöstä. Uusi julkinen asennus käyttää oletusta On,
+mutta vanha tallennettu Off säilyy. Aja vanhalla VPS:llä `bin\Set-Chat.ps1 -On`, kun kukaan ei pelaa.
+Päivittäjä näyttää kuuntelijan tilan ja varoittaa puuttuvasta chatista. Käynnistys-, portti- ja
+socket-virheet kirjataan ilman tunnisteita tai viestien sisältöä; HTTP-palvelin jatkaa toimintaansa.
+Kavereiden läsnäolotieto on edelleen erillinen opt-in. Muutos on automaattitestattu, ei uusi kahden
+pelaajan VPS-koe. Chat-kuuntelija toimii metagamen sisällä
 ([Asetukset]({{ config_page.url | relative_url }}#metagame-chat)). Jokainen alla oleva sääntö on
 katettu testeillä, jotka syöttävät palvelimen vastaukset ohjelmatiedostosta luettuun peliohjelman
 malliin. Kahden pelaajan testi vuokratulla palvelimella vahvistaa tai korjaa ne.

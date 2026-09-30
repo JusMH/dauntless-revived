@@ -58,7 +58,7 @@ try {
 DrainAndRegisterAPIKeys().then(async () => {
   await DrainAndRegisterUserAPIKeys();
 
-  // Text chat (roadmap 3.10, docs/findings/chat.md): only with CHAT=1, on loopback. A bad setting or a
+  // Text chat (roadmap 3.10, docs/findings/chat.md): on by default, CHAT=0 opts out. A bad setting or a
   // port in use is one error line; the metagame always starts, with or without chat.
   const Chat = await StartChat();
 

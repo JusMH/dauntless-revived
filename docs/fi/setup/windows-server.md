@@ -365,7 +365,8 @@ Omalta koneelta `Deploy-Remote.ps1 -Server <osoite> -Status` näyttää tilantee
 Pelin tekstichat (Ramsgaten ja metsästysten chat, ryhmächat, kiltachat ja kuiskaukset käyttäjänimin)
 on metagamen sisällä toimiva kuuntelija osoitteessa `127.0.0.1:61099`. Yhdyskäytävä välittää pelin
 chat-yhteyden sille jo valmiiksi, joten **palomuurista ei tarvitse avata mitään**, eivätkä kaverit
-tarvitse uutta käynnistintä. Uudessa asennuksessa se on pois päältä. Miten se toimii:
+tarvitse uutta käynnistintä. Uudessa julkisessa asennuksessa se on oletuksena päällä. Vanha tallennettu
+Off säilyy: ota chat käyttöön komennolla `Set-Chat.ps1 -On`, kun kukaan ei pelaa. Miten se toimii:
 [Tekstichat]({{ chat_page.url | relative_url }}).
 
 **Kytke se, kun kukaan ei pelaa.** Chatin kytkeminen päälle tai pois käynnistää kokonaisuuden

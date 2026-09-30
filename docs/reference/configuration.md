@@ -330,7 +330,7 @@ one `chat: not started ...` error line, and the metagame runs on without chat.
 
 | Name | Default | Values | What it does | Set by |
 |:-----|:--------|:-------|:-------------|:-------|
-| `CHAT` | off | `1` turns it on; `0` or unset is off, anything else is off with a warning | Starts the chat listener. The startup line is `chat: listening on 127.0.0.1:61099 (nick check enforce)`. It replaces `EXPERIMENTAL_CHAT` from the first prototype, which is no longer read (a warning says so). | Kit: always in public mode (`CHAT=1` or `0` from `-Chat On` or `Off`, else `server.json`) |
+| `CHAT` | on | unset/empty or `1` is on; `0` is off; other values are off with a warning | Starts loopback in-game chat. Bind/startup/socket failures are logged without message text or tokens; the HTTP backend stays up. Replaces the ignored `EXPERIMENTAL_CHAT`. Existing `CHAT=0` is preserved on update: run `Set-Chat.ps1 -On` once when the server is empty. | Kit: public installs use `-Chat`, else saved `Chat`, else On. Private kit installs explicitly set `0`. |
 | `CHAT_PORT` | `61099` | 1-65535 | The listener's port. Must be the port in the gateway's `GATEWAY_WS_URL`. | Kit: always in public mode (61099; 62099 in sandbox) |
 | `CHAT_BIND_HOST` | `127.0.0.1` | `127.0.0.1` or `::1`; with `GATEWAY_SECRET` set (public mode) only `127.0.0.1` | The listener's address. Anything else, `0.0.0.0` included, keeps chat off. Private mode (Tailscale) is not supported yet. | Kit: always `127.0.0.1` in public mode |
 | `CHAT_NICK_CHECK` | `enforce` | `enforce` or `log`; anything else counts as `enforce` with a warning | `enforce` refuses a room join whose nickname is not `<the account's username>:<its account id>:<its resource>` ([why]({{ '/findings/chat.html' | relative_url }}#nickname-check)). `log` admits a nickname that fails the resource, format or name rule, with one warning line per connection and room: a rollback switch in case the live test shows a real client being refused. A nickname with another account's id is refused in both modes (a real client never builds one). | Nobody by default |
@@ -573,7 +573,7 @@ Other rules:
   [Ports and network]({{ ports_page.url | relative_url }}).
 - `NODE_ENV=production` is written into all five files. Only the metagame and the deploy server read
   it.
-- Chat: `-Chat On` or `-Chat Off`, else the existing install's `server.json` (`"Chat"`), else Off. The
+- Chat: `-Chat On` or `-Chat Off`, else the existing install's `server.json` (`"Chat"`), else On. The
   choice is saved in `server.json`. `Set-Chat.ps1 -On` or `-Off` changes it later, in both
   `metagame.env` and `server.json`. Private mode has no chat yet.
 - The installer writes none of the switches added with the port of Harmonic's fork (`ESCALATION_*`,
