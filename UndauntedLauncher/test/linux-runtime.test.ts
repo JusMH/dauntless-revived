@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { detectLinuxRuntime } from "../src/main/linux-runtime";
+import { detectLinuxRuntime, prepareLinuxGameLaunch } from "../src/main/linux-runtime";
 
 function executable(file: string): string {
   mkdirSync(path.dirname(file), { recursive: true });
@@ -39,6 +39,44 @@ test("Linux runtime: auto-detects Steam compatibility tools and prepares Proton 
     assert.equal(runtime?.compatDataDir, path.join(userData, "compat", "proton"));
     assert.equal(runtime?.prefixDir, path.join(userData, "compat", "proton", "pfx"));
     assert.equal(runtime?.env.STEAM_COMPAT_DATA_PATH, path.join(userData, "compat", "proton"));
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("Linux runtime: auto-detects Proton from Flatpak Steam", () => {
+  const home = mkdtempSync(path.join(tmpdir(), "dr-linux-flatpak-proton-"));
+  try {
+    const root = path.join(home, ".var", "app", "com.valvesoftware.Steam", "data", "Steam");
+    const proton = executable(path.join(root, "steamapps", "common", "Proton - Experimental", "proton"));
+    const runtime = detectLinuxRuntime(path.join(home, "data"), { HOME: home, USER: "slayer", PATH: "" }, home);
+    assert.equal(runtime?.kind, "proton");
+    assert.equal(runtime?.command, proton);
+    assert.equal(runtime?.env.STEAM_COMPAT_CLIENT_INSTALL_PATH, root);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("Linux runtime: creates the Proton compat-data directory before first initialization", { skip: process.platform !== "linux" }, async () => {
+  const home = mkdtempSync(path.join(tmpdir(), "dr-linux-proton-init-"));
+  try {
+    const proton = path.join(home, "custom", "proton");
+    mkdirSync(path.dirname(proton), { recursive: true });
+    writeFileSync(
+      proton,
+      "#!/bin/sh\n[ -d \"$STEAM_COMPAT_DATA_PATH\" ] || exit 42\n/bin/mkdir -p \"$STEAM_COMPAT_DATA_PATH/pfx/drive_c\"\n",
+    );
+    chmodSync(proton, 0o755);
+    const userData = path.join(home, "data");
+    const prepared = await prepareLinuxGameLaunch(
+      userData,
+      { HOME: home, USER: "slayer", PATH: "", DAUNTLESS_REVIVED_PROTON: proton },
+      home,
+      { autoInstallRuntime: false },
+    );
+    assert.equal(prepared.runtimeName, "Proton (custom)");
+    assert.equal(prepared.configDir, path.join(userData, "compat", "proton", "pfx", "drive_c", "users", "steamuser", "AppData", "Local", "Archon", "Saved", "Config", "WindowsClient"));
   } finally {
     rmSync(home, { recursive: true, force: true });
   }

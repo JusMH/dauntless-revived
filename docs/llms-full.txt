@@ -1629,7 +1629,7 @@ You need:
 
 - an **x86_64** Linux desktop using glibc;
 - working graphics drivers, including Vulkan support for the normal Proton/DXVK path;
-- one compatibility runtime: Steam Proton, Proton-GE, Wine, or a Lutris Wine runner;
+- either an existing compatibility runtime (Steam Proton, Proton-GE, Wine, or Lutris Wine) or a desktop that can authorize the launcher's automatic Wine install;
 - about 11 GB for the game, plus free space for downloads and the compatibility prefix;
 - Tailscale only when your host gave you a private/v1 invite.
 
@@ -1669,12 +1669,11 @@ sudo apt install ./DauntlessRevivedLauncher-*-linux-amd64.deb
 Using `apt install ./file.deb` lets APT resolve package dependencies. Ubuntu documents local
 `.deb` installation with this command.
 
-For the game runtime, the easiest option is usually native Steam + Proton. Install Steam using your
-distribution's normal package/software source, start it once, and make sure at least one Proton
-version is installed. The launcher searches the usual native Steam locations automatically.
-
-Wine also works. On systems that provide it as `wine64`/Wine packages, install Wine through APT,
-then start the launcher normally.
+For the game runtime, the launcher searches native Steam **and Flatpak Steam** for installed Proton
+versions. Wine also works. If no supported runtime exists, packaged Linux builds can ask Polkit for
+authorization and install the distro's Wine package automatically when you press **PLAY**. Set
+`DAUNTLESS_REVIVED_AUTO_INSTALL=0` before starting the launcher if you prefer to manage dependencies
+yourself.
 
 After installation, launch **Dauntless Revived Launcher** from the application menu. The default game
 folder is:
@@ -1911,18 +1910,11 @@ Flatpak Steam normally stores its files under:
 ~/.var/app/com.valvesoftware.Steam/data/Steam
 ```
 
-That location is not currently part of automatic Proton discovery. Point the launcher at the Proton
-script explicitly. For example, with Proton Experimental:
+That location is searched automatically. Start Flatpak Steam once and install at least one Proton
+version; the launcher will find it without a wrapper or environment variable.
 
-```bash
-DAUNTLESS_REVIVED_PROTON="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common/Proton - Experimental/proton" \
-  ./DauntlessRevivedLauncher-*-linux-x86_64.AppImage
-```
-
-Adjust the folder name to the Proton version you actually have.
-
-For a packaged launcher from your desktop menu, you can also export
-`DAUNTLESS_REVIVED_PROTON` in your desktop session or create a small wrapper script.
+You can still use `DAUNTLESS_REVIVED_PROTON` to force one exact Proton script when troubleshooting
+or when your Steam library is in a nonstandard location.
 
 ## Choosing Proton or Wine
 
@@ -1931,8 +1923,10 @@ Runtime selection is:
 1. `DAUNTLESS_REVIVED_PROTON`, when explicitly set;
 2. `DAUNTLESS_REVIVED_WINE`, when explicitly set;
 3. Steam Proton / Proton-GE in native Steam's normal directories;
-4. `wine64` or `wine` from `PATH`;
-5. Lutris Wine under `~/.local/share/lutris/runners/wine`.
+4. Steam Proton / Proton-GE from Flatpak Steam;
+5. `wine64` or `wine` from `PATH`;
+6. Lutris Wine under `~/.local/share/lutris/runners/wine`;
+7. if none exists and automatic dependency installation is enabled, the distro's Wine package is installed through Polkit and detected again.
 
 Examples:
 
@@ -1973,9 +1967,18 @@ For the rest of the player workflow, see
 
 ### "Linux needs Proton or Wine"
 
-No supported runtime was found. Install native Steam + Proton, Wine, or Lutris Wine. If it is already
-installed in a nonstandard location, set `DAUNTLESS_REVIVED_PROTON` or
-`DAUNTLESS_REVIVED_WINE`.
+No supported runtime was found and automatic installation could not provide one. Normally the launcher
+offers to install Wine through your distro's package manager when you press **PLAY**. You can also
+install Steam + Proton, Wine, or Lutris Wine yourself. If a runtime is in a nonstandard location, set
+`DAUNTLESS_REVIVED_PROTON` or `DAUNTLESS_REVIVED_WINE`.
+
+### "The operating system couldn't store your key securely"
+
+Linux account keys use Electron's encrypted desktop secret store. The launcher now repairs missing
+desktop D-Bus variables, selects GNOME/libsecret when a GNOME-family keyring is present, and packaged
+builds can install `gnome-keyring`/libsecret through Polkit when those dependencies are missing.
+The DEB also recommends those packages during installation. If you deliberately disabled automatic
+dependency installation, install your desktop's Secret Service/KWallet provider yourself.
 
 ### AppImage does not start
 
@@ -1995,7 +1998,7 @@ under its Electron user-data folder. Common causes are:
 
 - broken/missing Vulkan drivers;
 - a Proton/Wine runtime that was moved after the launcher found it;
-- a Flatpak Steam Proton path that needs the explicit override;
+- a Steam/Flatpak Steam Proton install that is incomplete or was moved;
 - permission problems in the selected game folder;
 - a game folder that is not the exact pinned 1.4.4 build.
 

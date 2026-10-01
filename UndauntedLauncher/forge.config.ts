@@ -62,6 +62,7 @@ const config: ForgeConfig = {
           icon: "assets/icon.png",
           categories: ["Game"],
           mimeType: ["x-scheme-handler/dauntless-revived"],
+          recommends: ["gnome-keyring", "libsecret-1-0", "pkexec"],
           suggests: ["wine64", "steam"],
         },
       },

@@ -14,6 +14,11 @@ import { Controller, type Platform } from "./main/controller";
 import { GAME_MANIFEST, GAME_MANIFEST_FINGERPRINT, GAME_MANIFEST_PROBLEM } from "./main/game-manifest";
 import { findRunningClients } from "./main/launch";
 import { LinuxRuntimeMissingError, prepareLinuxGameLaunch } from "./main/linux-runtime";
+import {
+  linuxDependencyInstallPlan,
+  repairLinuxDesktopEnvironment,
+  runLinuxDependencyInstall,
+} from "./main/linux-dependencies";
 import { findTailscale } from "./main/system";
 import { describeError, log, logToFile } from "./main/log";
 import { boundedString, externalTarget, isTrustedPageUrl, relayPortOverride, settingsPatch } from "./main/ipc-validate";
@@ -24,6 +29,17 @@ import { APP_ID, SQUIRREL_NAME, UPDATE_FEED_URL } from "./main/constants";
 
 // Squirrel install / update / uninstall events: create or remove shortcuts, then quit.
 if (started) app.quit();
+
+// Repair a stripped desktop environment (for example when launched by a helper) before Chromium
+// chooses its Linux password-store backend. GNOME-family desktops use Secret Service/libsecret.
+const linuxDesktop = repairLinuxDesktopEnvironment();
+if (
+  process.platform === "linux" &&
+  linuxDesktop.forceGnomeLibsecret &&
+  !process.argv.some((arg) => arg.startsWith("--password-store="))
+) {
+  app.commandLine.appendSwitch("password-store", "gnome-libsecret");
+}
 
 // Every renderer runs in the Chromium sandbox, whatever a window's own options say.
 app.enableSandbox();
@@ -49,6 +65,34 @@ let quitting = false;
 
 function resourcesDir(): string {
   return app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "assets");
+}
+
+async function ensureLinuxSecureStorageDependency(): Promise<boolean> {
+  if (process.platform !== "linux" || safeStorage.isEncryptionAvailable()) return false;
+  const backend = safeStorage.getSelectedStorageBackend();
+  log.warn(`secure storage unavailable (backend ${backend})`);
+  if (
+    !app.isPackaged ||
+    process.env.DAUNTLESS_REVIVED_AUTO_INSTALL === "0" ||
+    process.env.DAUNTLESS_REVIVED_STORAGE_BOOTSTRAPPED === "1"
+  ) {
+    return false;
+  }
+
+  const plan = linuxDependencyInstallPlan("secure-storage");
+  if (!plan) return false;
+  log.info(`installing Linux secure-storage dependencies with ${plan.name}`);
+  try {
+    await runLinuxDependencyInstall(plan);
+    log.info("Linux secure-storage dependencies installed; restarting launcher");
+    process.env.DAUNTLESS_REVIVED_STORAGE_BOOTSTRAPPED = "1";
+    app.relaunch();
+    app.exit(0);
+    return true;
+  } catch (e) {
+    log.error(`secure-storage dependency install failed: ${describeError(e)}`);
+    return false;
+  }
 }
 
 // ------------------------------------------------------------------ invite links
@@ -357,7 +401,12 @@ function makePlatform(): Platform {
       process.platform === "linux"
         ? async () => {
             try {
-              return await prepareLinuxGameLaunch(app.getPath("userData"));
+              return await prepareLinuxGameLaunch(
+                app.getPath("userData"),
+                process.env,
+                app.getPath("home"),
+                { autoInstallRuntime: app.isPackaged },
+              );
             } catch (e) {
               if (e instanceof LinuxRuntimeMissingError) return null;
               throw e;
@@ -394,6 +443,12 @@ if (!started) {
       Menu.setApplicationMenu(null);
       logToFile(path.join(app.getPath("userData"), "logs"));
       log.info(`Dauntless Revived Launcher ${app.getVersion()} starting`);
+      if (process.platform === "linux") {
+        log.info(
+          `secure storage backend ${safeStorage.getSelectedStorageBackend()}, encryption ${safeStorage.isEncryptionAvailable() ? "available" : "unavailable"}`,
+        );
+        if (await ensureLinuxSecureStorageDependency()) return;
+      }
       if (GAME_MANIFEST) log.info(`game manifest ${GAME_MANIFEST.files.length} files, fingerprint ${GAME_MANIFEST_FINGERPRINT}`);
       else log.error(`compiled-in game manifest is not usable: ${GAME_MANIFEST_PROBLEM}`);
 

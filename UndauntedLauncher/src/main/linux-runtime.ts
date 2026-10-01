@@ -3,6 +3,8 @@ import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSyn
 import os from "node:os";
 import path from "node:path";
 import type { LaunchRuntime } from "./launch";
+import { linuxDependencyInstallPlan, runLinuxDependencyInstall } from "./linux-dependencies";
+import { describeError, log } from "./log";
 
 export type LinuxRuntimeKind = "proton" | "wine";
 
@@ -68,6 +70,8 @@ function protonCandidates(home: string): string[] {
     path.join(home, ".local", "share", "Steam"),
     path.join(home, ".steam", "root"),
     path.join(home, ".steam", "steam"),
+    path.join(home, ".var", "app", "com.valvesoftware.Steam", "data", "Steam"),
+    path.join(home, ".var", "app", "com.valvesoftware.Steam", ".local", "share", "Steam"),
   ];
   const out: string[] = [];
   for (const root of steamRoots) {
@@ -194,12 +198,30 @@ function wineUser(runtime: DetectedLinuxRuntime, env: NodeJS.ProcessEnv): string
   return raw.replace(/[\\/:*?"<>|]/g, "_").slice(0, 64) || "wineuser";
 }
 
+export interface PrepareLinuxGameLaunchOptions {
+  autoInstallRuntime?: boolean;
+}
+
 export async function prepareLinuxGameLaunch(
   userDataDir: string,
   env: NodeJS.ProcessEnv = process.env,
   home: string = env.HOME ?? os.homedir(),
+  options: PrepareLinuxGameLaunchOptions = {},
 ): Promise<PreparedLinuxGameLaunch> {
-  const detected = detectLinuxRuntime(userDataDir, env, home);
+  let detected = detectLinuxRuntime(userDataDir, env, home);
+  if (!detected && options.autoInstallRuntime && env.DAUNTLESS_REVIVED_AUTO_INSTALL !== "0") {
+    const plan = linuxDependencyInstallPlan("runtime", env);
+    if (plan) {
+      log.info(`no Proton/Wine runtime found; installing Wine with ${plan.name}`);
+      try {
+        await runLinuxDependencyInstall(plan, env, home);
+        log.info("Wine dependency install finished; detecting runtime again");
+      } catch (e) {
+        log.warn(`automatic Wine install failed: ${describeError(e)}`);
+      }
+      detected = detectLinuxRuntime(userDataDir, env, home);
+    }
+  }
   if (!detected) throw new LinuxRuntimeMissingError();
   await initialize(detected, home);
   const user = wineUser(detected, env);

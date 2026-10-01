@@ -35,7 +35,7 @@ Tarvitset:
 
 - **x86_64**-Linux-työpöydän, joka käyttää glibc:tä;
 - toimivat näytönohjaimen ajurit ja Vulkan-tuen Proton/DXVK-polulle;
-- yhden yhteensopivuusympäristön: Steam Proton, Proton-GE, Wine tai Lutris Wine;
+- joko valmiin yhteensopivuusympäristön (Steam Proton, Proton-GE, Wine tai Lutris Wine) tai työpöydän, joka voi hyväksyä käynnistimen automaattisen Wine-asennuksen;
 - noin 11 Gt pelille sekä vapaata tilaa latauksille ja yhteensopivuusprefiksille;
 - Tailscalen vain, jos ylläpitäjä antoi yksityisen/v1-kutsun.
 
@@ -74,13 +74,10 @@ sudo apt install ./DauntlessRevivedLauncher-*-linux-amd64.deb
 
 APT ratkaisee riippuvuudet, kun paikallinen DEB asennetaan näin.
 
-Pelin ajamiseen helpoin vaihtoehto on yleensä natiivisti asennettu Steam + Proton. Asenna Steam
-jakelusi tavallisesta pakettilähteestä tai sovelluskaupasta, käynnistä se kerran ja varmista, että
-ainakin yksi Proton-versio on asennettu. Käynnistin löytää tavalliset natiivin Steamin Proton-polut
-automaattisesti.
-
-Wine käy myös. Asenna jakelun tarjoama Wine/Wine64 APT:n kautta ja käynnistä Dauntless Revived
-normaalisti.
+Käynnistin etsii asennetut Proton-versiot automaattisesti sekä natiivista Steamista että Flatpak
+Steamista. Wine käy myös. Jos sopivaa ajoympäristöä ei löydy, paketoitu Linux-käynnistin voi pyytää
+Polkit-valtuutuksen ja asentaa jakelun Wine-paketin automaattisesti, kun painat **PELAA**. Aseta
+`DAUNTLESS_REVIVED_AUTO_INSTALL=0`, jos haluat hallita riippuvuudet itse.
 
 Oletuspelikansio Linuxissa on:
 
@@ -304,15 +301,11 @@ Flatpak Steam käyttää tavallisesti:
 ~/.var/app/com.valvesoftware.Steam/data/Steam
 ```
 
-Tätä polkua ei tällä hetkellä tutkita automaattisesti. Osoita käynnistin Protonin `proton`-skriptiin
-itse. Esimerkki Proton Experimentalista:
+Tämä polku tutkitaan nyt automaattisesti. Käynnistä Flatpak Steam kerran ja asenna vähintään yksi
+Proton-versio; käynnistin löytää sen ilman wrapper-skriptiä tai ympäristömuuttujaa.
 
-```bash
-DAUNTLESS_REVIVED_PROTON="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common/Proton - Experimental/proton" \
-  ./DauntlessRevivedLauncher-*-linux-x86_64.AppImage
-```
-
-Muuta kansion nimi siihen Proton-versioon, joka koneellasi oikeasti on.
+`DAUNTLESS_REVIVED_PROTON`-muuttujaa voi edelleen käyttää tietyn Proton-skriptin pakottamiseen
+vianetsinnässä tai jos Steam-kirjasto on epästandardissa polussa.
 
 ## Protonin tai Winen valinta
 
@@ -321,8 +314,10 @@ Valintajärjestys on:
 1. `DAUNTLESS_REVIVED_PROTON`, jos se on asetettu;
 2. `DAUNTLESS_REVIVED_WINE`, jos se on asetettu;
 3. Steam Proton / Proton-GE natiivin Steamin tavallisissa kansioissa;
-4. `wine64` tai `wine` `PATH`-muuttujasta;
-5. Lutris Wine kansiosta `~/.local/share/lutris/runners/wine`.
+4. Steam Proton / Proton-GE Flatpak Steamista;
+5. `wine64` tai `wine` `PATH`-muuttujasta;
+6. Lutris Wine kansiosta `~/.local/share/lutris/runners/wine`;
+7. jos mitään näistä ei löydy ja automaattinen riippuvuuksien asennus on käytössä, käynnistin asentaa jakelun Wine-paketin Polkitin kautta ja etsii ajoympäristön uudelleen.
 
 Esimerkkejä:
 
@@ -363,9 +358,18 @@ Muu pelaajan käyttö löytyy sivulta
 
 ### "Linux needs Proton or Wine"
 
-Käynnistin ei löytänyt yhteensopivaa ajoympäristöä. Asenna natiivi Steam + Proton, Wine tai Lutris
-Wine. Jos se on epästandardissa polussa, aseta `DAUNTLESS_REVIVED_PROTON` tai
-`DAUNTLESS_REVIVED_WINE`.
+Käynnistin ei löytänyt yhteensopivaa ajoympäristöä eikä automaattinen asennus saanut sitä käyttöön.
+Normaalisti käynnistin tarjoaa Winen asennusta jakelun paketinhallinnalla, kun painat **PELAA**. Voit
+myös asentaa Steam + Protonin, Winen tai Lutris Winen itse. Jos ajoympäristö on epästandardissa
+polussa, aseta `DAUNTLESS_REVIVED_PROTON` tai `DAUNTLESS_REVIVED_WINE`.
+
+### "The operating system couldn't store your key securely"
+
+Linuxin tiliavaimet tallennetaan Electronin salattuun työpöydän salaisuussäilöön. Käynnistin korjaa
+nyt puuttuvat työpöydän D-Bus-ympäristömuuttujat, valitsee GNOME/libsecret-taustan GNOME-sukuisessa
+ympäristössä ja paketoitu versio voi asentaa `gnome-keyring`/libsecret-riippuvuudet Polkitin kautta,
+jos ne puuttuvat. DEB myös suosittelee näitä paketteja asennuksen yhteydessä. Jos automaattinen
+riippuvuuksien asennus on poistettu käytöstä, asenna työpöytäsi Secret Service/KWallet-palvelu itse.
 
 ### AppImage ei käynnisty
 
@@ -385,7 +389,7 @@ alta. Tavallisia syitä ovat:
 
 - puuttuva tai rikkinäinen Vulkan-ajuri;
 - Proton/Wine on siirretty asennuksen jälkeen;
-- Flatpak Steamin Proton tarvitsee käsin annetun polun;
+- Steam/Flatpak Steam -Proton-asennus on keskeneräinen tai siirretty;
 - valitun pelikansion käyttöoikeudet;
 - pelikansio ei ole täsmälleen kiinnitetty 1.4.4-versio.
 
