@@ -8,7 +8,7 @@ export const PROJECT_CONTRIBUTORS_URL = "https://github.com/mixutin/dauntless-re
 // Undaunted, the project this launcher and the whole fork are a modified version of.
 export const UPSTREAM_URL = "https://github.com/SyST3MDeV/Undaunted";
 export const UPSTREAM_CONTRIBUTORS_URL = "https://github.com/SyST3MDeV/Undaunted/graphs/contributors";
-export const TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download/windows";
+export const TAILSCALE_DOWNLOAD_URL = "https://tailscale.com/download";
 export const VC_REDIST_URL = "https://aka.ms/vs/17/release/vc_redist.x64.exe";
 // Self-update feed: a rolling GitHub release that the release workflow keeps current
 // (update.electronjs.org only reads plain semver tags, and launcher releases are tagged launcher-v*).

@@ -48,11 +48,14 @@ function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
-function validDir(v: unknown): string | null {
-  return typeof v === "string" && v.length > 3 && v.length < 200 && path.win32.isAbsolute(v) && !v.includes("\0") ? v : null;
+function validDir(v: unknown, platform: NodeJS.Platform = process.platform): string | null {
+  if (typeof v !== "string" || v.length <= 3 || v.length >= 200 || v.includes("\0")) return null;
+  if (platform === "win32") return /^[A-Za-z]:[\\/]/.test(v) && path.win32.isAbsolute(v) ? v : null;
+  if (platform === "linux") return path.posix.isAbsolute(v) ? v : null;
+  return null;
 }
 
-export function sanitizeSettings(raw: unknown, language: Language): StoredSettings {
+export function sanitizeSettings(raw: unknown, language: Language, platform: NodeJS.Platform = process.platform): StoredSettings {
   const s = defaultSettings(language);
   if (!isObject(raw)) return s;
   if (isObject(raw.server)) {
@@ -76,8 +79,8 @@ export function sanitizeSettings(raw: unknown, language: Language): StoredSettin
       };
     }
   }
-  s.installDir = validDir(raw.installDir);
-  s.verifiedDir = validDir(raw.verifiedDir);
+  s.installDir = validDir(raw.installDir, platform);
+  s.verifiedDir = validDir(raw.verifiedDir, platform);
   if (GRAPHICS_PRESETS.includes(raw.graphics as GraphicsPreset)) s.graphics = raw.graphics as GraphicsPreset;
   if (EXPOSURE_MODES.includes(raw.exposure as ExposureMode)) s.exposure = raw.exposure as ExposureMode;
   s.windowed = raw.windowed === true;
@@ -95,7 +98,7 @@ export class SettingsStore {
   private data: StoredSettings;
   private readonly file: string;
 
-  constructor(dir: string, language: Language) {
+  constructor(dir: string, language: Language, private readonly platform: NodeJS.Platform = process.platform) {
     this.file = path.join(dir, "settings.json");
     let raw: unknown = null;
     try {
@@ -103,7 +106,7 @@ export class SettingsStore {
     } catch {
       raw = null;
     }
-    this.data = sanitizeSettings(raw, language);
+    this.data = sanitizeSettings(raw, language, this.platform);
   }
 
   get(): StoredSettings {
@@ -113,7 +116,7 @@ export class SettingsStore {
   async update(fn: (s: StoredSettings) => void): Promise<StoredSettings> {
     const copy: StoredSettings = JSON.parse(JSON.stringify(this.data));
     fn(copy);
-    this.data = sanitizeSettings(copy, copy.language);
+    this.data = sanitizeSettings(copy, copy.language, this.platform);
     await fsp.mkdir(path.dirname(this.file), { recursive: true });
     const tmp = `${this.file}.tmp`;
     await fsp.writeFile(tmp, JSON.stringify(this.data, null, 2));

@@ -63,6 +63,7 @@ export type ErrorCode =
   | "game_files_invalid"
   | "already_running"
   | "launch_failed"
+  | "compat_runtime_missing"
   | "config_failed"
   | "busy"
   | "cancelled"

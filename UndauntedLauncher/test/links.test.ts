@@ -23,7 +23,7 @@ const SHARE = "https://login.tailscale.com/admin/invite/links-test";
 
 // Every fixed link and the one URL it opens, written out here on purpose (not taken from constants.ts).
 const EXPECTED: Record<FixedTarget, string> = {
-  tailscale_download: "https://tailscale.com/download/windows",
+  tailscale_download: "https://tailscale.com/download",
   vc_redist: "https://aka.ms/vs/17/release/vc_redist.x64.exe",
   project_source: "https://github.com/mixutin/dauntless-revived",
   project_license: "https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/LICENSE.txt",

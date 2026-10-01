@@ -58,10 +58,10 @@ test("only drive-letter paths: network, device and relative paths are refused be
     "C:\\Games\\Base\0Game144",
     "C:\\" + "a".repeat(300),
   ]) {
-    assert.equal(cleanGameFolderInput(bad), null, JSON.stringify(bad));
-    assert.deepEqual(await locateExistingGame(bad), { ok: false, reason: "invalid_path" }, JSON.stringify(bad));
+    assert.equal(cleanGameFolderInput(bad, "win32"), null, JSON.stringify(bad));
+    assert.deepEqual(await locateExistingGame(bad, "win32"), { ok: false, reason: "invalid_path" }, JSON.stringify(bad));
   }
-  assert.equal(cleanGameFolderInput("c:/Games/BaseGame144/"), "c:\\Games\\BaseGame144");
+  assert.equal(cleanGameFolderInput("c:/Games/BaseGame144/", "win32"), "c:\\Games\\BaseGame144");
 });
 
 test("a game root longer than the install-folder limit is refused, so no game file passes 260 characters", async () => {

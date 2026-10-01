@@ -47,6 +47,12 @@ export function describeLaunch(exe: string, args: string[]): string {
 
 export type SpawnFn = typeof spawn;
 
+export interface LaunchRuntime {
+  command: string;
+  argsPrefix: string[];
+  env: NodeJS.ProcessEnv;
+}
+
 // Tracks the one game process this launcher started.
 export class GameProcess {
   private child: ChildProcess | null = null;
@@ -62,11 +68,19 @@ export class GameProcess {
     this.listeners.push(fn);
   }
 
-  start(win64Dir: string, args: string[]): Promise<void> {
+  start(win64Dir: string, args: string[], runtime?: LaunchRuntime): Promise<void> {
     if (this.child) return Promise.reject(new Error("already running"));
     const exe = path.join(win64Dir, EXE_NAME);
+    const command = runtime?.command ?? exe;
+    const launchArgs = runtime ? [...runtime.argsPrefix, exe, ...args] : args;
     return new Promise((resolve, reject) => {
-      const child = this.spawnFn(exe, args, { cwd: win64Dir, stdio: "ignore", windowsHide: false, detached: false });
+      const child = this.spawnFn(command, launchArgs, {
+        cwd: win64Dir,
+        stdio: "ignore",
+        windowsHide: false,
+        detached: false,
+        env: runtime?.env ?? process.env,
+      });
       let started = false;
       child.once("spawn", () => {
         started = true;
@@ -88,7 +102,22 @@ export class GameProcess {
 // Lists running Dauntless clients. Game servers (the same exe started with -server, as on the
 // host's own PC) do not count. Only process ids and a yes/no are read back: other processes'
 // command lines contain their keys and never leave PowerShell.
-export function findRunningClients(): Promise<number[]> {
+export function findRunningClients(platform: NodeJS.Platform = process.platform): Promise<number[]> {
+  if (platform === "linux") {
+    return new Promise((resolve) => {
+      execFile("pgrep", ["-f", EXE_NAME], { timeout: 10000 }, (err, stdout) => {
+        if (err) return resolve([]);
+        resolve(
+          stdout
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => /^\d+$/.test(line))
+            .map(Number),
+        );
+      });
+    });
+  }
+  if (platform !== "win32") return Promise.resolve([]);
   return new Promise((resolve) => {
     execFile("tasklist.exe", ["/FI", `IMAGENAME eq ${EXE_NAME}`, "/FO", "CSV", "/NH"], { windowsHide: true, timeout: 10000 }, (err, stdout) => {
       if (err || !stdout.toLowerCase().includes(EXE_NAME.toLowerCase())) return resolve([]);

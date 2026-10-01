@@ -1,13 +1,17 @@
 import type { ForgeConfig } from "@electron-forge/shared-types";
 import { MakerSquirrel } from "@electron-forge/maker-squirrel";
 import { MakerZIP } from "@electron-forge/maker-zip";
+import { MakerDeb } from "@electron-forge/maker-deb";
+import { MakerRpm } from "@electron-forge/maker-rpm";
+import { MakerAppImage } from "@reforged/maker-appimage";
 import { VitePlugin } from "@electron-forge/plugin-vite";
 import { FusesPlugin } from "@electron-forge/plugin-fuses";
 import { FuseV1Options, FuseVersion } from "@electron/fuses";
 
-// Windows only. The Squirrel installer is what friends run; the ZIP is for people who prefer a
-// portable copy. CI (.github/workflows/ci.yml) builds both on every push; .github/workflows/
-// launcher-release.yml publishes them.
+// Windows uses Squirrel plus a portable ZIP. Linux builds AppImage, deb, rpm and a portable ZIP.
+// CI builds both platforms on every push and launcher-release.yml publishes them together.
+const skipRpm = process.env.DAUNTLESS_REVIVED_SKIP_RPM === "1";
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
@@ -41,8 +45,62 @@ const config: ForgeConfig = {
       setupIcon: "assets/icon.ico",
       iconUrl: "https://raw.githubusercontent.com/mixutin/dauntless-revived/dauntless-revived/UndauntedLauncher/assets/icon.ico",
       noMsi: true,
+    }, ["win32"]),
+    new MakerZIP({}, ["win32", "linux"]),
+    new MakerDeb(
+      {
+        options: {
+          name: "dauntless-revived-launcher",
+          productName: "Dauntless Revived Launcher",
+          genericName: "Game Launcher",
+          bin: "DauntlessRevivedLauncher",
+          description: "Launcher for the Dauntless Revived community servers",
+          section: "games",
+          priority: "optional",
+          maintainer: "mixutin",
+          homepage: "https://github.com/mixutin/dauntless-revived",
+          icon: "assets/icon.png",
+          categories: ["Game"],
+          mimeType: ["x-scheme-handler/dauntless-revived"],
+          suggests: ["wine64", "steam"],
+        },
+      },
+      ["linux"],
+    ),
+    ...(skipRpm
+      ? []
+      : [
+          new MakerRpm(
+            {
+              options: {
+                name: "dauntless-revived-launcher",
+                productName: "Dauntless Revived Launcher",
+                genericName: "Game Launcher",
+                bin: "DauntlessRevivedLauncher",
+                description: "Launcher for the Dauntless Revived community servers",
+                license: "AGPL-3.0-only",
+                homepage: "https://github.com/mixutin/dauntless-revived",
+                icon: "assets/icon.png",
+                categories: ["Game"],
+                mimeType: ["x-scheme-handler/dauntless-revived"],
+              },
+            },
+            ["linux"],
+          ),
+        ]),
+    new MakerAppImage({
+      options: {
+        name: "dauntless-revived-launcher",
+        productName: "Dauntless Revived Launcher",
+        genericName: "Game Launcher",
+        bin: "DauntlessRevivedLauncher",
+        icon: "assets/icon.png",
+        categories: ["Game"],
+        mimeType: ["x-scheme-handler/dauntless-revived"],
+        keywords: ["Dauntless", "launcher", "gaming", "Proton", "Wine"],
+        compressor: "zstd",
+      },
     }),
-    new MakerZIP({}, ["win32"]),
   ],
   plugins: [
     new VitePlugin({

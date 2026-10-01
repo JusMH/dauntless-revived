@@ -1,4 +1,4 @@
-// Account keys, one per server, stored only encrypted with Windows DPAPI (Electron safeStorage).
+// Account keys, one per server, stored only through Electron safeStorage (DPAPI on Windows, the desktop secret store on Linux).
 // The key never goes to the renderer; it is read here when a request or the game launch needs it.
 //
 // A public server's key is tied to the certificate fingerprint it was saved with. An invite for the

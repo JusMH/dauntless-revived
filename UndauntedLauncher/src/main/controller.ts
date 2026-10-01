@@ -52,7 +52,7 @@ import { AbortedError, hashFile, removePartFiles, verifyInstall, VerifiedCache }
 import { dllStatus, installPinnedDlls, DllError, win64Dir } from "./dlls";
 import { applyGameConfig } from "./engineini";
 import { locateExistingGame } from "./game-folder";
-import { buildLaunchArgs, describeLaunch, GameProcess, type SpawnFn } from "./launch";
+import { buildLaunchArgs, describeLaunch, GameProcess, type LaunchRuntime, type SpawnFn } from "./launch";
 import { backupFileText, KeyStore, KeyStoreError, serverId, type Encryptor, type KeySlot } from "./keystore";
 import { SettingsStore, type StoredServer, type StoredSettings } from "./settings";
 import { freeBytes, missingVcRuntime } from "./system";
@@ -73,6 +73,7 @@ export interface Platform {
   userDataDir: string;
   resourcesDir: string;
   defaultInstallDir: string;
+  hostPlatform?: NodeJS.Platform;
   appVersion: string;
   packaged: boolean;
   defaultLanguage: Language;
@@ -93,6 +94,7 @@ export interface Platform {
   emitProgress(p: TaskProgress): void;
   findTailscale(): string | null;
   findRunningClients(): Promise<number[]>;
+  prepareGameLaunch?(): Promise<{ runtime: LaunchRuntime; configDir: string; runtimeName: string } | null>;
   spawn?: SpawnFn;
   installUpdate?(): void;
 }
@@ -149,7 +151,7 @@ export class Controller {
   private phase: Phase = "loading";
 
   constructor(private readonly p: Platform) {
-    this.settings = new SettingsStore(p.userDataDir, p.defaultLanguage);
+    this.settings = new SettingsStore(p.userDataDir, p.defaultLanguage, p.hostPlatform ?? process.platform);
     this.keys = new KeyStore(path.join(p.userDataDir, "keys"), p.encryptor);
     this.game = new GameProcess(p.spawn);
     this.verified = new VerifiedCache(path.join(p.userDataDir, "verified-files.json"));
@@ -171,6 +173,10 @@ export class Controller {
 
   get installDir(): string {
     return this.s.installDir ?? this.p.defaultInstallDir;
+  }
+
+  private get hostPlatform(): NodeJS.Platform {
+    return this.p.hostPlatform ?? process.platform;
   }
 
   // True while the game runs through the local relay: closing the launcher would cut the game off.
@@ -263,7 +269,7 @@ export class Controller {
         freeBytes: this.freeSpace,
         requiredBytes: missingBytes + DISK_MARGIN_BYTES,
         totalBytes: manifest?.totalBytes ?? 0,
-        vcRuntimeMissing: missingVcRuntime(),
+        vcRuntimeMissing: missingVcRuntime(process.env, existsSync, this.hostPlatform),
         contentAvailable: this.contentEndpoint() !== null,
       },
       task: this.task,
@@ -793,13 +799,15 @@ export class Controller {
     if (!picked) return err("cancelled");
     // A folder that already holds the game (BaseGame144, its Dauntless folder, or Archon or Win64
     // inside it) is used as that game: no second copy is downloaded next to it.
-    const existing = await locateExistingGame(picked);
+    const existing = await locateExistingGame(picked, this.hostPlatform);
     if (this.task || this.busy || this.game.running) return err("busy");
     // A game found there whose root is too long is refused, not given a second copy in a subfolder
     // (which would be longer still).
     if (!existing.ok && existing.reason === "too_long") return this.fail("folder_invalid");
-    let dir = existing.ok ? existing.root : path.resolve(picked);
-    if (!path.win32.isAbsolute(dir) || dir.length > 150) return this.fail("folder_invalid");
+    const pathApi = this.hostPlatform === "win32" ? path.win32 : path.posix;
+    let dir = existing.ok ? existing.root : pathApi.resolve(picked);
+    const absolute = this.hostPlatform === "win32" ? /^[A-Za-z]:[\\/]/.test(dir) && path.win32.isAbsolute(dir) : path.posix.isAbsolute(dir);
+    if (!absolute || dir.length > 150) return this.fail("folder_invalid");
     // Otherwise an empty folder is used as is, and anything else gets a subfolder.
     if (!existing.ok) {
       let entries: string[] = [];
@@ -808,7 +816,7 @@ export class Controller {
       } catch {
         entries = [];
       }
-      if (entries.length > 0 && !entries.some((e) => e.toLowerCase() === "archon")) dir = path.join(dir, "DauntlessRevived");
+      if (entries.length > 0 && !entries.some((e) => e.toLowerCase() === "archon")) dir = pathApi.join(dir, "DauntlessRevived");
     }
     await this.settings.update((s) => {
       s.installDir = dir === this.p.defaultInstallDir ? null : dir;
@@ -830,7 +838,7 @@ export class Controller {
   // or different, and installs the pinned DLLs.
   async useExistingGamePath(input: string): Promise<ActionResult> {
     if (this.task || this.busy || this.game.running) return err("busy");
-    const found = await locateExistingGame(input);
+    const found = await locateExistingGame(input, this.hostPlatform);
     // Unlike the folder dialog, a pasted path leaves the window usable while the folder is looked at.
     if (this.task || this.busy || this.game.running) return err("busy");
     if (!found.ok) return this.fail(found.reason === "not_found" ? "game_folder_not_found" : "folder_invalid");
@@ -1075,17 +1083,34 @@ export class Controller {
 
       let launched = false;
       try {
+        let prepared: { runtime: LaunchRuntime; configDir: string; runtimeName: string } | null = null;
+        if (this.p.prepareGameLaunch) {
+          try {
+            prepared = await this.p.prepareGameLaunch();
+          } catch (e) {
+            log.error(`compatibility runtime preparation failed: ${describeError(e)}`);
+            return this.fail("launch_failed");
+          }
+          if (this.hostPlatform === "linux" && prepared === null) return this.fail("compat_runtime_missing");
+        }
         try {
-          await applyGameConfig({ host: gameHost, xmppPort, graphics: this.s.graphics, exposure: this.s.exposure, configDir: this.p.gameConfigDir });
+          await applyGameConfig({
+            host: gameHost,
+            xmppPort,
+            graphics: this.s.graphics,
+            exposure: this.s.exposure,
+            configDir: prepared?.configDir ?? this.p.gameConfigDir,
+          });
           if (this.s.exposure !== "game") log.info(`game config: auto exposure ${this.s.exposure}`);
         } catch (e) {
           log.error(`could not write the game config: ${describeError(e)}`);
           return this.fail("config_failed");
         }
         const args = buildLaunchArgs({ host: gameHost, port: gamePort, key, windowed: this.s.windowed });
-        log.info(`starting ${describeLaunch(EXE_NAME, args)}${sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : ""}`);
+        const via = prepared ? ` via ${prepared.runtimeName}` : "";
+        log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : ""}`);
         try {
-          await this.game.start(win64Dir(dir), args);
+          await this.game.start(win64Dir(dir), args, prepared?.runtime);
         } catch (e) {
           log.error(`launch failed: ${describeError(e)}`);
           return this.fail("launch_failed");

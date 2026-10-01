@@ -45,6 +45,7 @@ const ERROR_CODES: Record<ErrorCode, true> = {
   game_files_invalid: true,
   already_running: true,
   launch_failed: true,
+  compat_runtime_missing: true,
   config_failed: true,
   busy: true,
   cancelled: true,

@@ -4,7 +4,13 @@ import { existsSync, promises as fsp } from "node:fs";
 import path from "node:path";
 import { VC_RUNTIME_FILES } from "./constants";
 
-export function tailscaleCandidates(env: NodeJS.ProcessEnv = process.env): string[] {
+export function tailscaleCandidates(env: NodeJS.ProcessEnv = process.env, platform: NodeJS.Platform = process.platform): string[] {
+  if (platform === "linux") {
+    const out = ["/usr/bin/tailscale", "/usr/local/bin/tailscale", "/snap/bin/tailscale"];
+    for (const d of (env.PATH ?? "").split(path.delimiter)) if (d.trim()) out.push(path.join(d.trim(), "tailscale"));
+    return [...new Set(out)];
+  }
+  if (platform !== "win32") return [];
   const dirs = new Set<string>();
   for (const base of [env.ProgramW6432, env.ProgramFiles, env["ProgramFiles(x86)"], "C:\\Program Files"]) {
     if (base) dirs.add(path.join(base, "Tailscale"));
@@ -17,8 +23,12 @@ export function tailscaleCandidates(env: NodeJS.ProcessEnv = process.env): strin
   return candidates;
 }
 
-export function findTailscale(env: NodeJS.ProcessEnv = process.env, exists: (p: string) => boolean = existsSync): string | null {
-  for (const c of tailscaleCandidates(env)) {
+export function findTailscale(
+  env: NodeJS.ProcessEnv = process.env,
+  exists: (p: string) => boolean = existsSync,
+  platform: NodeJS.Platform = process.platform,
+): string | null {
+  for (const c of tailscaleCandidates(env, platform)) {
     try {
       if (exists(c)) return c;
     } catch {
@@ -43,7 +53,12 @@ export async function freeBytes(dir: string): Promise<number | null> {
   }
 }
 
-export function missingVcRuntime(env: NodeJS.ProcessEnv = process.env, exists: (p: string) => boolean = existsSync): string[] {
+export function missingVcRuntime(
+  env: NodeJS.ProcessEnv = process.env,
+  exists: (p: string) => boolean = existsSync,
+  platform: NodeJS.Platform = process.platform,
+): string[] {
+  if (platform !== "win32") return [];
   const windir = env.WINDIR ?? env.SystemRoot ?? "C:\\Windows";
   return VC_RUNTIME_FILES.filter((f) => !exists(path.join(windir, "System32", f)));
 }

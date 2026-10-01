@@ -13,6 +13,7 @@ import { updateElectronApp, UpdateSourceType } from "update-electron-app";
 import { Controller, type Platform } from "./main/controller";
 import { GAME_MANIFEST, GAME_MANIFEST_FINGERPRINT, GAME_MANIFEST_PROBLEM } from "./main/game-manifest";
 import { findRunningClients } from "./main/launch";
+import { LinuxRuntimeMissingError, prepareLinuxGameLaunch } from "./main/linux-runtime";
 import { findTailscale } from "./main/system";
 import { describeError, log, logToFile } from "./main/log";
 import { boundedString, externalTarget, isTrustedPageUrl, relayPortOverride, settingsPatch } from "./main/ipc-validate";
@@ -27,7 +28,7 @@ if (started) app.quit();
 // Every renderer runs in the Chromium sandbox, whatever a window's own options say.
 app.enableSandbox();
 nativeTheme.themeSource = "dark";
-app.setAppUserModelId(app.isPackaged ? `com.squirrel.${SQUIRREL_NAME}.${SQUIRREL_NAME}` : APP_ID);
+app.setAppUserModelId(process.platform === "win32" && app.isPackaged ? `com.squirrel.${SQUIRREL_NAME}.${SQUIRREL_NAME}` : APP_ID);
 
 // Art from the host's art pack is served to the renderer through this app-internal scheme.
 protocol.registerSchemesAsPrivileged([{ scheme: "dr-art", privileges: { standard: true, secure: true } }]);
@@ -69,9 +70,9 @@ function deliverInviteLink(link: string | null): void {
 
 function registerProtocolClient(): void {
   if (!app.isPackaged) return; // a dev build must not take over the scheme
-  // Squirrel keeps a stub exe one folder up that always starts the newest version.
+  // Squirrel keeps a stub exe one folder up that always starts the newest version on Windows.
   const stub = path.resolve(path.dirname(process.execPath), "..", path.basename(process.execPath));
-  const target = existsSync(stub) ? stub : process.execPath;
+  const target = process.platform === "win32" && existsSync(stub) ? stub : process.execPath;
   if (!app.setAsDefaultProtocolClient(INVITE_SCHEME, target, [])) log.warn("could not register the invite link handler");
 }
 
@@ -298,12 +299,15 @@ function makePlatform(): Platform {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
   };
   const localAppData = process.env.LOCALAPPDATA ?? path.join(app.getPath("home"), "AppData", "Local");
+  const defaultInstallDir =
+    process.platform === "linux" ? path.join(app.getPath("home"), "Games", "DauntlessRevived") : path.join(localAppData, "DauntlessRevived", "Game");
   const relayPort = relayPortOverride(process.env.DAUNTLESS_REVIVED_RELAY_PORT);
   if (relayPort !== undefined) log.warn(`relay port overridden to ${relayPort}`);
   return {
     userDataDir: app.getPath("userData"),
     resourcesDir: resourcesDir(),
-    defaultInstallDir: path.join(localAppData, "DauntlessRevived", "Game"),
+    defaultInstallDir,
+    hostPlatform: process.platform,
     appVersion: app.getVersion(),
     packaged: app.isPackaged,
     defaultLanguage: app.getLocale().toLowerCase().startsWith("fi") ? "fi" : "en",
@@ -347,10 +351,21 @@ function makePlatform(): Platform {
     },
     emitSnapshot: (s) => send(IPC.snapshot, s),
     emitProgress: (p) => send(IPC.progress, p),
-    findTailscale: () => findTailscale(),
-    findRunningClients: () => findRunningClients(),
+    findTailscale: () => findTailscale(process.env, existsSync, process.platform),
+    findRunningClients: () => findRunningClients(process.platform),
+    prepareGameLaunch:
+      process.platform === "linux"
+        ? async () => {
+            try {
+              return await prepareLinuxGameLaunch(app.getPath("userData"));
+            } catch (e) {
+              if (e instanceof LinuxRuntimeMissingError) return null;
+              throw e;
+            }
+          }
+        : undefined,
     installUpdate: () => {
-      if (app.isPackaged) {
+      if (app.isPackaged && process.platform === "win32") {
         quitting = true;
         autoUpdater.quitAndInstall();
       }
@@ -389,7 +404,7 @@ if (!started) {
       createWindow();
       await controller.init();
 
-      if (app.isPackaged) {
+      if (app.isPackaged && process.platform === "win32") {
         updateElectronApp({
           updateSource: { type: UpdateSourceType.StaticStorage, baseUrl: UPDATE_FEED_URL },
           updateInterval: "1 hour",

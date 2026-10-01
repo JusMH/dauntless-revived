@@ -2,9 +2,11 @@
 
 *[In English](README.md)*
 
-Windows-sovellus, jonka kaverit asentavat pelatakseen Dauntless Revived -palvelimella. Se liittyy
+Windows- ja Linux-sovellus, jonka kaverit asentavat pelatakseen Dauntless Revived -palvelimella. Se liittyy
 palvelimelle kutsulla, luo tilin, lataa ja tarkistaa Dauntless 1.4.4:n pelitiedostot ylläpitäjän
 omalta palvelimelta, laittaa kaiken valmiiksi ja käynnistää pelin. Kielinä englanti ja suomi.
+
+**Linux:** x86_64-Linuxille julkaistaan AppImage-, deb-, rpm- ja siirrettävät paketit. Windowsin 1.4.4-peliasiakas käynnistyy Protonin tai Winen kautta. Katso [LINUX.md](LINUX.md).
 
 **Sovelluksessa tai tässä repositoriossa ei ole pelitiedostoja.** Ne tulevat ylläpitäjän
 sisältöpalvelimelta, ja jokainen tiedosto tarkistetaan käynnistimeen käännettyä listaa vasten
@@ -13,14 +15,13 @@ Palvelin, joka tarjoaa jotain muuta, hylätään.
 
 ## Kavereille
 
-1. Asenna `DauntlessRevivedLauncher-Setup.exe` projektin julkaisuista. Sitä ei ole vielä
-   allekirjoitettu, joten SmartScreen voi pyytää vahvistusta (Lisätietoja, sitten Suorita silti).
-   Koneella, jossa tunnistamattomat sovellukset on asetettu estettäviksi, SmartScreen estää sen
-   kokonaan eikä tarjoa Suorita silti -vaihtoehtoa. Tarkista silloin tiedosto saman julkaisun
-   `SHA256SUMS.txt`-tiedostoa vasten (`Get-FileHash .\DauntlessRevivedLauncher-Setup.exe` -komennon on
-   näytettävä sama SHA-256 isoin kirjaimin), poista esto (hiiren oikea > Ominaisuudet > Poista esto, tai
-   `Unblock-File .\DauntlessRevivedLauncher-Setup.exe`) ja käynnistä se uudelleen. Allekirjoitus on
-   tiekartan kohta 4.16.
+1. Asenna käynnistin projektin julkaisusta. Windowsissa käytä
+   `DauntlessRevivedLauncher-Setup.exe`-asennusohjelmaa. Linuxissa käytä [LINUX.md](LINUX.md)-ohjeen
+   AppImage-, `.deb`-, `.rpm`- tai siirrettävää ZIP-pakettia. Tarkista lataus saman julkaisun
+   `SHA256SUMS.txt`-tiedostoa vasten. Windows-asennusohjelmaa ei ole vielä allekirjoitettu, joten
+   SmartScreen voi pyytää vahvistusta; jos se estää ohjelman kokonaan, tarkista tiiviste, poista
+   tiedoston esto (Ominaisuudet > Poista esto tai `Unblock-File`) ja käynnistä se uudelleen.
+   Allekirjoitus on tiekartan kohta 4.16.
 2. Avaa ylläpitäjän lähettämä kutsulinkki tai liitä se Pelaa-sivulle ja paina **LIITY**.
 3. Valitse käyttäjänimi ja paina **REKISTERÖIDY**. Tallenna avaimesta varmuuskopio, kun käynnistin
    tarjoaa sitä.
@@ -75,8 +76,9 @@ käynnissä. Välitin kuuntelee vain osoitteessa 127.0.0.1 ja hylkää verkkosiv
 - Siirtymät ja uudet ikkunat on estetty. Linkit avautuvat selaimeen vain kiinteältä sallittujen
   listalta: sivu nimeää linkin (esimerkiksi `project_source`), ei koskaan anna osoitetta, ja
   pääprosessi avaa linkin kiinteän osoitteen (`src/main/links.ts`).
-- Tiliavain tallennetaan vain Windowsin DPAPI:lla (`safeStorage`). Sitä ei näytetä, sitä ei kirjoiteta
-  tavalliseen tiedostoon (paitsi itse tallentamaasi varmuuskopioon), ja se peitetään lokissa.
+- Tiliavain tallennetaan Electronin `safeStorage`-rajapinnalla käyttöjärjestelmän suojattuun
+  tallennustilaan. Sitä ei näytetä, sitä ei kirjoiteta tavalliseen tiedostoon (paitsi itse
+  tallentamaasi varmuuskopioon), ja se peitetään lokissa.
 - Avain lähetetään vain kutsun palvelimelle (julkisessa tilassa vain lukitun yhteyden kautta): tilin
   tarkistuksen, latausten ja palvelimen tilan mukana. Palvelin näyttää paikalla olijat vain
   rekisteröityneille pelaajille, joten ennen rekisteröitymistä palvelinpaneeli pyytää kirjautumaan
@@ -91,13 +93,16 @@ käynnissä. Välitin kuuntelee vain osoitteessa 127.0.0.1 ja hylkää verkkosiv
 
 ## Kehitys
 
-Vaatimukset: Windows ja Node.js 24.
+Vaatimukset: Windows tai x86_64 Linux ja Node.js 24. Linux-pakettien tekeminen tarvitsee lisäksi
+`rpmbuild`-, `fakeroot`- ja `mksquashfs`-työkalut.
 
-```powershell
+```text
 npm ci
 npm run typecheck
 npm test            # yksikkötestit (node:test), paikalliset testipalvelimet vain porteissa 62012-62013 ja 624xx
-npm run make        # asennusohjelma ja zip kansioon out/make/
+npm run make        # Windows: Squirrel-asennusohjelma + siirrettävä zip
+npm run make:linux  # Linux: AppImage + deb + rpm + siirrettävä zip
+npm run collect:linux
 ```
 
 `DAUNTLESS_REVIVED_RELAY_PORT` siirtää välittimen pois portista 61000 harjoituksia varten koneella,
@@ -107,20 +112,20 @@ Ulkoasu noudattaa projektin brändiä (`brand/`, katso sen README): tiedoston `b
 kahdeksan väriä `--dr-*`-muuttujina tiedostossa `src/renderer/styles.css`, logo ja tunnuskuva sekä
 tiedoston `src/renderer/scene.ts` piirtämä oma tausta (vuoret, havumetsä, usva, himmeät revontulet ja
 lumi), jonka palvelimen kuvapaketti korvaa. Se liikuttaa vain kokonaisia kerroksia hitaasti; se pysyy
-paikallaan pelin ollessa käynnissä eikä liiku lainkaan, kun Windowsin "Näytä animaatiot" -asetus on
-pois päältä (vähennetty liike). `npm run icon` kopioi kuvakkeet ja ikkunan kuvat kansiosta `brand/`,
+paikallaan pelin ollessa käynnissä eikä liiku lainkaan, kun käyttöjärjestelmä pyytää
+vähennettyä liikettä. `npm run icon` kopioi kuvakkeet ja ikkunan kuvat kansiosta `brand/`,
 jossa `python3 brand/build.py` tekee ne. `npm test` epäonnistuu, jos jokin kopio on vanhentunut, jos
 tyylitiedostossa on väri, joka ei ole muuttuja, tai jos jokin sen käyttämä väripari ei läpäise WCAG
 AA -vaatimusta.
 
 ## Julkaisut ja päivitykset
 
-CI (`.github/workflows/ci.yml`) kääntää ja testaa käynnistimen jokaisen pushin yhteydessä ja pitää
-asennusohjelman, zipin ja `SHA256SUMS.txt`:n ladattavana viikon ajan.
-`.github/workflows/launcher-release.yml` julkaisee `package.json`-tiedoston version
-`dauntless-revived`-haarasta GitHub-julkaisuna `launcher-v<versio>`, jokaiselle tiedostolle
-allekirjoitetun käännöstodistuksen (build provenance attestation) kera, ja luo sen tagin. Uusi julkaisu
-syntyy siis nostamalla versiota:
+CI (`.github/workflows/ci.yml`) kääntää ja testaa käynnistimen Windowsissa ja Linuxissa jokaisen
+pushin yhteydessä. Windows-asennusohjelma/ZIP sekä Linuxin AppImage/DEB/RPM/ZIP säilytetään viikon
+ajan. `.github/workflows/launcher-release.yml` julkaisee nämä samat testatut tiedostot
+`dauntless-revived`-haarasta GitHub-julkaisuna `launcher-v<versio>`, yhdellä
+`SHA256SUMS.txt`-tiedostolla ja käännöstodistuksella (build provenance attestation), ja luo tagin
+käännettyyn committiin. Uusi julkaisu syntyy siis nostamalla versiota:
 
 - oletuksena `dauntless-revived`-haaran push, joka läpäisee kaikki tarkistukset ja jonka versiolla ei
   ole vielä `launcher-v<versio>`-julkaisua, julkaisee CI:n kääntämän asennusohjelman. Tauon saat
@@ -128,12 +133,13 @@ syntyy siis nostamalla versiota:
   variables > Actions > Variables);
 - tai aja Actions > **Launcher release** > **Run workflow** `dauntless-revived`-haaralle.
 
-Julkaisun jälkeen työnkulku siirtää jatkuvan `launcher-updates`-julkaisun uuteen versioon; asennetut
-käynnistimet tarkistavat sen tunnin välein ja päivittävät itsensä. Versio julkaistaan vain, jos se on
+Julkaisun jälkeen työnkulku siirtää jatkuvan `launcher-updates`-julkaisun uuden Windowsin
+Squirrel-paketin kohdalle; asennetut Windows-käynnistimet tarkistavat sen tunnin välein. Linuxissa
+päivitetään pakettimuodon kautta tai lataamalla uudempi julkaisu. Versio julkaistaan vain, jos se on
 uudempi kuin kaikki aiemmat, eikä julkaistua versiota koskaan korvata. Esiversio (kuten
 `0.2.0-beta.1`) julkaistaan GitHubin esijulkaisuna, eikä se koskaan päädy `launcher-updates`-julkaisuun.
 Jos ajo epäonnistuu kesken, aja sen epäonnistuneet työt uudelleen: se viimeistelee aloittamansa. Jo
-julkaistulle versiolle ajettu työnkulku vain päivittää `launcher-updates`-julkaisun siihen. Pidä
+julkaistulle versiolle ajettu työnkulku vain päivittää Windowsin päivityssyötteen siihen. Pidä
 GitHubin muuttumattomat julkaisut (immutable releases) pois päältä, koska `launcher-updates`-julkaisua
 päivitetään paikallaan.
 

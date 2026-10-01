@@ -23,29 +23,39 @@ export const MAX_GAME_ROOT = 150;
 export type GameFolderResult = { ok: true; root: string } | { ok: false; reason: "invalid_path" | "not_found" | "too_long" };
 
 // The folder as a clean absolute drive-letter path, or null. Explorer's "Copy as path" adds quotes.
-export function cleanGameFolderInput(input: string): string | null {
+function pathsFor(platform: NodeJS.Platform): typeof path.win32 | typeof path.posix {
+  return platform === "win32" ? path.win32 : path.posix;
+}
+
+export function cleanGameFolderInput(input: string, platform: NodeJS.Platform = process.platform): string | null {
   let s = input.trim();
   if (s.length >= 2 && s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
   if (s.length === 0 || s.length > MAX_GAME_INPUT || s.includes("\0")) return null;
-  if (!/^[A-Za-z]:[\\/]/.test(s)) return null;
-  return path.win32.resolve(s);
+  if (platform === "win32") {
+    if (!/^[A-Za-z]:[\\/]/.test(s)) return null;
+    return path.win32.resolve(s);
+  }
+  if (platform !== "linux" || !path.posix.isAbsolute(s)) return null;
+  return path.posix.resolve(s);
 }
 
-export function gameRootCandidates(folder: string): string[] {
-  const out = [folder, path.win32.join(folder, "Dauntless")];
-  const name = path.win32.basename(folder).toLowerCase();
-  if (name === "archon") out.push(path.win32.dirname(folder));
-  if (name === "win64") out.push(path.win32.resolve(folder, "..", "..", ".."));
+export function gameRootCandidates(folder: string, platform: NodeJS.Platform = process.platform): string[] {
+  const p = pathsFor(platform);
+  const out = [folder, p.join(folder, "Dauntless")];
+  const name = p.basename(folder).toLowerCase();
+  if (name === "archon") out.push(p.dirname(folder));
+  if (name === "win64") out.push(p.resolve(folder, "..", "..", ".."));
   return out;
 }
 
-export async function locateExistingGame(input: string): Promise<GameFolderResult> {
-  const folder = cleanGameFolderInput(input);
+export async function locateExistingGame(input: string, platform: NodeJS.Platform = process.platform): Promise<GameFolderResult> {
+  const folder = cleanGameFolderInput(input, platform);
   if (folder === null) return { ok: false, reason: "invalid_path" };
   let tooLong = false;
-  for (const root of gameRootCandidates(folder)) {
+  const p = pathsFor(platform);
+  for (const root of gameRootCandidates(folder, platform)) {
     try {
-      if (!(await fsp.stat(path.win32.join(root, ...EXE_RELATIVE_PATH.split("/")))).isFile()) continue;
+      if (!(await fsp.stat(p.join(root, ...EXE_RELATIVE_PATH.split("/")))).isFile()) continue;
     } catch {
       continue; // not this layout
     }
@@ -55,7 +65,7 @@ export async function locateExistingGame(input: string): Promise<GameFolderResul
   return { ok: false, reason: tooLong ? "too_long" : "not_found" };
 }
 
-export async function findExistingGameRoot(input: string): Promise<string | null> {
-  const r = await locateExistingGame(input);
+export async function findExistingGameRoot(input: string, platform: NodeJS.Platform = process.platform): Promise<string | null> {
+  const r = await locateExistingGame(input, platform);
   return r.ok ? r.root : null;
 }

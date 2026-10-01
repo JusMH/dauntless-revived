@@ -294,3 +294,13 @@ test("exposure setting defaults to the game and rejects unexpected renderer valu
   assert.deepEqual(settingsPatch({ exposure: "basic" }), { exposure: "basic" });
   assert.equal(settingsPatch({ exposure: "manual" }), null);
 });
+
+test("stored game folders stay native to the host platform", () => {
+  const win = sanitizeSettings({ installDir: "C:\\Games\\Dauntless", verifiedDir: "/home/slayer/Games/Dauntless" }, "en", "win32");
+  assert.equal(win.installDir, "C:\\Games\\Dauntless");
+  assert.equal(win.verifiedDir, null);
+
+  const linux = sanitizeSettings({ installDir: "/home/slayer/Games/Dauntless", verifiedDir: "C:\\Games\\Dauntless" }, "en", "linux");
+  assert.equal(linux.installDir, "/home/slayer/Games/Dauntless");
+  assert.equal(linux.verifiedDir, null);
+});
