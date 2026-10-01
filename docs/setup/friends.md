@@ -377,13 +377,13 @@ This is a small private revival and a work in progress. As of this writing:
   below. Until parties are proven, you can also queue for the same hunt at about the same time: the
   matchmaker collects players who queue for the same hunt and starts one server for them once 4 have
   joined, or once 20 seconds pass with nobody new joining.
-- Text chat is built but not switched on yet (see below). Use Discord.
+- Text chat is built but not switched on yet (see below). Use the [Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu).
 - Bounties and cooldowns are stored, but drafting and claiming a bounty and the daily reset have not
   been tried in the game yet. Escalations are stubbed and do not carry over between sessions, unless
   your host has switched real Escalation on (then everyone starts again from level 0).
 - The in-game store is built but off unless your host switches it on. When it is on, everything in it
   is free.
-- Voice chat ran on Vivox, a paid third-party service, and cannot come back. Use Discord.
+- Voice chat ran on Vivox, a paid third-party service, and cannot come back. Use the [Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu).
 - A server hosted on someone's PC is off when that PC is off. A server on a rented machine does not
   depend on anyone's PC.
 
@@ -469,7 +469,7 @@ between you that are still waiting. The game may keep the tab hidden; if it does
   online is built into the chat server, but the host switches it on only after chat itself works and
   two players have tried it.
 - **Chat**: whispers, party, guild and Ramsgate chat, with usernames, is built, but the host turns it
-  on only after two players have tried it; until then, use Discord. At first Ramsgate chat reaches
+  on only after two players have tried it; until then, use the [Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu). At first Ramsgate chat reaches
   only the players who travelled there with you as a party.
 - **Changes show late.** Friend requests, accepted requests and guild changes reach the other player
   at their next login (for guilds, also after travelling), not at once.

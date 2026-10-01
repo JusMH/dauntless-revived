@@ -22,6 +22,7 @@ const EUGAMEHOST_GAME2_URL = "https://www.eugamehost.com/clients/cart.php?a=add&
 const EUGAMEHOST_GAME3_URL = "https://www.eugamehost.com/clients/cart.php?a=add&pid=240&promocode=SIGNUP6MONTH&skipconfig=1";
 const EUGAMEHOST_GAME5_URL = "https://www.eugamehost.com/clients/cart.php?a=add&pid=242&promocode=SIGNUP6MONTH&skipconfig=1";
 const EUGAMEHOST_5800X_URL = "https://www.eugamehost.com/clients/cart.php?a=add&pid=500";
+const DISCORD_URL = "https://discord.gg/ZJRprHzsgu";
 
 export const FIXED_LINKS: Readonly<Record<FixedTarget, string>> = Object.freeze({
   tailscale_download: TAILSCALE_DOWNLOAD_URL,
@@ -36,6 +37,7 @@ export const FIXED_LINKS: Readonly<Record<FixedTarget, string>> = Object.freeze(
   eugamehost_game3: EUGAMEHOST_GAME3_URL,
   eugamehost_game5: EUGAMEHOST_GAME5_URL,
   eugamehost_5800x: EUGAMEHOST_5800X_URL,
+  discord: DISCORD_URL,
 });
 
 // The URL of a fixed target, or null for anything else (a raw URL, an unknown name, "__proto__").
@@ -73,6 +75,8 @@ export function isAllowedStaticUrl(url: string): boolean {
       return GITHUB_PAGES.has(url);
     case "www.eugamehost.com":
       return url === EUGAMEHOST_URL || url === EUGAMEHOST_GAME2_URL || url === EUGAMEHOST_GAME3_URL || url === EUGAMEHOST_GAME5_URL || url === EUGAMEHOST_5800X_URL;
+    case "discord.gg":
+      return url === DISCORD_URL;
     default:
       return false;
   }

@@ -35,6 +35,7 @@ is written up here.
 [Set it up]({{ '/setup/' | relative_url }}){: .btn .btn-primary .mr-2 }
 [Read the findings]({{ '/findings/' | relative_url }}){: .btn .mr-2 }
 [Reference]({{ '/reference/' | relative_url }}){: .btn .mr-2 }
+[Join Discord](https://discord.gg/ZJRprHzsgu){: .btn .btn-primary .mr-2 }
 [Roadmap]({{ roadmap_page.url | relative_url }}){: .btn }
 
 ---
@@ -82,7 +83,7 @@ higher figure at Cinematic settings).
   game. The details are on [Friends, parties and guilds]({{ '/findings/social.html' | relative_url }}).
 - **Text chat.** Built and tested without the game: Ramsgate, hunt, party and guild chat and whispers,
   with usernames, in the metagame itself. It is off by default until two players have tried it on the
-  rented server. Use Discord meanwhile. The details are on
+  rented server. Use the [Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu) meanwhile. The details are on
   [Text chat]({{ '/findings/chat.html' | relative_url }}).
 - **Bounties, cooldowns and escalation.** With real progression, bounties and cooldowns are stored
   per account, but drafting and claiming a bounty in the game and cooldowns across a daily reset have
@@ -98,7 +99,7 @@ higher figure at Cinematic settings).
 
 The [roadmap]({{ roadmap_page.url | relative_url }}) has the order we plan to work in, plus the bugs
 we have seen in real sessions. Some things cannot come back. Voice chat ran on Vivox, a paid
-third-party service, so use Discord instead. Content released after November 2020 is not in the
+third-party service, so use the [Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu) instead. Content released after November 2020 is not in the
 1.4.4 build.
 
 ---

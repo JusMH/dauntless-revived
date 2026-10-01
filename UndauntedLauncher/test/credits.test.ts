@@ -148,7 +148,7 @@ test("the credits hold no links and no e-mail addresses", () => {
   assert.ok(!/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(data), "no e-mail addresses on the Credits page");
 });
 
-test("the page opens links by name only, and the GitHub button and Credits are in the rail", () => {
+test("the page opens links by name only, and community/source controls are in the rail", () => {
   const TARGETS: Record<ExternalTarget, true> = {
     tailscale_download: true,
     tailscale_share: true,
@@ -164,6 +164,7 @@ test("the page opens links by name only, and the GitHub button and Credits are i
     eugamehost_game3: true,
     eugamehost_game5: true,
     eugamehost_5800x: true,
+    discord: true,
   };
   const dir = path.join(ROOT, "src", "renderer");
   let opens = 0;
@@ -189,6 +190,7 @@ test("the page opens links by name only, and the GitHub button and Credits are i
   const rail = html.slice(html.indexOf('<nav class="rail"'), html.indexOf("</nav>"));
   assert.match(rail, /<button type="button" class="icon-btn" id="github-btn" data-i18n-aria="github_link"><\/button>/);
   assert.match(rail, /<button type="button" class="rail-link" id="credits-btn">/);
+  assert.match(rail, /<button type="button" class="discord-mini" id="discord-btn">/);
   assert.match(html, /<section class="view" id="view-credits" aria-labelledby="credits-title" hidden><\/section>/);
 });
 

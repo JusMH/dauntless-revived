@@ -400,7 +400,7 @@ Tämä on pieni yksityinen elvytyshanke, ja työ on kesken. Tätä kirjoitettaes
   (pelaajia yhteen sovittava osa) kerää pelaajat, jotka jonottavat samaan metsästykseen, ja
   käynnistää heille yhden palvelimen, kun neljä on liittynyt tai kun 20 sekuntia kuluu ilman, että
   kukaan uusi liittyy.
-- Tekstichat on rakennettu, mutta sitä ei ole vielä kytketty päälle (katso alta). Käytä Discordia.
+- Tekstichat on rakennettu, mutta sitä ei ole vielä kytketty päälle (katso alta). Käytä [Dauntless Revived Discordia](https://discord.gg/ZJRprHzsgu).
 - Palkkiotehtävät (bounties) ja odotusajat (cooldowns) tallentuvat, mutta palkkiotehtävän valitsemista
   ja lunastamista sekä vuorokauden vaihdetta ei ole vielä kokeiltu pelissä. Escalation-sarjat ovat
   vain tynkiä, jotka eivät oikeasti tallenna mitään, eivätkä ne säily pelikerrasta toiseen, ellei
@@ -408,7 +408,7 @@ Tämä on pieni yksityinen elvytyshanke, ja työ on kesken. Tätä kirjoitettaes
 - Pelin kauppa on rakennettu, mutta se on pois päältä, ellei isäntäsi kytke sitä päälle. Kun se on
   päällä, kaikki siinä on ilmaista.
 - Äänichat toimi Vivoxilla, joka on maksullinen ulkopuolinen palvelu, eikä se voi palata. Käytä
-  Discordia.
+  [Dauntless Revived Discordia](https://discord.gg/ZJRprHzsgu).
 - Jonkun omalla koneella pyörivä palvelin on poissa päältä, kun se kone on sammutettu. Vuokratulla
   koneella pyörivä palvelin ei riipu kenenkään omasta koneesta.
 
@@ -496,7 +496,7 @@ muutu.
   näyttäminen paikalla on rakennettu chat-palvelimeen, mutta isäntä kytkee sen päälle vasta, kun chat
   itse toimii ja kaksi pelaajaa on kokeillut sitä.
 - **Chat**: kuiskaukset sekä ryhmä-, kilta- ja Ramsgate-chat käyttäjänimin on rakennettu, mutta isäntä
-  kytkee sen päälle vasta, kun kaksi pelaajaa on kokeillut sitä; siihen asti käytä Discordia. Aluksi
+  kytkee sen päälle vasta, kun kaksi pelaajaa on kokeillut sitä; siihen asti käytä [Dauntless Revived Discordia](https://discord.gg/ZJRprHzsgu). Aluksi
   Ramsgaten chat tavoittaa vain ne pelaajat, jotka matkustivat sinne kanssasi ryhmänä.
 - **Muutokset näkyvät viiveellä.** Kaveripyynnöt, hyväksytyt pyynnöt ja kiltojen muutokset näkyvät
   toiselle pelaajalle hänen seuraavalla kirjautumisellaan (killoissa myös matkustamisen jälkeen), eivät

@@ -37,6 +37,7 @@ const TARGETS: Readonly<Record<ExternalTarget, true>> = {
   eugamehost_game3: true,
   eugamehost_game5: true,
   eugamehost_5800x: true,
+  discord: true,
 };
 
 export function externalTarget(v: unknown): ExternalTarget | null {

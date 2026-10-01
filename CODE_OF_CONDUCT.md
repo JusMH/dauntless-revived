@@ -23,18 +23,17 @@ friendly place to be.
 
 ## Where this applies
 
-Everywhere in this project: issues, pull requests, Discussions, commit messages, and anywhere else
+Everywhere in this project: issues, pull requests, Discussions, the official [Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu), commit messages, and anywhere else
 you represent the project.
 
 ## Enforcement
 
-The maintainer, [mixutin](https://github.com/mixutin), moderates with GitHub's tools: editing or
-hiding comments, locking or closing threads, and blocking accounts from the repository. Most
-problems end with a friendly note. Serious or repeated ones end with a block.
+The maintainer, [mixutin](https://github.com/mixutin), moderates with the tools available on GitHub
+and Discord: removing or hiding content, locking or closing threads, and blocking or banning accounts.
+Most problems end with a friendly note. Serious or repeated ones end with a block or ban.
 
-To report something, use the **⋯** menu on the comment, issue or discussion and choose
-**Report content**. You can send the report to GitHub, and to the repository's maintainer when
-GitHub offers that option.
+To report something, use the platform's reporting/moderation controls. On GitHub, use the **⋯** menu
+on the comment, issue or discussion and choose **Report content**.
 
 ---
 
@@ -50,6 +49,8 @@ muut tarkoittavat hyvää. Voit olla eri mieltä asioista, mutta älä loukkaa i
 yksityisten tietojen jakaminen, pelitiedostojen tai piraattikopioiden pyytäminen tai jakaminen,
 roskaviestit ja tahallinen keskustelun sotkeminen.
 
-**Valvonta.** Ylläpitäjä (mixutin) voi muokata tai piilottaa viestejä, lukita keskusteluja ja
-estää käyttäjiä. Voit ilmoittaa asiattomasta viestistä viestin **⋯**-valikon kohdasta
-**Report content**.
+**Missä tämä pätee.** GitHubin lisäksi myös virallisessa [Dauntless Revived Discordissa](https://discord.gg/ZJRprHzsgu).
+
+**Valvonta.** Ylläpitäjä (mixutin) voi poistaa tai piilottaa sisältöä, lukita keskusteluja sekä
+estää käyttäjiä GitHubissa tai Discordissa. Käytä kyseisen palvelun ilmoitus- ja moderointitoimintoja;
+GitHubissa viestin **⋯**-valikosta löytyy **Report content**.

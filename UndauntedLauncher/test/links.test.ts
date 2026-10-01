@@ -35,6 +35,7 @@ const EXPECTED: Record<FixedTarget, string> = {
   eugamehost_game3: "https://www.eugamehost.com/clients/cart.php?a=add&pid=240&promocode=SIGNUP6MONTH&skipconfig=1",
   eugamehost_game5: "https://www.eugamehost.com/clients/cart.php?a=add&pid=242&promocode=SIGNUP6MONTH&skipconfig=1",
   eugamehost_5800x: "https://www.eugamehost.com/clients/cart.php?a=add&pid=500",
+  discord: "https://discord.gg/ZJRprHzsgu",
 };
 
 // A Record, so the compiler fails this file when a link name is added without a test here.
@@ -53,6 +54,7 @@ const ALL_TARGETS: Record<ExternalTarget, true> = {
   eugamehost_game3: true,
   eugamehost_game5: true,
   eugamehost_5800x: true,
+  discord: true,
 };
 
 // Raw URLs and tricks: none of these may ever be opened.
@@ -103,6 +105,9 @@ const BAD_URLS = [
   "https://www.eugamehost.com.evil.example/",
   "https://www.eugamehost.com/clients/cart.php?a=add&pid=999",
   "https://eugamehost.com/",
+  "https://discord.gg.evil.example/ZJRprHzsgu",
+  "https://discord.gg/ZJRprHzsgu/extra",
+  "https://discord.com/invite/ZJRprHzsgu",
   "https://evil.example/",
   "",
 ];

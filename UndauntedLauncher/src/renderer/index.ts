@@ -1186,6 +1186,7 @@ function renderSettings(): void {
         { class: "card-row" },
         linkButton(t("about_source"), () => open("project_source"), { icon: "external", fk: "about-src" }),
         linkButton(t("about_license_link"), () => open("project_license"), { icon: "external", fk: "about-lic" }),
+        linkButton(t("discord_link"), () => open("discord"), { icon: "external", fk: "about-discord" }),
       ),
       h("div", { class: "card-row" }, h("span", { class: "small-print" }, t("about_credits")), linkButton(t("nav_credits"), () => setView("credits"), { fk: "about-credits" })),
       h("p", { class: "small-print" }, t("about_disclaimer")),
@@ -1741,7 +1742,7 @@ function initChrome(): void {
   for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>("#lang-switch .lang-btn"))) {
     b.addEventListener("click", () => void api.setSettings({ language: b.dataset.lang === "fi" ? "fi" : "en" }));
   }
-  // Credits and the GitHub button: in the rail, so they are there on every page, invite or not.
+  // Credits, Discord and GitHub live in the rail, so they are available on every page, invite or not.
   const credits = $("#credits-btn");
   credits.prepend(icon("heart"));
   credits.addEventListener("click", () => setView("credits"));
@@ -1749,6 +1750,7 @@ function initChrome(): void {
   github.appendChild(githubMark());
   github.addEventListener("click", () => open("project_source"));
   $("#eugamehost-btn").addEventListener("click", () => open("eugamehost"));
+  $("#discord-btn").addEventListener("click", () => open("discord"));
   document.addEventListener("visibilitychange", () => void api.setStatusPolling(!document.hidden));
   window.setInterval(() => {
     renderPanel();

@@ -13,6 +13,8 @@ sisältöpalvelimelta, ja jokainen tiedosto tarkistetaan käynnistimeen käänne
 (410 tiedostoa, koot ja SHA-256-tiivisteet, `UndauntedContent/data/dauntless-1.4.4.json`).
 Palvelin, joka tarjoaa jotain muuta, hylätään.
 
+**Yhteisö:** [Liity Dauntless Revived Discordiin](https://discord.gg/ZJRprHzsgu) saadaksesi apua, pelikavereita ja projektin päivityksiä. Discord-painike näkyy myös aina käynnistimen sivupalkissa.
+
 ## Kavereille
 
 1. Asenna käynnistin projektin julkaisusta. Windowsissa käytä

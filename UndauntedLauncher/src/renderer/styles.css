@@ -434,6 +434,34 @@ img {
   height: auto;
 }
 
+.discord-mini {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid var(--dr-azure);
+  border-radius: 10px;
+  background: var(--dr-deep);
+  color: var(--dr-frost);
+  font-size: 13px;
+  font-weight: 700;
+  transition: border-color 0.15s, color 0.15s, transform 0.15s;
+}
+.discord-mini:hover {
+  border-color: var(--dr-glow);
+  color: var(--dr-glow);
+  transform: translateY(-1px);
+}
+.discord-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dr-glow);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--dr-glow) 45%, transparent);
+}
+
 /* Credits and the GitHub button, under the language switch. */
 .rail-links {
   display: flex;
