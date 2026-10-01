@@ -68,9 +68,10 @@ Lisää vastauksia on sivulla
 
 ## Tilanne
 
-Tilanne 22.9.2026. Itse peliä on tähän mennessä pelannut yksi ihminen, omistaja: ensin
-palvelinkoneella ja 22.9.2026 internetin yli vuokratulla palvelimellamme käynnistimen kautta.
-Merkintä ”(yksin)” tarkoittaa juuri sitä. Seuraavaksi on vuorossa testi toisen pelaajan kanssa.
+Pelaamista koskevat rivit kuvaavat viimeisimpiä oikeita pelitestejä **22.9.2026**; infrastruktuurin
+riveillä on mukana myös **1.10.2026** valmistunut Linux/OpenBSD-porttaustyö. Peliä kokeiltiin ensin
+yksin palvelinkoneella ja vuokratulla palvelimella, ja 22.9. myös kahdella pelaajalla internetin yli.
+Merkintä ”(yksin)” tarkoittaa juuri sitä.
 
 | Ominaisuus | Tila | Lisätietoa |
 |---|---|---|
@@ -83,6 +84,8 @@ Merkintä ”(yksin)” tarkoittaa juuri sitä. Seuraavaksi on vuorossa testi to
 | Tavarat, varusteet ja tehtävät | Toimii (yksin) | Tallentuvat tietokantaan ja säilyvät, vaikka peli ja palvelin käynnistetään uudelleen |
 | Pelaajan taso, mestaruus ja Hunt Pass (palkintojärjestelmä) | Toimii (yksin), oletuksena päällä | Alkavat alusta (Slayer-taso 1, ei mestaruutta, tyhjä Hunt Pass) ja tallentuvat; jokaisella tilillä on Elite Hunt Pass. Kokeiltu pelissä testitilillä, myös palvelimen uudelleenkäynnistyksen yli. Vuokratulla palvelimella 22.9.2026: Slayer-taso 3, aseen mestaruus ja hirviön mestaruus (taso 2, ensimmäistä kertaa pelissä nähty), ja pelipalvelin vahvisti tasopalkinnot. `PROGRESSION_MODE=stub` palauttaa alkuperäisen kiinteän tason 50 ([päivitysohjeet](https://mixutin.github.io/dauntless-revived/fi/setup/upgrading.html)) |
 | Palvelin vuokratulla koneella | Käynnissä | [Windows-palvelinpaketti](https://mixutin.github.io/dauntless-revived/fi/setup/windows-server.html) asennettiin vuokratulle Windows Server 2019 -virtuaalipalvelimelle julkiseen tilaan 21.–22.9.2026. Siellä tarkistettu: palvelinkokonaisuus käynnistyy koneen käynnistyessä palvelutilillä, Ramsgate pyörii ja lähettää elonmerkkejä (heartbeat), yhdyskäytävä vastaa internetistä kiinnitetyllä varmenteella, ja tunnin välein otettava varmuuskopio toimii. Ensimmäisessä oikeassa testissä (22.9.2026) kolme pelipalvelinta pyöri yhtä aikaa, ja sallittujen lista avasi peliportit pelaajalle ja sulki ne, kun hän lähti |
+| Linux-palvelinporttaus | Ohjauspuoli toimii; aito Wine/Proton-pelitesti seuraavana | [Linux-palvelin](https://mixutin.github.io/dauntless-revived/fi/setup/linux-server.html): metagame, sisältö, deploy, gateway ja SQLite toimivat natiivisti Linuxissa/systemd:llä, nftables tekee dynaamisen UDP-sallittujen listan ja Ramsgate/metsästykset käynnistyvät Proton/Wine-kääreen kautta. Paikallinen kiinnitetty 1.4.4-pelikansio läpäisi kaikki 410 manifestitiedoston kokotarkistukset, ja smoke-testissä deploy näki Ramsgaten portissa 8777 oikealla tuotantokomentorivillä. |
+| OpenBSD-palvelinporttaus | Natiivi ohjauspuoli CI-testattu; kahden koneen pelitesti seuraavana | [OpenBSD-palvelin](https://mixutin.github.io/dauntless-revived/fi/setup/openbsd-server.html): Node/SQLite-palvelut toimivat natiivisti OpenBSD 7.9:ssa rc.d:n alla, PF hoitaa TLS-ohjauksen ja pelaajataulun, ja Windows x86_64 -peliprosessi ajetaan rajatulla SSH-yhteydellä Linux/Proton/Wine-työntekijällä. Aito OpenBSD 7.9 -virtuaalikone rakentaa ja testaa portin CI:ssä. |
 | Kaverikäynnistin | Julkaistu | CI julkaisi ensimmäisen version, 0.1.0:n, [GitHubin julkaisuihin](https://github.com/mixutin/dauntless-revived/releases/latest) `SHA256SUMS.txt`-tiedoston ja käännöksen alkuperätodistuksen (build provenance attestation) kanssa; asennetut käynnistimet päivittävät itsensä. Omistaja rekisteröityi sillä vuokratulle palvelimelle ja latasi pelin (noin 11 Gt) yhdyskäytävän kautta. Samana yönä julkaistu 0.1.1 ei enää laita pelin automaattista valotusta pois; se oli tehnyt Ramsgatesta aivan liian pimeän. Ei vielä allekirjoitettu: omistajan koneella SmartScreen esti asennusohjelman kokonaan, ja tarkistus `SHA256SUMS.txt`-tiedostoa vasten ja eston poistaminen toimivat ([ohje](https://mixutin.github.io/dauntless-revived/fi/setup/friends.html)) |
 | Pelaaminen kavereiden kanssa internetin yli | Toimii (kaksi pelaajaa) | Testattu 22.9.2026 vuokratulla palvelimella. Ensin yksi pelaaja: kutsu, rekisteröityminen, pelin lataus, opetusjakso, Ramsgate, Training Dojo ja ensimmäinen metsästys. Sitten kaksi pelaajaa yhdessä: he näkivät toisensa Ramsgatessa ja metsästivät yhdessä, kun he jonottivat samaan metsästykseen muutaman sekunnin sisällä toisistaan (ryhmät eivät vielä toimi pelissä, ks. seuraava rivi) |
 | Pelaajaryhmät, kaverit ja killat | Rakennettu, odottaa testiä pelissä | Palvelimen puoli: ryhmäkutsut, hyväksyminen ja hylkääminen, johtajaksi nostaminen, poistaminen ja lähteminen, koko ryhmä samalle metsästyspalvelimelle, yhdessä takaisin Ramsgateen, haku nimellä, kaverilista ja estolista sekä killat (perustaminen, kutsut, arvot, erottaminen, lähteminen ja lakkauttaminen); kaikki paitsi ryhmät tallentuvat SQLiteen. Kahden pelaajan testissä 22.9.2026 ryhmäkutsu tuli toisen pelaajan peliin mutta ei näkynyt, eikä kaverin lisääminen tehnyt mitään: palvelin kuvasi kutsussa `POST /accountinfo/public` väärää pelaajaa ja vastasi kutsuun `POST /account/mapping` muodossa, jota peli ei lue. Molemmat on korjattu ja ovat vuokratulla palvelimellamme 22.9.2026 alkaen, ja korjaukset läpäisevät testit, jotka toistavat pelin omat pyynnöt; pelissä niitä ei ole vielä kokeiltu ([tarkemmin](https://mixutin.github.io/dauntless-revived/fi/findings/social.html)). Kutsuminen ei vaadi kaveruutta. Pelaajien näkyminen paikalla vaatii chat-yhteyden läsnäolotiedot: rakennettu 23.9.2026, oletuksena pois päältä (ks. chat-rivi) |
@@ -119,7 +122,7 @@ ohjesivuston sivulla [Tiekartta](https://mixutin.github.io/dauntless-revived/fi/
 2. **Metagame** on taustapalvelin eli ohjelma, jonka kanssa peli keskustelee taustalla (TypeScript, Express ja SQLite-tietokanta, portti 61000; portti on kuin oven numero verkossa). Se hoitaa tilit, hahmot, tavarat, varusteet, etenemisen, pelien järjestämisen (matchmaking), pelaajaryhmät ja kaverilistan.
 3. **Deploy server** (portti 61001, vain palvelinkoneella) käynnistää pelipalvelimia tarpeen mukaan. Ne ovat saman pelin kopioita, jotka DLL-tiedosto muuttaa palvelimiksi.
 4. Pelipalvelimet (UDP-portit 8770–8777: Ramsgate portissa 8777, harjoitussali portissa 8776 ja enintään 6 metsästystä porteissa 8770–8775) pyörittävät itse peliä.
-5. Kaverit yhdistävät kahdella tavalla. **Yksityisessä tilassa** he tulevat palvelinkoneelle Tailscalen kautta. **Julkisessa tilassa** ([Windows-palvelinpaketin](https://mixutin.github.io/dauntless-revived/fi/setup/windows-server.html) oletus) salattu **yhdyskäytävä** (gateway) on pelin ainoa julkinen TCP-portti: kaverikäynnistin tarkistaa sen varmenteen kutsun sormenjälkeä vasten, ja pelin UDP-portit avautuvat vain kirjautuneiden pelaajien osoitteille. Sen takana oleva **sisältöpalvelin** antaa pelitiedostot rekisteröityneille tileille, ja käynnistin tarkistaa jokaisen tiedoston siihen sisäänrakennettua listaa vasten.
+5. Kaverit yhdistävät kahdella tavalla. **Yksityisessä tilassa** he tulevat palvelinkoneelle Tailscalen kautta. **Julkisessa tilassa** salattu **yhdyskäytävä** (gateway) on pelin ainoa julkinen TCP-portti: kaverikäynnistin tarkistaa sen varmenteen kutsun sormenjälkeä vasten, ja pelin UDP-portit avautuvat vain kirjautuneiden pelaajien osoitteille. Windows käyttää Windows Firewallia, Linux nftablesia ja OpenBSD PF:n pelaajataulua sekä ohjausta/NAT:ia Linux-pelityöntekijälle. Sen takana oleva **sisältöpalvelin** antaa pelitiedostot rekisteröityneille tileille, ja käynnistin tarkistaa jokaisen tiedoston siihen sisäänrakennettua listaa vasten.
 
 ## Mitä projektissa on
 
@@ -132,9 +135,12 @@ tehtävälistan kohta 4.15); niissä olevien npm-pakettien nimet ovat `dauntless
 | `UndauntedDeployServer/` | Käynnistää ja valvoo pelipalvelimia (Ramsgate, metsästykset, harjoitussali) |
 | `UndauntedGateway/` | Vain julkisessa tilassa: salattu yhdyskäytävä (pelin ainoa julkinen TCP-portti) ja apuohjelma, joka avaa peliportit kirjautuneille pelaajille |
 | `UndauntedContent/` | Sisältöpalvelin: pelitiedostot (tarkistetaan 410 tiedoston luetteloa vasten), uutiset ja kuvapaketti, vain rekisteröityneille käynnistimille |
-| `UndauntedLauncher/` | Dauntless Revived Launcher: kutsuttujen kavereiden Windows-sovellus, pohjana alkuperäisen Undaunted-projektin käynnistin. Kansiossa `assets/` ovat ne kaksi tiivisteillä kiinnitettyä valmista DLL-tiedostoa, jotka jokainen asennustapa asentaa |
+| `UndauntedLauncher/` | Dauntless Revived Launcher Windowsille ja x86_64-Linuxille, pohjana alkuperäisen Undaunted-projektin käynnistin. Kansiossa `assets/` ovat ne kaksi tiivisteillä kiinnitettyä valmista DLL-tiedostoa, jotka jokainen asennustapa asentaa |
 | `UndauntedInternalServer/` | Undauntedin palvelin-DLL:n C++-lähdekoodi. DLL:n avulla peli toimii pelipalvelimena, ja se ohjaa pelaajat omalle taustapalvelimelle. Se kääntyy Visual Studio 2022 Build Toolsilla, mutta mikään tässä koodivarastossa ei käännä sitä; jokainen asennustapa käyttää valmiita DLL-tiedostoja kansiosta `UndauntedLauncher/assets/` |
 | `deploy/windows-server/` | Windows-palvelinpaketti: asentaa ja pyörittää koko palvelimen Windows Server 2019 -koneella julkisessa tai yksityisessä tilassa, varmuuskopioineen, kutsuineen ja päivityksineen |
+| `deploy/linux-server/` | Erillinen Linux-palvelinporttaus: systemd-palvelut, nftables-sallittujen lista, yhden koneen Proton/Wine-kääre ja Linux-pelityöntekijän asennin |
+| `deploy/openbsd-server/` | Erillinen OpenBSD 7.9 -ohjauspuoli: rc.d-palvelut, PF-säännöt ja rajattu SSH-käynnistin Linux-pelityöntekijälle |
+| `deploy/unix-common/` | Linuxin ja OpenBSD:n yhteiset asetusten, SQLite-bootstrapin, kutsujen ja yhteensopivuusajon apuohjelmat; Windows-paketti ei käytä niitä |
 | `friend-kit/` | Vain Tailscalea käyttävät asennus- ja käynnistysohjelmat kavereiden koneille |
 | `tools/` | `sync-roadmap.js` ja `build-llms.js` (ohjesivuston tuotetut tiedostot), `make-friend-kit.ps1`, `make-game-manifest.js` sekä kansiossa `ci/` CI:n tarkistukset |
 | `docs/` | Ohjesivusto (GitHub Pages); suomenkieliset sivut ovat kansiossa `docs/fi/` |
@@ -195,7 +201,8 @@ tehtävälistan kohta 4.15); niissä olevien npm-pakettien nimet ovat `dauntless
   tekijänoikeustiedot ja `SOURCE.txt`, joka kertoo tarkan koodiversion.
 - Oma **kaverikäynnistin** (`UndauntedLauncher/`), tehty alkuperäisen käynnistimen pohjalta, joka oli
   kytketty kiinteästi Undauntedin omiin palvelimiin. Se liittyy palvelimelle kutsulla, rekisteröi
-  pelaajan (se säilyttää avaimen vain Windowsin DPAPI-suojauksella salattuna; ainoa selväkielinen
+  pelaajan (se säilyttää avaimen käyttöjärjestelmän suojatussa tallennuksessa: Windowsissa DPAPI,
+  Linuxissa työpöydän salaisuustallennus; ainoa selväkielinen
   kopio on varmuuskopio, jonka pelaaja itse päättää tallentaa), lataa pelin isännältä ja tarkistaa
   jokaisen tiedoston siihen sisäänrakennettua luetteloa vasten, asentaa kaksi kiinnitettyä
   DLL-tiedostoa ja pelin asetukset sekä välittää julkisessa tilassa pelin salaamattomat HTTP-kutsut salattuna yhteytenä, joka on kiinnitetty
@@ -210,10 +217,17 @@ tehtävälistan kohta 4.15); niissä olevien npm-pakettien nimet ovat `dauntless
   palvelimen Windows Server 2019 -koneelle pelkällä avaimella toimivan SSH-yhteyden yli. Mukana ovat
   vähäoikeuksinen palvelutili, käynnistys koneen käynnistyessä, valvonta, tunnin välein otettavat
   varmuuskopiot, kutsut ja päivitykset.
+- Erillinen **Linux-palvelinporttaus** (`deploy/linux-server/`): Node/SQLite-ohjauspuoli toimii
+  natiivisti systemd:n alla, julkiset peliportit suodatetaan dynaamisella nftables-listalla ja
+  kiinnitetyn Windows 1.4.4 -pelin palvelinprosessit ajetaan Protonilla/Winellä muuttamatta Windows-polkuja.
+- Erillinen **OpenBSD-palvelinporttaus** (`deploy/openbsd-server/`): ohjauspuoli toimii natiivisti
+  OpenBSD 7.9:ssa rc.d:n alla, PF hoitaa TLS-ohjauksen ja pelaajakohtaisen peli-UDP:n, ja rajattu SSH
+  käynnistää varsinaiset Windows-peliprosessit Linux/Proton/Wine-työntekijällä.
 - Metsästyspalvelimet käynnistyvät konsoli-ikkuna piilotettuna.
-- **CI** jokaisesta muutoksesta: jokaisen paketin käännös ja testit, palvelinpaketin testit,
-  ohjesivuston käännös ja tarkistus, ettei projektiin ole lisätty salaisuuksia, avaimia, tietokantoja
-  tai pelitiedostoja.
+- **CI** jokaisesta muutoksesta: jokaisen paketin käännös ja testit, Windows-palvelinpaketti,
+  erillinen Linux-palvelinportti, OpenBSD-portin rakennus/testi aidossa OpenBSD 7.9 -virtuaalikoneessa,
+  ohjesivuston käännös sekä tarkistus, ettei projektiin ole lisätty salaisuuksia, avaimia,
+  tietokantoja tai pelitiedostoja.
 - **Oma nimi.** Käynnistimessä, pelin tervetulotekstissä ja palvelimen viesteissä lukee Dauntless
   Revived, ja kiitoksissa mainitaan Undaunted. Kansiot, palvelin-DLL:n tiedostonimi
   (`UndauntedInternalServer.dll`), `/undaunted/api`-reitit ja `x-undaunted-*`-otsakkeet pitävät

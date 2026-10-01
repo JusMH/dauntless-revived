@@ -175,19 +175,23 @@ URL: https://mixutin.github.io/dauntless-revived/setup/
 # Setup
 
 These pages describe how we run Dauntless Revived: the genuine **Dauntless 1.4.4** client (October
-2020, UE4, pak v9) against our fork of [Undaunted](https://github.com/SyST3MDeV/Undaunted), all on one
-Windows PC. Everything in this section is about **1.4.4**. The final client, 2.1.1, does not work with
-this setup, because Undaunted's server DLL hooks fixed addresses inside the 1.4.4 executable.
+2020, UE4, pak v9) against our fork of [Undaunted](https://github.com/SyST3MDeV/Undaunted). The
+original and most thoroughly live-tested server path is Windows, but there are now separate Linux
+and OpenBSD server ports as well. Everything in this section is about **1.4.4**. The final client,
+2.1.1, does not work with this setup, because Undaunted's server DLL hooks fixed addresses inside the
+1.4.4 executable.
 
 You need **your own copy** of the 1.4.4 client. This site and the repository contain no game files and
 do not link to downloads.
 
-**Status (22 September 2026).** The host setup is what we run on the owner's PC, on loopback, for the
-owner alone. For friends we use the [Windows server kit](https://mixutin.github.io/dauntless-revived/setup/windows-server.html) in
-public mode: it is deployed on a rented Windows Server 2019 VPS, where the owner played over the
-internet on 22 September 2026, and a test with a second player is next. Opening a host PC to friends
-over Tailscale is documented, but it has not been run end to end yet, and those pages say so where it
-matters.
+**Status (1 October 2026).** The rented public server still runs the live-tested
+[Windows server kit](https://mixutin.github.io/dauntless-revived/setup/windows-server.html). The separate
+[Linux server port](https://mixutin.github.io/dauntless-revived/setup/linux-server.html) builds the control plane natively and
+has passed a local end-to-end launch-contract smoke test with the pinned 1.4.4 tree; a real
+Proton/Wine Ramsgate + hunt session is the next milestone. The
+[OpenBSD server port](https://mixutin.github.io/dauntless-revived/setup/openbsd-server.html) builds/tests the Node control plane
+inside a real OpenBSD 7.9 CI VM and uses a separate Linux Proton/Wine game worker; its final milestone
+is a live two-machine game session.
 
 ## Pages
 
@@ -197,15 +201,20 @@ matters.
 | [Join as a friend](https://mixutin.github.io/dauntless-revived/setup/friends.html) | An invited player | Tailscale, checking your game files, copying the two DLLs, registering for a personal account key, launching, and what works right now. |
 | [Linux launcher](https://mixutin.github.io/dauntless-revived/setup/linux.html) | A Linux player | Distro-by-distro launcher install instructions for Ubuntu/Debian/Mint/Pop!_OS, Fedora, openSUSE, Arch-family systems, NixOS, Gentoo, Void and universal AppImage/tarball installs, plus Proton/Wine setup. |
 | [Run it for a group](https://mixutin.github.io/dauntless-revived/setup/admin.html) | The host, once the stack runs locally | Tailscale sharing, firewall rules scoped to the Tailscale interface, switching addresses, invite codes and accounts, the admin API, capacity, and database backups. Target configuration, not yet tested end to end. |
-| [Windows server kit](https://mixutin.github.io/dauntless-revived/setup/windows-server.html) | The host, for an always-on rented server | One command from your PC installs everything on a Windows Server 2019 VPS over key-only SSH. Public mode: one TLS gateway port with a pinned certificate, game ports opened only for logged-in players. Invites, updates with rollback, backups, uninstall. Deployed on a rented server in public mode on 21–22 September 2026; one player played there over the internet on 22 September 2026, and a test with a second player is next. |
+| [Windows server kit](https://mixutin.github.io/dauntless-revived/setup/windows-server.html) | The host, for the live-tested Windows path | One command installs everything on Windows Server 2019+ with the current backup/update tooling. The existing Windows port is unchanged. |
+| [Linux server](https://mixutin.github.io/dauntless-revived/setup/linux-server.html) | A Linux host | Native Node/SQLite control plane, systemd, nftables and Dauntless 1.4.4 game processes through Proton/Wine. Includes a one-host install and a separate Linux game-worker mode. |
+| [OpenBSD server](https://mixutin.github.io/dauntless-revived/setup/openbsd-server.html) | An OpenBSD host plus Linux game worker | Native OpenBSD 7.9 control plane with rc.d + PF. Game-server processes are forwarded to a restricted Linux Proton/Wine worker over SSH. |
 | [Troubleshooting](https://mixutin.github.io/dauntless-revived/setup/troubleshooting.html) | Everyone | Problems we actually hit, with causes and fixes. A few entries come from reading the code and are marked as such. |
 | [Upgrade notes](https://mixutin.github.io/dauntless-revived/setup/upgrading.html) | The host, before updating a server that already has players | What each update changes for players and what to decide first. Now: real progression is on by default, so earlier players start at Slayer level 1 unless you keep their max ranks or stay on the stub. |
 
 ## Suggested order
 
-1. Host: work through [Host a server](https://mixutin.github.io/dauntless-revived/setup/host.html) until you are standing in
-   Ramsgate on your own PC.
-2. Host: follow [Run it for a group](https://mixutin.github.io/dauntless-revived/setup/admin.html) to let friends in.
+1. Pick a server platform: [Windows](https://mixutin.github.io/dauntless-revived/setup/windows-server.html),
+   [Linux](https://mixutin.github.io/dauntless-revived/setup/linux-server.html) or
+   [OpenBSD + Linux worker](https://mixutin.github.io/dauntless-revived/setup/openbsd-server.html). For the manual single-PC
+   development path, use [Host a server](https://mixutin.github.io/dauntless-revived/setup/host.html).
+2. Host: follow [Run it for a group](https://mixutin.github.io/dauntless-revived/setup/admin.html) for accounts, invites and
+   group-operation details.
 3. Linux friends: install the launcher with [Linux launcher](https://mixutin.github.io/dauntless-revived/setup/linux.html).
 4. Each friend: follow [Join as a friend](https://mixutin.github.io/dauntless-revived/setup/friends.html).
 
@@ -3865,6 +3874,445 @@ game stack leaves monitoring available. Use an SSH tunnel from a remote PC.
 After code updates, re-run the dashboard installer to refresh its copied files. See
 [tools/DASHBOARD.md](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DASHBOARD.md)
 for account-key fingerprints, invitations, performance CSVs, permissions and disabling the tasks.
+
+================================================================================
+URL: https://mixutin.github.io/dauntless-revived/setup/linux-server.html
+================================================================================
+
+# Linux server
+
+The Linux server port is separate from the Windows Server kit. It runs the metagame, deploy server,
+content server and TLS gateway **natively on Linux**, while Ramsgate, the Training Dojo and hunts use
+the original Dauntless 1.4.4 Windows x86_64 executable through **Proton or Wine**.
+
+Nothing under `deploy/windows-server/` is used or changed by this port.
+
+## Status
+
+As of **1 October 2026**, the Linux control plane is working and continuously tested on Linux.
+
+We have verified locally that:
+
+- all four Node services build natively on Linux;
+- SQLite migrations and game-server key registration work;
+- the pinned 1.4.4 game tree passes all 410 manifest size checks;
+- the exact 1.4.4 EXE hash is accepted and both pinned DLLs are installed;
+- metagame, content and deploy run together;
+- the deploy API reports Ramsgate on UDP 8777;
+- the existing game-server argument contract reaches the Linux compatibility wrapper unchanged.
+
+The final live milestone is still **running the real game process under Proton/Wine and joining
+Ramsgate plus one hunt**. The development PC used for the first porting pass did not have a real
+Proton/Wine runtime installed, so the launch-contract smoke test used a stand-in runtime.
+
+## Architecture
+
+```text
+Players
+   |
+   +-- private: Tailscale ----------+
+   |                                |
+   +-- public: TLS :443 ---> Gateway|
+                                    v
+                         Native Linux Node services
+                         + Metagame / SQLite
+                         + Content
+                         + Deploy
+                                    |
+                                    v
+                         launch-gameserver.mjs
+                                    |
+                              Proton / Wine
+                                    |
+                         Dauntless 1.4.4 -server
+                         UDP 8770-8777
+```
+
+The existing deploy server still starts one executable path. On Linux that path is the wrapper in
+`deploy/linux-server/launch-gameserver.mjs`; Windows continues pointing directly at the EXE.
+
+## Requirements
+
+- x86_64 Linux with glibc
+- Node.js **20.19+**; Node 22 or 24 recommended
+- npm
+- the exact Dauntless **1.4.4** game tree
+- Proton/GE-Proton or 64-bit Wine
+- `xvfb-run` for a headless game worker unless you provide a real X display
+- systemd for the normal service install
+- nftables for public mode
+- enough RAM for the Node stack plus however many game processes you allow
+
+The required game EXE SHA-256 is:
+
+```text
+d3d41e614908d2befd518b27046d9822d6130ef12ba3504babbdb786bef9cff4
+```
+
+The installer refuses a different build.
+
+## Prepare the host
+
+Clone the repository and put your own 1.4.4 game tree somewhere the service account can traverse,
+for example:
+
+```text
+/srv/dauntless/BaseGame144/Dauntless
+```
+
+On a Debian/Ubuntu-style server, a typical prerequisite set is:
+
+```bash
+sudo apt update
+sudo apt install nodejs npm nftables xvfb
+```
+
+Install Proton or Wine separately. For a headless dedicated host, a known Proton/GE-Proton or Wine
+build should be pinned instead of changing runtimes on every update.
+
+## Private server
+
+For a host reachable through Tailscale:
+
+```bash
+sudo ./deploy/linux-server/install.sh \
+  --game-dir /srv/dauntless/BaseGame144/Dauntless \
+  --my-ip 100.x.y.z \
+  --mode private
+```
+
+Private mode exposes the metagame/content/chat services on the address you provide and does not start
+the public TLS gateway or nftables allowlist helper.
+
+## Public server
+
+For a public IPv4 host:
+
+```bash
+sudo ./deploy/linux-server/install.sh \
+  --game-dir /srv/dauntless/BaseGame144/Dauntless \
+  --my-ip 203.0.113.10 \
+  --mode public \
+  --firewall-interface eth0
+```
+
+Public mode uses the same pinned-TLS launcher flow as the Windows server:
+
+- TCP 443 is the public gateway;
+- metagame/content/deploy stay behind it;
+- UDP 8770-8777 is fail-closed except for player addresses reported by authenticated gateway traffic.
+
+The helper owns its own nftables table, `inet dauntless_revived`.
+
+## Choose Proton or Wine
+
+Explicit Proton:
+
+```bash
+sudo ./deploy/linux-server/install.sh \
+  --game-dir /srv/dauntless/BaseGame144/Dauntless \
+  --my-ip 203.0.113.10 \
+  --mode public \
+  --firewall-interface eth0 \
+  --proton /home/dauntless/.local/share/Steam/compatibilitytools.d/GE-Proton10-1/proton
+```
+
+Explicit Wine:
+
+```bash
+sudo ./deploy/linux-server/install.sh \
+  --game-dir /srv/dauntless/BaseGame144/Dauntless \
+  --my-ip 203.0.113.10 \
+  --mode public \
+  --firewall-interface eth0 \
+  --wine /usr/bin/wine64
+```
+
+The wrapper forces `WINEDLLOVERRIDES=dxgi=n,b` so the pinned proxy `dxgi.dll` loads. It keeps a
+dedicated compatibility prefix/data directory under the server data tree.
+
+## Files and services
+
+Default locations:
+
+| What | Path |
+|---|---|
+| Application | `/opt/dauntless-revived` |
+| State / database / TLS | `/var/lib/dauntless-revived` |
+| Secret environment files | `/etc/dauntless-revived` |
+| systemd units | `/etc/systemd/system/dauntless-*.service` |
+
+Services:
+
+- `dauntless-metagame`
+- `dauntless-deploy`
+- `dauntless-content`
+- public mode only: `dauntless-allowlist`, `dauntless-gateway`
+
+Manage them with:
+
+```bash
+sudo ./deploy/linux-server/stack.sh status
+sudo ./deploy/linux-server/stack.sh restart
+sudo ./deploy/linux-server/stack.sh restart deploy
+sudo ./deploy/linux-server/stack.sh logs
+```
+
+## Create an invite
+
+```bash
+sudo -u dauntless node /opt/dauntless-revived/deploy/unix-common/new-invite.mjs \
+  --config /etc/dauntless-revived \
+  --name FriendName
+```
+
+It writes a single-use code directly into SQLite and prints the complete v1/v2 invite.
+
+Friends on Linux can use the [Linux launcher](https://mixutin.github.io/dauntless-revived/setup/linux.html).
+
+## Separate Linux game worker
+
+The game processes can live on another Linux machine. This is also the worker mode the OpenBSD port
+uses.
+
+On the worker:
+
+```bash
+sudo ./deploy/linux-server/install-worker.sh \
+  --game-dir /srv/dauntless/BaseGame144/Dauntless \
+  --proton /home/dauntless/.local/share/Steam/compatibilitytools.d/GE-Proton10-1/proton
+```
+
+The worker installer creates the fixed `dr-game-worker` command. Give the control-plane host a
+dedicated SSH key and restrict its `authorized_keys` entry to the forced command printed by the
+installer. That key should have no sudo access and no general shell.
+
+## Backups and updates
+
+The Linux port does not yet have the Windows kit's transactional update/rollback script.
+
+Before updating, back up the data directory. SQLite can also be copied safely through the helper:
+
+```bash
+sudo -u dauntless node /opt/dauntless-revived/deploy/unix-common/dr-db.cjs \
+  backup /opt/dauntless-revived/UndauntedMetagame \
+  /var/lib/dauntless-revived/undaunted.db \
+  /var/lib/dauntless-revived/undaunted-backup.db
+```
+
+Then pull/copy the newer source and re-run the installer with the same arguments. Keep the same
+`/var/lib/dauntless-revived` and `/etc/dauntless-revived` directories to preserve keys and data.
+
+## Troubleshooting
+
+**No Proton or Wine found:** pass `--proton /absolute/path/to/proton` or
+`--wine /absolute/path/to/wine64`.
+
+**No DISPLAY:** install Xvfb/`xvfb-run`, or deliberately pass `--xvfb 0` only when a display is
+already supplied.
+
+**Public players reach the gateway but not hunts:** check that your provider/cloud firewall permits
+the UDP game range and that the nftables `dauntless_revived` table is still in the packet path.
+
+**Ramsgate repeatedly restarts:** inspect `journalctl -u dauntless-deploy` and the compatibility
+runtime output first. Do not replace the pinned EXE/DLLs with another game build.
+
+See [Troubleshooting](https://mixutin.github.io/dauntless-revived/setup/troubleshooting.html) for shared server/client issues.
+
+================================================================================
+URL: https://mixutin.github.io/dauntless-revived/setup/openbsd-server.html
+================================================================================
+
+# OpenBSD server
+
+The OpenBSD port runs the **control plane natively on OpenBSD** and sends the actual Dauntless game
+processes to a separate Linux Proton/Wine worker.
+
+This is a separate port. It does not modify or depend on `deploy/windows-server/`.
+
+## Why two machines?
+
+The metagame, deploy server, content server, TLS gateway and SQLite database are portable Node.js
+services and run on OpenBSD.
+
+The Ramsgate/hunt server is not a native server binary: it is the original **Windows x86_64
+Dauntless 1.4.4 client executable** started with `-server -nullrhi` and the pinned server DLL.
+This OpenBSD port therefore treats game execution as a Linux-worker responsibility instead of trying
+to make the Windows process part of the OpenBSD base system.
+
+## Architecture
+
+```text
+Internet players
+      |
+      | TCP 443
+      v
+OpenBSD
++ PF
+|  + TCP rdr 443 -> 127.0.0.1:61443
+|  + dynamic player table
+|  + UDP rdr/NAT -> Linux worker
+|
++ Native Node services
+   + Gateway
+   + Metagame / SQLite
+   + Content
+   + Deploy
+          |
+          | restricted SSH command
+          v
+Linux worker
++ dr-game-worker
++ Proton / Wine
++ Dauntless 1.4.4 Ramsgate / hunts
+```
+
+PF source-NATs the forwarded game UDP toward the worker, which keeps the return path symmetric
+through the OpenBSD host.
+
+## OpenBSD requirements
+
+- OpenBSD/amd64 7.9
+- Node.js 20.19+ and npm
+- git
+- PF
+- one external interface
+- one interface/path that reaches the Linux worker
+- a dedicated SSH private key for the game worker
+- your own exact 1.4.4 game tree on OpenBSD for the content server
+
+The Linux worker also needs its own copy of the game tree.
+
+## 1. Prepare the Linux worker
+
+Follow the worker section of [Linux server](https://mixutin.github.io/dauntless-revived/setup/linux-server.html), or run:
+
+```bash
+sudo ./deploy/linux-server/install-worker.sh \
+  --game-dir /srv/dauntless/BaseGame144/Dauntless \
+  --proton /home/dauntless/.local/share/Steam/compatibilitytools.d/GE-Proton10-1/proton
+```
+
+Create a dedicated SSH key on OpenBSD:
+
+```sh
+ssh-keygen -t ed25519 -f /root/.ssh/dauntless_worker
+```
+
+Add its public key to the Linux worker's `dauntless` account using the
+`restrict,command=".../ssh-worker-command.sh"` prefix printed by the worker installer.
+
+The restricted key receives only a bounded base64url JSON argv payload. It does not get a general
+remote shell.
+
+## 2. Install OpenBSD prerequisites
+
+```sh
+doas pkg_add node git
+```
+
+Clone the repo and place the local 1.4.4 game tree somewhere readable by the future `_dauntless`
+service account.
+
+## 3. Install the control plane
+
+Example public setup:
+
+```sh
+doas ./deploy/openbsd-server/install.ksh \
+  --game-dir /srv/dauntless/BaseGame144/Dauntless \
+  --my-ip 203.0.113.10 \
+  --worker-host 10.0.0.2 \
+  --worker-ip 10.0.0.2 \
+  --worker-key /root/.ssh/dauntless_worker \
+  --interface vio0 \
+  --worker-interface vether0 \
+  --mode public \
+  --configure-pf
+```
+
+Replace:
+
+- `vio0` with the public-facing PF interface;
+- `vether0` with the interface/path used to reach the Linux worker;
+- `10.0.0.2` with the worker address;
+- the example public IP with your server's address.
+
+A live install refuses to edit PF unless you explicitly pass `--configure-pf`.
+
+## PF rules
+
+Public mode creates a dedicated `dauntless-revived` PF anchor containing:
+
+- a persistent `<dauntless_revived_players>` table;
+- TCP 443 redirect to the unprivileged gateway on `127.0.0.1:61443`;
+- UDP 8770-8777 redirect only for addresses in the player table;
+- source NAT toward the Linux worker;
+- a fail-closed block for all other game UDP.
+
+The gateway reports authenticated player addresses to a loopback-only allowlist helper. The helper
+updates only the anchor table through `pfctl`; it does not rebuild your entire PF ruleset on every
+login.
+
+The installer validates `/etc/pf.conf` before reloading it. If your existing rules have an earlier
+`quick` rule that bypasses the anchor, place the Dauntless anchor appropriately in your own ruleset.
+
+## Gateway privileges
+
+The OpenBSD gateway binds to **127.0.0.1:61443**, not privileged port 443. PF performs the public
+443 redirect. The `_dauntless` process therefore does not need privilege merely to accept TLS.
+
+## Service control
+
+The installer creates separate rc.d services:
+
+- `dauntless_metagame`
+- `dauntless_deploy`
+- `dauntless_content`
+- public mode: `dauntless_allowlist`, `dauntless_gateway`
+
+Use:
+
+```sh
+doas ./deploy/openbsd-server/stack.ksh status
+doas ./deploy/openbsd-server/stack.ksh restart
+doas ./deploy/openbsd-server/stack.ksh restart deploy
+```
+
+## Create an invite
+
+```sh
+doas -u _dauntless node /opt/dauntless-revived/deploy/unix-common/new-invite.mjs \
+  --config /etc/dauntless-revived \
+  --name FriendName
+```
+
+## Validation status
+
+The repository CI boots a real **OpenBSD 7.9** virtual machine for this port. It builds the native
+Node services, runs their portable test suites, checks the ksh/rc.d files, migrates a fresh SQLite
+database and validates generated PF syntax.
+
+The full two-machine live game test is still the final integration milestone: OpenBSD gateway/PF on
+one machine, real Proton/Wine game processes on the Linux worker, and a player completing Ramsgate
+plus one hunt.
+
+## Troubleshooting
+
+**Worker SSH starts then immediately exits:** test the dedicated key manually and verify its
+`authorized_keys` forced-command prefix. The OpenBSD deploy env uses the fixed
+`dr-game-worker` command.
+
+**Gateway works but game UDP never reaches the worker:** check both PF interfaces, IPv4 forwarding,
+the worker route, and the generated source-NAT rule.
+
+**PF refuses the generated anchor:** run `pfctl -nf /etc/pf.conf` and inspect any earlier
+`quick` rules or naming conflicts before enabling services.
+
+**Content downloads work but game launch fails:** the OpenBSD control plane is healthy; troubleshoot
+the Linux worker's Proton/Wine runtime and pinned game tree.
+
+See [Troubleshooting](https://mixutin.github.io/dauntless-revived/setup/troubleshooting.html) for shared issues.
 
 ================================================================================
 URL: https://mixutin.github.io/dauntless-revived/setup/upgrading.html

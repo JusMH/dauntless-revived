@@ -59,9 +59,10 @@ More answers are in the [FAQ](https://mixutin.github.io/dauntless-revived/faq.ht
 
 ## Status
 
-As of 22 September 2026. The game itself has so far been played by one person, the owner: first on
-the host PC, then on 22 September 2026 over the internet on our rented server, through the launcher.
-The rows marked "(solo)" mean exactly that. A test with a second player is next.
+Gameplay rows below describe the latest live game tests from **22 September 2026**; infrastructure
+rows also include the Linux/OpenBSD porting work completed on **1 October 2026**. The game was first
+played solo on the host and rented server, then tested with two players over the internet on
+22 September. Rows marked "(solo)" mean exactly that.
 
 | Feature | State | Notes |
 |---|---|---|
@@ -74,6 +75,8 @@ The rows marked "(solo)" mean exactly that. A test with a second player is next.
 | Inventory, gear and quests | Works (solo) | Saved to SQLite; survives a client restart and a full server restart |
 | Slayer level, mastery and the Hunt Pass | Works (solo), on by default | Start from the beginning (Slayer level 1, no mastery, an empty Hunt Pass) and are saved; every account owns the Elite Hunt Pass. Tested in game on a throwaway account, including a full restart. On the rented server on 22 September 2026: Slayer level 3, weapon mastery and behemoth mastery (rank 2, the first time behemoth mastery was seen in game), with the rank rewards confirmed by the game server. `PROGRESSION_MODE=stub` brings back upstream's fixed level 50 ([upgrade notes](https://mixutin.github.io/dauntless-revived/setup/upgrading.html)) |
 | A server on a rented machine | Running | The [Windows server kit](https://mixutin.github.io/dauntless-revived/setup/windows-server.html) was deployed to a rented Windows Server 2019 VPS in public mode on 21–22 September 2026. Checked there: the stack starts at boot as the service account, Ramsgate runs and sends heartbeats, the gateway answers from the internet with the pinned certificate, and the hourly backup runs. In the first real test (22 September 2026) three game servers ran at once, and the UDP allowlist opened the game ports for the player and closed them after they left |
+| Linux server port | Control plane working; real Wine/Proton game session next | [Linux server](https://mixutin.github.io/dauntless-revived/setup/linux-server.html): metagame, content, deploy, gateway and SQLite run natively under Linux/systemd; nftables provides the dynamic UDP allowlist; Ramsgate/hunts launch through a separate Proton/Wine wrapper. The local pinned 1.4.4 tree passed all 410 manifest size checks, the Node stack and database bootstrap pass, and a smoke test reached Ramsgate on UDP 8777 with the exact production argv. A real Proton/Wine Ramsgate + hunt session is still the next milestone. |
+| OpenBSD server port | Native control plane CI-tested; live two-machine game session next | [OpenBSD server](https://mixutin.github.io/dauntless-revived/setup/openbsd-server.html): Node/SQLite services run natively on OpenBSD 7.9 under rc.d with PF for TLS redirect and a dynamic player table. The Windows x86_64 game process runs on a restricted Linux Proton/Wine worker over SSH. A real OpenBSD 7.9 VM builds/tests this port in CI. |
 | Friend launcher | Released on Windows; Linux support added | The first release, 0.1.0, was published on [GitHub Releases](https://github.com/mixutin/dauntless-revived/releases/latest) by CI, with `SHA256SUMS.txt` and a build provenance attestation; installed launchers update themselves. The owner registered with it on the rented server and downloaded the game (about 11 GB) through the gateway. 0.1.1, published the same night, stopped turning off the game's automatic exposure, which had made Ramsgate far too dark. Not code-signed yet: on the owner's PC SmartScreen blocked the installer outright, and checking it against `SHA256SUMS.txt` and unblocking it worked ([how](https://mixutin.github.io/dauntless-revived/setup/friends.html)) |
 | Playing with friends over the internet | Works (two players) | Tested on 22 September 2026 on the rented server. First one player: an invite, registration, the game download, the tutorial, Ramsgate, the Training Dojo and the first hunt. Then two players together: they saw each other in Ramsgate and hunted together, after queueing the same hunt within a few seconds of each other (parties don't work in game yet, see the next row) |
 | Parties, friends and guilds | Built, awaiting a live test | Server side: party invites, accept and decline, promote, kick and leave, the whole party on one hunt server, back to Ramsgate together, lookups by name, a friends list and blocklist, and guilds (create, invite, ranks, kick, leave, disband), all but parties saved in SQLite. In the two-player test on 22 September 2026 a party invite reached the other player's game but never showed, and Add Friends did nothing: the server described the wrong player in `POST /accountinfo/public` and answered `POST /account/mapping` in a shape the game does not read. Both are fixed, running on our rented server since 22 September 2026, and pass tests that replay the game's own requests; nobody has tried them in the game yet ([details](https://mixutin.github.io/dauntless-revived/findings/social.html)). Invites don't require being friends. Showing players as online needs presence over the chat connection: built since 23 September 2026, off by default (see the chat row) |
@@ -109,7 +112,7 @@ The live checklist, with every step and what "done" means for it, is [ROADMAP.md
 2. The **metagame** (TypeScript, Express, SQLite; TCP 61000) handles accounts, characters, inventory, loadouts, progression, matchmaking, parties and the friends list.
 3. The **deploy server** (TCP 61001, this machine only) starts game servers on demand: more copies of the same client, switched into server mode by the DLL.
 4. Those game servers (UDP 8770 to 8777: Ramsgate on 8777, the Training Dojo on 8776, up to 6 hunts on 8770 to 8775) host the game itself.
-5. Friends connect in one of two ways. In **private mode** they reach the host over Tailscale. In **public mode** (the default of the [Windows server kit](https://mixutin.github.io/dauntless-revived/setup/windows-server.html)) a TLS **gateway** is the game's only public TCP port: the friend launcher checks its certificate against the fingerprint in the invite, and the game's UDP ports open only for the addresses of players who logged in. A **content server** behind it hands the game files to registered accounts, and the launcher checks every file against a list built into it.
+5. Friends connect in one of two ways. In **private mode** they reach the host over Tailscale. In **public mode** the TLS **gateway** is the game's only public TCP port: the friend launcher checks its certificate against the fingerprint in the invite, and the game's UDP ports open only for the addresses of players who logged in. Windows uses Windows Firewall, Linux uses nftables, and OpenBSD uses a PF player table plus redirect/NAT to its Linux game worker. A **content server** behind the gateway hands the game files to registered accounts, and the launcher checks every file against a list built into it.
 
 ## Repository layout
 
@@ -125,6 +128,9 @@ The component folders keep upstream's `Undaunted...` names for now (renaming the
 | `UndauntedLauncher/` | The Dauntless Revived Launcher for Windows and x86_64 Linux; on Linux the pinned Windows game client runs through Proton/Wine. `assets/` holds the two pinned prebuilt DLLs every setup installs |
 | `UndauntedInternalServer/` | The C++ source of Undaunted's server DLL, which lets the retail client run as a game server and points clients at the backend. It compiles with the Visual Studio 2022 Build Tools, but nothing in this repository builds it; every setup uses the prebuilt DLLs from `UndauntedLauncher/assets/` |
 | `deploy/windows-server/` | The Windows server kit: installs and runs the whole server on Windows Server 2019, in public or private mode, with backups, invites and updates |
+| `deploy/linux-server/` | Separate Linux server port: systemd service templates, nftables allowlist, one-host Proton/Wine launch wrapper and the reusable Linux game-worker installer |
+| `deploy/openbsd-server/` | Separate OpenBSD 7.9 control-plane port: rc.d services, PF redirect/allowlist rules and the restricted SSH launcher for a Linux game worker |
+| `deploy/unix-common/` | Shared Linux/OpenBSD config, SQLite/bootstrap, invite and compatibility-runner helpers; the Windows kit does not use these |
 | `friend-kit/` | The Tailscale-only setup and play scripts for invited friends' PCs |
 | `tools/` | `sync-roadmap.js` and `build-llms.js` (the generated docs files), `make-friend-kit.ps1`, `make-game-manifest.js`, and in `ci/` the checks CI runs |
 | `docs/` | The documentation site (GitHub Pages), with the Finnish pages in `docs/fi/` |
@@ -192,9 +198,16 @@ The component folders keep upstream's `Undaunted...` names for now (renaming the
 - A **Windows server kit** (`deploy/windows-server/`): one command from your PC installs the whole
   server on a Windows Server 2019 machine over key-only SSH, with a low-privilege service account,
   start at boot, supervision, hourly backups, invites and updates.
+- A separate **Linux server port** (`deploy/linux-server/`): the Node/SQLite control plane runs
+  natively under systemd, public game ports use a dynamic nftables allowlist, and the pinned Windows
+  1.4.4 game processes run through Proton/Wine without changing the Windows deployment path.
+- A separate **OpenBSD server port** (`deploy/openbsd-server/`): the control plane runs natively on
+  OpenBSD 7.9 under rc.d, PF handles public TLS redirect and per-player game UDP, and a restricted SSH
+  command starts each proprietary Windows game process on a Linux Proton/Wine worker.
 - Hunt servers start with their console window hidden.
-- **CI** on every push: the builds and tests of every package, the server kit's tests, the docs
-  build, and a check that no secrets, keys, databases or game files are committed.
+- **CI** on every push: the builds and tests of every package, the Windows server kit, the separate
+  Linux server port, a real OpenBSD 7.9 VM build/test for the OpenBSD port, the docs build, and a check
+  that no secrets, keys, databases or game files are committed.
 - **Our own name.** The launcher, the in-game welcome text and the server's messages say Dauntless
   Revived, and the credits name Undaunted. The folders, the server DLL's file name
   (`UndauntedInternalServer.dll`), the `/undaunted/api` routes and the `x-undaunted-*` headers keep
