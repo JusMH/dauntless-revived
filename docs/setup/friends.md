@@ -8,6 +8,7 @@ ref: setup/friends
 ---
 
 {% assign admin_page = site.pages | where: "path", "setup/admin.md" | first %}
+{% assign linux_page = site.pages | where: "path", "setup/linux.md" | first %}
 {% assign legal_page = site.pages | where: "path", "legal.md" | first %}
 {% assign trouble_page = site.pages | where: "path", "setup/troubleshooting.md" | first %}
 
@@ -20,12 +21,11 @@ edits or certificates. All traffic goes over a private Tailscale connection to t
 
 **Public-mode servers use the launcher, not this page.** If the host sent you a
 `dauntless-revived://join?...` line (a public server on a rented machine), you do not need Tailscale or
-the manual steps below. Install the launcher from
-[github.com/mixutin/dauntless-revived/releases/latest](https://github.com/mixutin/dauntless-revived/releases/latest)
-(`DauntlessRevivedLauncher-Setup.exe`), paste the invite line, and it does everything. If you already
-have an account key, choose **"I already have an account key"** and paste your `account.key` instead
-of registering. Keep the launcher open while you play. The rest of this page is the manual Tailscale
-path.
+the manual steps below. On Windows install `DauntlessRevivedLauncher-Setup.exe`; on Linux follow the
+[Linux launcher]({{ linux_page.url | relative_url }}) guide for your distro. Then paste the invite
+line and the launcher does the rest. If you already have an account key, choose **"I already have an
+account key"** and import/paste it instead of registering. Keep the launcher open while you play. The
+rest of this page is the manual Windows/Tailscale path.
 
 **If you already have the game.** On the install screen, choose **"I already have the game files"**
 and paste the path of your 1.4.4 folder (for example `C:\Games\BaseGame144`, or the `Dauntless`

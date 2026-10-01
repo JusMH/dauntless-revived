@@ -1,7 +1,7 @@
 ---
 title: Windows server kit
 parent: Setup
-nav_order: 5
+nav_order: 6
 description: "Install a Dauntless Revived server on a rented Windows Server 2019 VPS in public mode: one TLS gateway port with a pinned certificate, game ports opened only for logged-in players, key-only SSH deployment, invites, updates and backups."
 lang: en
 ref: setup/windows-server

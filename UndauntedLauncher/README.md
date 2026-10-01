@@ -6,7 +6,7 @@ The Windows and Linux app friends install to play on a Dauntless Revived server.
 invite, creates the account, downloads and checks the Dauntless 1.4.4 game files from the host's
 own server, sets everything up and starts the game. English and Finnish.
 
-**Linux:** native launcher packages are available for x86_64; the Windows 1.4.4 game client runs through Proton or Wine. See [LINUX.md](LINUX.md).
+**Linux:** native launcher packages are available for x86_64; the Windows 1.4.4 game client runs through Proton or Wine. See the [distro-by-distro Linux guide](https://mixutin.github.io/dauntless-revived/setup/linux.html) or [LINUX.md](LINUX.md).
 
 **No game files are in this app or in this repository.** They come from the host's content server,
 and every file is checked against the list of 410 files, sizes and SHA-256 hashes compiled into the

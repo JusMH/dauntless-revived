@@ -2,7 +2,7 @@
 title: Vianetsintä
 parent: Asennus
 grand_parent: Dauntless Revived suomeksi
-nav_order: 4
+nav_order: 5
 description: "Dauntless 1.4.4 ja Dauntless Revived -palvelin: ongelmat, joihin törmäsimme, syineen ja korjauksineen. Varatut portit, kirjautuminen, sumea grafiikka, Defender ja git."
 lang: fi
 ref: setup/troubleshooting

@@ -4,6 +4,11 @@ Dauntless Revived Launcher supports x86_64 Linux. The launcher itself is native 
 
 No game files are included in the Linux packages. The launcher downloads or verifies the same pinned 1.4.4 files as the Windows build.
 
+Full distro-by-distro instructions are on the project site:
+
+- [Linux launcher guide (English)](https://mixutin.github.io/dauntless-revived/setup/linux.html)
+- [Linux-käynnistimen ohje (suomeksi)](https://mixutin.github.io/dauntless-revived/fi/setup/linux.html)
+
 ## Downloads
 
 Each `launcher-v*` GitHub release contains:
@@ -11,9 +16,19 @@ Each `launcher-v*` GitHub release contains:
 - `DauntlessRevivedLauncher-<version>-linux-x86_64.AppImage` — universal option for most desktop distributions.
 - `DauntlessRevivedLauncher-<version>-linux-amd64.deb` — Debian, Ubuntu, Linux Mint, Pop!_OS and derivatives.
 - `DauntlessRevivedLauncher-<version>-linux-x86_64.rpm` — Fedora, openSUSE and RPM-family distributions.
-- `DauntlessRevivedLauncher-<version>-linux-x64.zip` — portable fallback for other glibc-based desktop distributions.
+- `DauntlessRevivedLauncher-<version>-linux-x64.tar.gz` — portable fallback for Arch/Gentoo and other glibc-based desktops.
+- `DauntlessRevivedLauncher-<version>-linux-x64.zip` — the same portable application in ZIP form.
 
-For Arch Linux, Manjaro, EndeavourOS, CachyOS and similar distributions, use the AppImage or portable ZIP. NixOS can run the AppImage through its normal AppImage/FHS support (for example `appimage-run`). Alpine and other musl-only systems are not advertised because Electron's official Linux binaries target glibc.
+| Distribution | Recommended package |
+|---|---|
+| Ubuntu, Debian, Linux Mint, Pop!_OS | `.deb` |
+| Fedora, Nobara, Rocky, AlmaLinux | `.rpm` on mutable systems; AppImage on Atomic/immutable systems |
+| openSUSE Tumbleweed / Leap | `.rpm` |
+| Arch, EndeavourOS, CachyOS, Manjaro | AppImage or `.tar.gz` |
+| NixOS | AppImage through `appimage-run` |
+| Gentoo / Void / other glibc distros | AppImage or `.tar.gz` |
+
+Alpine and other musl-only systems are not advertised because Electron's official Linux binaries target glibc. ARM64 is not supported because the game itself is Windows x86_64.
 
 Check the file against `SHA256SUMS.txt` from the same release before running it.
 
@@ -44,6 +59,20 @@ openSUSE:
 sudo zypper install ./DauntlessRevivedLauncher-*-linux-x86_64.rpm
 ```
 
+Arch-family / Gentoo / Void portable install:
+
+```bash
+mkdir -p ~/.local/opt/dauntless-revived
+tar -xzf DauntlessRevivedLauncher-*-linux-x64.tar.gz -C ~/.local/opt/dauntless-revived
+~/.local/opt/dauntless-revived/DauntlessRevivedLauncher
+```
+
+NixOS one-off AppImage run:
+
+```bash
+nix-shell -p appimage-run --run 'appimage-run ./DauntlessRevivedLauncher-*-linux-x86_64.AppImage'
+```
+
 The default game folder on Linux is `~/Games/DauntlessRevived`. You can choose another absolute Linux path or point the launcher at an existing Dauntless 1.4.4 folder.
 
 ## Proton and Wine
@@ -69,6 +98,17 @@ DAUNTLESS_REVIVED_WINE=/usr/bin/wine64 ./DauntlessRevivedLauncher-*.AppImage
 ```
 
 If the Play button reports that no compatibility runtime exists, install Steam with a Proton version, Proton-GE, Wine, or a Lutris Wine runner and try again.
+
+### Flatpak Steam
+
+Native Steam locations are auto-detected. Flatpak Steam normally keeps Proton under
+`~/.var/app/com.valvesoftware.Steam/data/Steam`, which is not currently searched automatically.
+Point the launcher at the actual Proton script, for example:
+
+```bash
+DAUNTLESS_REVIVED_PROTON="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common/Proton - Experimental/proton" \
+  ./DauntlessRevivedLauncher-*-linux-x86_64.AppImage
+```
 
 Private/Tailscale servers work on Linux too; the launcher searches the normal Linux Tailscale executable locations and `PATH`.
 

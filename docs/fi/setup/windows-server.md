@@ -2,7 +2,7 @@
 title: Windows-palvelin
 parent: Asennus
 grand_parent: Dauntless Revived suomeksi
-nav_order: 5
+nav_order: 6
 description: "Dauntless Revived -palvelin vuokratulle Windows Server 2019 -koneelle julkisessa tilassa: yksi salattu portti, kiinnitetty varmenne, peliportit auki vain kirjautuneille, asennus SSH:lla, kutsut ja varmuuskopiot."
 lang: fi
 ref: setup/windows-server

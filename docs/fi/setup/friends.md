@@ -10,6 +10,7 @@ locale: fi_FI
 ---
 
 {% assign admin_page = site.pages | where: "path", "fi/setup/admin.md" | first %}
+{% assign linux_page = site.pages | where: "path", "fi/setup/linux.md" | first %}
 {% assign legal_page = site.pages | where: "path", "fi/legal.md" | first %}
 {% assign trouble_page = site.pages | where: "path", "fi/setup/troubleshooting.md" | first %}
 
@@ -23,11 +24,11 @@ varmenteita. Kaikki liikenne kulkee yksityisen Tailscale-yhteyden kautta isänn�
 
 **Julkisen tilan palvelimet käyttävät käynnistintä, eivät tätä sivua.** Jos isäntä lähetti sinulle
 `dauntless-revived://join?...`-rivin (julkinen palvelin vuokrakoneella), et tarvitse Tailscalea etkä alla
-olevia käsivaiheita. Asenna käynnistin osoitteesta
-[github.com/mixutin/dauntless-revived/releases/latest](https://github.com/mixutin/dauntless-revived/releases/latest)
-(`DauntlessRevivedLauncher-Setup.exe`), liitä kutsurivi, niin se hoitaa kaiken. Jos sinulla on jo
-tiliavain, valitse **"Minulla on jo tiliavain"** ja liitä `account.key`-tiedostosi rekisteröitymisen
-sijaan. Pidä käynnistin auki pelatessasi. Loput tästä sivusta on käsivaiheinen Tailscale-polku.
+olevia käsivaiheita. Windowsissa asenna `DauntlessRevivedLauncher-Setup.exe`; Linuxissa seuraa oman
+jakelusi [Linux-käynnistin]({{ linux_page.url | relative_url }}) -ohjetta. Liitä sitten kutsurivi, ja
+käynnistin hoitaa loput. Jos sinulla on jo tiliavain, valitse **"Minulla on jo tiliavain"** ja tuo tai
+liitä se rekisteröitymisen sijaan. Pidä käynnistin auki pelatessasi. Loput tästä sivusta on käsivaiheinen
+Windows/Tailscale-polku.
 
 **Jos sinulla on jo peli.** Valitse asennusnäkymässä **"Minulla on jo pelitiedostot"** ja liitä
 1.4.4-kansiosi polku (esimerkiksi `C:\Pelit\BaseGame144` tai sen sisällä oleva `Dauntless`-kansio),

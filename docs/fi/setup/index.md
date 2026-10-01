@@ -12,6 +12,7 @@ locale: fi_FI
 
 {% assign host_page = site.pages | where: "path", "fi/setup/host.md" | first %}
 {% assign friends_page = site.pages | where: "path", "fi/setup/friends.md" | first %}
+{% assign linux_page = site.pages | where: "path", "fi/setup/linux.md" | first %}
 {% assign admin_page = site.pages | where: "path", "fi/setup/admin.md" | first %}
 {% assign trouble_page = site.pages | where: "path", "fi/setup/troubleshooting.md" | first %}
 {% assign winserver_page = site.pages | where: "path", "fi/setup/windows-server.md" | first %}
@@ -48,6 +49,7 @@ missä sillä on merkitystä.
 |---|---|---|
 | [Pystytä palvelin]({{ host_page.url | relative_url }}) | Palvelinta pyörittävälle | Version tarkistus, asennus lyhyeen polkuun, kahden DLL-tiedoston asennus kiinnitettyjä tiivisteitä vasten, asetustiedostot, metagamen ja deploy-palvelimen käynnistys, ensimmäisen käynnistyksen tarkistukset, peliohjelman käynnistys ja kaiken pysäyttäminen. Lopussa on yhden sivun käynnistyslista. |
 | [Liity kaverina]({{ friends_page.url | relative_url }}) | Kutsutulle pelaajalle | Tailscale, pelitiedostojen tarkistus, kahden DLL-tiedoston kopiointi, rekisteröityminen henkilökohtaista tiliavainta varten, käynnistys ja se, mikä toimii juuri nyt. |
+| [Linux-käynnistin]({{ linux_page.url | relative_url }}) | Linux-pelaajalle | Jakelukohtaiset ohjeet Ubuntulle/Debianille/Mintille/Pop!_OS:lle, Fedoralle, openSUSElle, Arch-sukuisille jakeluille, NixOS:lle, Gentoolle, Voidille sekä AppImage- ja tar-paketeille, mukaan lukien Proton/Wine. |
 | [Palvelin ryhmälle]({{ admin_page.url | relative_url }}) | Isännälle, kun kokonaisuus toimii jo paikallisesti | Tailscale-jako, Tailscale-liitäntään rajatut palomuurisäännöt, osoitteiden vaihtaminen, kutsukoodit ja tilit, ylläpitorajapinta, kapasiteetti ja tietokannan varmuuskopiot. Tavoitekokoonpano, jota ei ole vielä testattu alusta loppuun. |
 | [Windows-palvelin]({{ winserver_page.url | relative_url }}) | Isännälle, jatkuvasti päällä olevaa vuokrapalvelinta varten | Yksi komento omalta koneelta asentaa kaiken Windows Server 2019 -virtuaalipalvelimelle SSH-avaimella. Julkinen tila: yksi salattu portti kiinnitetyllä varmenteella, ja peliportit auki vain kirjautuneille pelaajille. Kutsut, päivitykset paluumahdollisuudella, varmuuskopiot ja poistaminen. Asennettu vuokratulle palvelimelle julkiseen tilaan 21.–22.9.2026; yksi pelaaja pelasi siellä internetin yli 22.9.2026, ja testi toisen pelaajan kanssa on seuraavana vuorossa. |
 | [Vianetsintä]({{ trouble_page.url | relative_url }}) | Kaikille | Ongelmat, joihin oikeasti törmäsimme, syineen ja korjauksineen. Muutama kohta on peräisin koodin lukemisesta, ja ne on merkitty sellaisiksi. |
@@ -59,7 +61,8 @@ missä sillä on merkitystä.
    Ramsgatessa omalla koneellasi.
 2. Isäntä: seuraa sivua [Palvelin ryhmälle]({{ admin_page.url | relative_url }}) päästääksesi
    kaverit sisään.
-3. Jokainen kaveri: seuraa sivua [Liity kaverina]({{ friends_page.url | relative_url }}).
+3. Linux-kaveri: asenna käynnistin sivun [Linux-käynnistin]({{ linux_page.url | relative_url }}) mukaan.
+4. Jokainen kaveri: seuraa sivua [Liity kaverina]({{ friends_page.url | relative_url }}).
 
 Näiden ohjeiden taustalla olevat tarkat tiedot (jokainen asetus, portti, HTTP-reitti, tiedosto ja
 skriptin parametri oletusarvoineen) ovat [Tekninen viite]({{ reference_page.url | relative_url }}) -osiossa.

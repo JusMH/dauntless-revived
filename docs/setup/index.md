@@ -10,6 +10,7 @@ ref: setup/index
 
 {% assign host_page = site.pages | where: "path", "setup/host.md" | first %}
 {% assign friends_page = site.pages | where: "path", "setup/friends.md" | first %}
+{% assign linux_page = site.pages | where: "path", "setup/linux.md" | first %}
 {% assign admin_page = site.pages | where: "path", "setup/admin.md" | first %}
 {% assign trouble_page = site.pages | where: "path", "setup/troubleshooting.md" | first %}
 {% assign winserver_page = site.pages | where: "path", "setup/windows-server.md" | first %}
@@ -41,6 +42,7 @@ matters.
 |---|---|---|
 | [Host a server]({{ host_page.url | relative_url }}) | The person running the server | Verifying the build, installing it at a short path, placing the two DLLs with pinned hashes, the config files, starting the metagame and deploy server, first-boot checks, launching the client, and stopping everything. Ends with a one-page start checklist. |
 | [Join as a friend]({{ friends_page.url | relative_url }}) | An invited player | Tailscale, checking your game files, copying the two DLLs, registering for a personal account key, launching, and what works right now. |
+| [Linux launcher]({{ linux_page.url | relative_url }}) | A Linux player | Distro-by-distro launcher install instructions for Ubuntu/Debian/Mint/Pop!_OS, Fedora, openSUSE, Arch-family systems, NixOS, Gentoo, Void and universal AppImage/tarball installs, plus Proton/Wine setup. |
 | [Run it for a group]({{ admin_page.url | relative_url }}) | The host, once the stack runs locally | Tailscale sharing, firewall rules scoped to the Tailscale interface, switching addresses, invite codes and accounts, the admin API, capacity, and database backups. Target configuration, not yet tested end to end. |
 | [Windows server kit]({{ winserver_page.url | relative_url }}) | The host, for an always-on rented server | One command from your PC installs everything on a Windows Server 2019 VPS over key-only SSH. Public mode: one TLS gateway port with a pinned certificate, game ports opened only for logged-in players. Invites, updates with rollback, backups, uninstall. Deployed on a rented server in public mode on 21–22 September 2026; one player played there over the internet on 22 September 2026, and a test with a second player is next. |
 | [Troubleshooting]({{ trouble_page.url | relative_url }}) | Everyone | Problems we actually hit, with causes and fixes. A few entries come from reading the code and are marked as such. |
@@ -51,7 +53,8 @@ matters.
 1. Host: work through [Host a server]({{ host_page.url | relative_url }}) until you are standing in
    Ramsgate on your own PC.
 2. Host: follow [Run it for a group]({{ admin_page.url | relative_url }}) to let friends in.
-3. Each friend: follow [Join as a friend]({{ friends_page.url | relative_url }}).
+3. Linux friends: install the launcher with [Linux launcher]({{ linux_page.url | relative_url }}).
+4. Each friend: follow [Join as a friend]({{ friends_page.url | relative_url }}).
 
 The exact facts behind these guides (every setting, port, HTTP route, file and script parameter,
 with its default) are in the [Reference]({{ reference_page.url | relative_url }}) section.

@@ -1,7 +1,7 @@
 ---
 title: Upgrade notes
 parent: Setup
-nav_order: 6
+nav_order: 7
 description: "What changes for players when you update an existing Dauntless Revived server: the port of Harmonic's fork (Slayer Links on; Escalation, the store and online status built but off), text chat, friends, parties and guilds, and real progression on by default. How to keep old max ranks, start fresh, or stay on the stub."
 lang: en
 ref: setup/upgrading

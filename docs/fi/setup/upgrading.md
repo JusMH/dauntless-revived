@@ -2,7 +2,7 @@
 title: Päivitysohjeet
 parent: Asennus
 grand_parent: Dauntless Revived suomeksi
-nav_order: 6
+nav_order: 7
 description: "Mitä pelaajille muuttuu, kun päivität jo käytössä olevan Dauntless Revived -palvelimen: Harmonicin forkin siirto (Slayer Links päällä; Escalation, kauppa ja paikalla olo rakennettu mutta pois päältä), tekstichat, kaverit, ryhmät ja killat sekä oletuksena päällä oleva oikea eteneminen. Näin pidät vanhat maksimitasot, aloitat alusta tai jatkat tyngällä."
 lang: fi
 ref: setup/upgrading

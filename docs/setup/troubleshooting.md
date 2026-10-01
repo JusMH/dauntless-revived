@@ -1,7 +1,7 @@
 ---
 title: Troubleshooting
 parent: Setup
-nav_order: 4
+nav_order: 5
 description: "Problems we hit running the Dauntless 1.4.4 client against a Dauntless Revived server, with causes and fixes: port clashes, login, blurry graphics, Defender and git."
 lang: en
 ref: setup/troubleshooting

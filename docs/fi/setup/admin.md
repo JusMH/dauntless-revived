@@ -2,7 +2,7 @@
 title: Palvelin ryhmälle
 parent: Asennus
 grand_parent: Dauntless Revived suomeksi
-nav_order: 3
+nav_order: 4
 description: "Dauntless Revived -palvelin kavereille: Tailscale-jako, palomuurisäännöt, kutsukoodit, ylläpitäjän tilit, kapasiteetti ja tietokannan varmuuskopiot."
 lang: fi
 ref: setup/admin

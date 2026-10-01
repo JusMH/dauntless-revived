@@ -1,7 +1,7 @@
 ---
 title: Run it for a group
 parent: Setup
-nav_order: 3
+nav_order: 4
 description: "Opening a Dauntless Revived server to a few friends: Tailscale sharing, firewall rules, invite codes, admin accounts, capacity figures and database backups."
 lang: en
 ref: setup/admin

@@ -6,7 +6,7 @@ Windows- ja Linux-sovellus, jonka kaverit asentavat pelatakseen Dauntless Revive
 palvelimelle kutsulla, luo tilin, lataa ja tarkistaa Dauntless 1.4.4:n pelitiedostot ylläpitäjän
 omalta palvelimelta, laittaa kaiken valmiiksi ja käynnistää pelin. Kielinä englanti ja suomi.
 
-**Linux:** x86_64-Linuxille julkaistaan AppImage-, deb-, rpm- ja siirrettävät paketit. Windowsin 1.4.4-peliasiakas käynnistyy Protonin tai Winen kautta. Katso [LINUX.md](LINUX.md).
+**Linux:** x86_64-Linuxille julkaistaan AppImage-, deb-, rpm- ja siirrettävät paketit. Windowsin 1.4.4-peliasiakas käynnistyy Protonin tai Winen kautta. Katso [jakelukohtainen Linux-ohje](https://mixutin.github.io/dauntless-revived/fi/setup/linux.html) tai [LINUX.md](LINUX.md).
 
 **Sovelluksessa tai tässä repositoriossa ei ole pelitiedostoja.** Ne tulevat ylläpitäjän
 sisältöpalvelimelta, ja jokainen tiedosto tarkistetaan käynnistimeen käännettyä listaa vasten
@@ -16,8 +16,8 @@ Palvelin, joka tarjoaa jotain muuta, hylätään.
 ## Kavereille
 
 1. Asenna käynnistin projektin julkaisusta. Windowsissa käytä
-   `DauntlessRevivedLauncher-Setup.exe`-asennusohjelmaa. Linuxissa käytä [LINUX.md](LINUX.md)-ohjeen
-   AppImage-, `.deb`-, `.rpm`- tai siirrettävää ZIP-pakettia. Tarkista lataus saman julkaisun
+   `DauntlessRevivedLauncher-Setup.exe`-asennusohjelmaa. Linuxissa valitse jakelullesi sopiva
+   AppImage-, `.deb`-, `.rpm`- tai siirrettävä paketti [Linux-käynnistimen ohjeesta](https://mixutin.github.io/dauntless-revived/fi/setup/linux.html). Tarkista lataus saman julkaisun
    `SHA256SUMS.txt`-tiedostoa vasten. Windows-asennusohjelmaa ei ole vielä allekirjoitettu, joten
    SmartScreen voi pyytää vahvistusta; jos se estää ohjelman kokonaan, tarkista tiiviste, poista
    tiedoston esto (Ominaisuudet > Poista esto tai `Unblock-File`) ja käynnistä se uudelleen.
