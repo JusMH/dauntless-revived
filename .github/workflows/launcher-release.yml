@@ -266,7 +266,8 @@ jobs:
             "DauntlessRevivedLauncher-$VERSION-linux-x86_64.AppImage" \
             "DauntlessRevivedLauncher-$VERSION-linux-amd64.deb" \
             "DauntlessRevivedLauncher-$VERSION-linux-x86_64.rpm" \
-            "DauntlessRevivedLauncher-$VERSION-linux-x64.zip" | sort)"
+            "DauntlessRevivedLauncher-$VERSION-linux-x64.zip" \
+            "DauntlessRevivedLauncher-$VERSION-linux-x64.tar.gz" | sort)"
           expected="$(printf '%s\n' "$windows_assets" "$linux_assets" SHA256SUMS.txt SHA256SUMS-LINUX.txt | sort)"
           actual="$(ls -A | sort)"
           if [ "$actual" != "$expected" ]; then
@@ -397,7 +398,8 @@ jobs:
           - Universal AppImage: \`DauntlessRevivedLauncher-${VERSION}-linux-x86_64.AppImage\`
           - Debian/Ubuntu/Mint/Pop!_OS: \`DauntlessRevivedLauncher-${VERSION}-linux-amd64.deb\`
           - Fedora/openSUSE/RHEL-family: \`DauntlessRevivedLauncher-${VERSION}-linux-x86_64.rpm\`
-          - Portable: \`DauntlessRevivedLauncher-${VERSION}-linux-x64.zip\`
+          - Portable ZIP: \`DauntlessRevivedLauncher-${VERSION}-linux-x64.zip\`
+          - Portable tar.gz: \`DauntlessRevivedLauncher-${VERSION}-linux-x64.tar.gz\`
 
           Linux runs the pinned Windows game client through an installed Proton or Wine runtime. The launcher
           auto-detects Steam Proton, Proton-GE, system Wine and Lutris Wine; no game files are bundled.
