@@ -21,6 +21,23 @@ ref: setup/admin
 # Run it for a group
 {: .no_toc }
 
+## Private owner dashboard (2026-09-30)
+
+On an updated Windows kit server, run `C:\DauntlessRevived\bin\Install-OwnerDashboard.ps1 -OpenOnLogon`
+as administrator, then restart the metagame during maintenance to activate backend health collection.
+Open `http://127.0.0.1:61110` **on the VPS** and unlock with `data\keys\owner.key`.
+From your own PC, forward that port through SSH; do not open it in the public firewall.
+The dashboard starts at boot and with a full stack start/restart. Browser opening happens only
+in the installing operator's interactive session, not in the game service account.
+
+The lightweight views show CPU/RAM, backend request/error/event-loop metrics, uptime, player
+locations, process memory, free disk/network, account names and key fingerprints, registration
+invites and bounded operational logs. Key matching happens in the browser without sending the
+entered player key. Game tick rate is not yet instrumented. Process metrics reuse the kit's
+minute CSV rather than repeatedly launching scanners. Re-run the dashboard installer after
+updates. See [the dashboard operator guide](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DASHBOARD.md)
+for security, limitations and disabling autostart.
+
 This page covers how we open our Undaunted-based stack (client build **1.4.4**) to a handful of
 friends: network access, firewall, addresses, accounts, capacity and backups. It assumes the stack
 already runs for you locally, with the metagame, the deploy server and a Ramsgate server.
@@ -422,7 +439,7 @@ shows the value it uses. Every setting is on [Configuration]({{ config_page.url 
 | Strict Escalation rules | `ESCALATION_STRICT=1` | Only after real Escalation has run with no `breaks a soft rule` line. | Same as above. |
 | The free store | `STORE=free` | Decide whether the store stays free (roadmap 3.7). Count the accounts with more than one character (below): a purchase goes to the character saved last. | Open every store tab, buy one item of each kind, log in again, finish a hunt ([The in-game store]({{ '/findings/store.html' | relative_url }}#open)). |
 | Unlimited premium bounty tokens | `STORE_REPEATABLE_TOKENS=1` (with `STORE=free`) | Your decision: it means unlimited free premium bounty drafts. | The bundle shows in the store. |
-| Friends' online status | `CHAT_PRESENCE=1` (with `CHAT=1`) | Chat itself must work first. The kit's `Set-Chat.ps1` has no switch for it: add the line by hand. | The presence test on [Text chat]({{ '/findings/chat.html' | relative_url }}#how-to-verify-presence): no player is kicked from a party. |
+| Friends' online status | On by default; `CHAT_PRESENCE=0` disables | Chat itself must work. No manual player status setting; remove an existing operator opt-out to enable. | The presence test on [Text chat]({{ '/findings/chat.html' | relative_url }}#how-to-verify-presence): no player is kicked from a party. |
 | Hunt Pass rank entitlements on confirm | `PROGRESSION_CONFIRM_ENTITLEMENTS=1` | Only if an in-game test shows the Elite ranks' cosmetics (ranks 6, 9, 29 and 50) never arrive by themselves (no `POST /entitlementv2` in the log). | The cosmetic shows after Claim. |
 | Your own Hunt Pass season files | `PROGRESSION_CONFIG_DIR=<folder>` and, for another season, `ACTIVE_HUNT_PASS=<id>` | Read [Game settings]({{ '/reference/game-settings.html' | relative_url }}#hunt-pass-seasons); never change a season players already have progress in. | The start line `Progression config: ...` names what was loaded; a bad file stops the metagame with the reason. |
 

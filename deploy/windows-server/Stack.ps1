@@ -90,6 +90,13 @@ if ($Only) { $Enabled = @($DRComponentOrder | Where-Object { $Only -contains $_ 
 # this runs as a child process). Functions return only booleans.
 function Say([string]$Text) { Write-Host $Text }
 function Label([string]$C) { $DRComponents[$C].Label }
+function Start-OwnerDashboard {
+    if ($WhatIfPreference -or -not $ViaTask -or (Get-DRConfigValue $Cfg 'DashboardEnabled' $false) -ne $true) { return }
+    try {
+        Start-ScheduledTask -TaskName 'Dauntless Revived dashboard'
+        if ((Get-DRConfigValue $Cfg 'DashboardOpenOnStart' $false) -eq $true) { Start-ScheduledTask -TaskName 'Dauntless Revived open dashboard' }
+    } catch { Say '!! Owner dashboard task could not start; game services are unaffected.' }
+}
 function LogDir([string]$C) { if ($C -eq 'allowlist') { $AllowlistDir } else { $P.Logs } }
 # The allowlist helper runs as SYSTEM, so its pid file must never live in a service-writable folder
 # (a compromised service account could redirect a SYSTEM write with a reparse point). It goes to the
@@ -512,6 +519,7 @@ try {
         'start' {
             if ($ViaTask -and $Only) { Stop-DR "-Only does not apply to a start through the scheduled tasks (they start everything). Use 'restart -Only <component>'." }
             if ($ViaTask) { Start-ViaTask } else { $ok = Start-Components; if (-not $ok) { Say '!! not everything started' } }
+            Start-OwnerDashboard
             if (-not $WhatIfPreference) { ''; Show-Status }
         }
         'stop' {
@@ -529,6 +537,7 @@ try {
                 Stop-Components
                 if (-not $Only) { [void](Invoke-Backup); $script:SkipBackup = $true }   # the copy was just taken
                 if ($ViaTask) { Start-ViaTask } else { $ok = Start-Components; if (-not $ok) { Say '!! not everything started' } }
+                Start-OwnerDashboard
             }
             if (-not $WhatIfPreference) { ''; Show-Status }
         }

@@ -445,7 +445,7 @@ describe("friends' online status (CHAT_PRESENCE=1)", () => {
 
     it("(g) CHAT_PRESENCE off: not one presence or friends-list stanza outside rooms", async () => {
         const Saved = process.env.CHAT_PRESENCE;
-        delete process.env.CHAT_PRESENCE;
+        process.env.CHAT_PRESENCE = "0";
 
         const Off = new ChatServer({ Clock: () => Now, AutoTick: false });
         await Off.listen(0);
@@ -468,26 +468,38 @@ describe("friends' online status (CHAT_PRESENCE=1)", () => {
             assert.ok(Logs.Lines.includes("info chat: friends' online status off: no presence is sent outside rooms"));
         }
         finally{
-            if(Saved !== undefined) process.env.CHAT_PRESENCE = Saved;
+            if(Saved === undefined) delete process.env.CHAT_PRESENCE; else process.env.CHAT_PRESENCE = Saved;
             await Off.close();
         }
     });
 
-    it("the switch: CHAT_PRESENCE=1 enables presence; explicitly disabled chat produces a warning", async () => {
+    it("the default: friends automatically see login and logout without a presence setting", async () => {
         const Saved = process.env.CHAT_PRESENCE;
-        process.env.CHAT_PRESENCE = "1";
+        delete process.env.CHAT_PRESENCE;
+        const On = new ChatServer({ Clock: () => Now, AutoTick: false });
 
         try{
-            const On = new ChatServer({ Clock: () => Now, AutoTick: false });
             await On.listen(0);
-            await On.close();
+            Befriend(A, B);
+            const Alice = await Online(A, On);
+            const Bob = await Online(B, On);
+            Broadcast(Alice, CITY);
+            await Alice.Barrier();
+            Broadcast(Bob, HUNT);
+            assert.ok((await Frames(Bob)).some((Frame) => Frame.Kind === "presence" && Frame.From === Jid(Alice) && Frame.Status === CITY));
+            const AliceJid = Jid(Alice);
+            await Alice.Logout();
+            assert.ok((await Frames(Bob)).some((Frame) => Frame.Kind === "presence" && Frame.From === AliceJid && Frame.Type === "unavailable"));
+            await Bob.Logout();
             assert.ok(Logs.Lines.some((Line) => Line.startsWith("info chat: friends' online status on (CHAT_PRESENCE=1)")));
         }
         finally{
+            await On.close();
             if(Saved === undefined) delete process.env.CHAT_PRESENCE; else process.env.CHAT_PRESENCE = Saved;
         }
 
         assert.deepEqual(ReadChatConfig({ CHAT: "0", CHAT_PRESENCE: "1" }).Warnings, ["CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online"]);
+        assert.deepEqual(ReadChatConfig({ CHAT: "0" }).Warnings, ["CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online"]);
         assert.deepEqual(ReadChatConfig({ CHAT_PRESENCE: "1" }).Warnings, []);
         assert.deepEqual(ReadChatConfig({ CHAT: "1", CHAT_PRESENCE: "1" }).Warnings, []);
         assert.deepEqual(ReadChatConfig({ CHAT_PRESENCE: "0" }).Warnings, []);

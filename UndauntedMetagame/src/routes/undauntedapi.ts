@@ -21,6 +21,8 @@ import { RefuseAdminKeyThroughProxy } from "../middleware/RequestOrigin";
 import { IsSoftRegisteredCaller, SoftAccountAuth } from "../middleware/SoftAccountAuth";
 import { AdminMutationRateLimit, HealthReadRateLimit } from "../middleware/RateLimits";
 import { BackendHealthEnabled, BackendRuntimeHealth } from '../middleware/BackendHealth';
+import { userapikeys, users } from '../db/schema';
+import { eq } from 'drizzle-orm';
 
 export const undauntedApiRouter = Router();
 
@@ -28,6 +30,19 @@ undauntedApiRouter.get('/BackendHealth', HealthReadRateLimit, HasUndauntedAdminA
     res.setHeader('Cache-Control', 'no-store');
     if (!BackendHealthEnabled()) { res.status(404).json({error: 'health_disabled'}); return; }
     res.json(BackendRuntimeHealth());
+});
+
+// Operator-only directory. Keys are irreversible hashes in storage: expose only a short
+// fingerprint for matching a launcher's backup key, never a key or the full stored hash.
+undauntedApiRouter.get('/DashboardAccounts', HealthReadRateLimit, HasUndauntedAdminApiKey, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const offset = req.query.offset === undefined ? 0 : Number(req.query.offset);
+    if (!Number.isSafeInteger(offset) || offset < 0 || offset > 10000000) { res.status(400).json({error: 'invalid_offset'}); return; }
+    const rows = GetDb().select({id: users.userId, name: users.name, admin: users.isAdmin, hash: userapikeys.keyHash})
+        .from(users).leftJoin(userapikeys, eq(users.userId, userapikeys.userId)).orderBy(users.userId).limit(101).offset(offset).all();
+    res.json({accounts: rows.slice(0, 100).map(row => ({id: row.id, name: row.name, admin: row.admin,
+        keyFingerprint: row.hash && /^[a-f0-9]{64}$/i.test(row.hash) ? row.hash.slice(0, 16).toLowerCase() : null})),
+        nextOffset: rows.length > 100 ? offset + 100 : null});
 });
 
 function StatusForRollbackError(Error: RollbackError){

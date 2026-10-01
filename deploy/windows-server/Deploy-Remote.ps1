@@ -94,7 +94,7 @@ function Get-SshArgs {
     return @('-i', $KeyFile, '-p', "$SshPort", '-T',
         '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes', '-o', 'PasswordAuthentication=no', '-o', 'KbdInteractiveAuthentication=no',
         '-o', 'StrictHostKeyChecking=accept-new', '-o', "UserKnownHostsFile=$KnownHostsFile",
-        '-o', 'ConnectTimeout=20', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8')
+        '-o', 'IPQoS=none', '-o', 'ConnectTimeout=20', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=8')
 }
 
 # On a first connection, verify the server's SSH host key against -HostKeyFingerprint and pin it into

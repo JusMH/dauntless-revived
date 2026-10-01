@@ -1605,6 +1605,23 @@ URL: https://mixutin.github.io/dauntless-revived/setup/admin.html
 
 # Run it for a group
 
+## Private owner dashboard (2026-09-30)
+
+On an updated Windows kit server, run `C:\DauntlessRevived\bin\Install-OwnerDashboard.ps1 -OpenOnLogon`
+as administrator, then restart the metagame during maintenance to activate backend health collection.
+Open `http://127.0.0.1:61110` **on the VPS** and unlock with `data\keys\owner.key`.
+From your own PC, forward that port through SSH; do not open it in the public firewall.
+The dashboard starts at boot and with a full stack start/restart. Browser opening happens only
+in the installing operator's interactive session, not in the game service account.
+
+The lightweight views show CPU/RAM, backend request/error/event-loop metrics, uptime, player
+locations, process memory, free disk/network, account names and key fingerprints, registration
+invites and bounded operational logs. Key matching happens in the browser without sending the
+entered player key. Game tick rate is not yet instrumented. Process metrics reuse the kit's
+minute CSV rather than repeatedly launching scanners. Re-run the dashboard installer after
+updates. See [the dashboard operator guide](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DASHBOARD.md)
+for security, limitations and disabling autostart.
+
 This page covers how we open our Undaunted-based stack (client build **1.4.4**) to a handful of
 friends: network access, firewall, addresses, accounts, capacity and backups. It assumes the stack
 already runs for you locally, with the metagame, the deploy server and a Ramsgate server.
@@ -1999,7 +2016,7 @@ shows the value it uses. Every setting is on [Configuration](https://mixutin.git
 | Strict Escalation rules | `ESCALATION_STRICT=1` | Only after real Escalation has run with no `breaks a soft rule` line. | Same as above. |
 | The free store | `STORE=free` | Decide whether the store stays free (roadmap 3.7). Count the accounts with more than one character (below): a purchase goes to the character saved last. | Open every store tab, buy one item of each kind, log in again, finish a hunt ([The in-game store](https://mixutin.github.io/dauntless-revived/findings/store.html#open)). |
 | Unlimited premium bounty tokens | `STORE_REPEATABLE_TOKENS=1` (with `STORE=free`) | Your decision: it means unlimited free premium bounty drafts. | The bundle shows in the store. |
-| Friends' online status | `CHAT_PRESENCE=1` (with `CHAT=1`) | Chat itself must work first. The kit's `Set-Chat.ps1` has no switch for it: add the line by hand. | The presence test on [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify-presence): no player is kicked from a party. |
+| Friends' online status | On by default; `CHAT_PRESENCE=0` disables | Chat itself must work. No manual player status setting; remove an existing operator opt-out to enable. | The presence test on [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify-presence): no player is kicked from a party. |
 | Hunt Pass rank entitlements on confirm | `PROGRESSION_CONFIRM_ENTITLEMENTS=1` | Only if an in-game test shows the Elite ranks' cosmetics (ranks 6, 9, 29 and 50) never arrive by themselves (no `POST /entitlementv2` in the log). | The cosmetic shows after Claim. |
 | Your own Hunt Pass season files | `PROGRESSION_CONFIG_DIR=<folder>` and, for another season, `ACTIVE_HUNT_PASS=<id>` | Read [Game settings](https://mixutin.github.io/dauntless-revived/reference/game-settings.html#hunt-pass-seasons); never change a season players already have progress in. | The start line `Progression config: ...` names what was loaded; a bad file stops the metagame with the reason. |
 
@@ -2846,7 +2863,7 @@ Only with `CHAT=1` and `CHAT_PRESENCE=1` ([how it works](https://mixutin.github.
 
 | Line | Meaning |
 |:-----|:--------|
-| `chat: friends' online status off: no presence is sent outside rooms` | The default: nobody shows as online. |
+| `chat: friends' online status off: no presence is sent outside rooms` | Explicitly disabled: remove `CHAT_PRESENCE=0` or set it to `1`, then restart the metagame. |
 | `chat: friends' online status on (CHAT_PRESENCE=1): ...` | On. |
 | `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online` | Set `CHAT=1` too, or remove `CHAT_PRESENCE`. |
 | `chat: presence c=<id> uid=<account> online: told N friend session(s), heard of M` | A player's game sent its first presence; N friends were told, and the player heard of M. |
@@ -3271,17 +3288,17 @@ harmlessly, as before chat existed. If the chat code itself is at fault,
 `Update-DauntlessServer.ps1 -Rollback` goes back to the build before the update; older code ignores
 `CHAT`. Private mode has no chat yet.
 
-**Friends' online status** is a second switch, `CHAT_PRESENCE=1`, which `Set-Chat.ps1` does not set:
-add it to `metagame.env` by hand once chat works, and restart the metagame when nobody is playing
-(`Stack.ps1 restart -Only metagame`). The metagame log then says `chat: friends' online status on`.
-Test it as described on [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify-presence) before
-you leave it on; taking the line out again turns it off.
+**Friends' online status** is automatic and on by default. Players need no manual status setting.
+An existing `CHAT_PRESENCE=0` in `metagame.env` remains an explicit opt-out: remove it and restart
+the metagame when nobody is playing (`Stack.ps1 restart -Only metagame`). The log says
+`chat: friends' online status on`. Run the two-player party/hunt test on
+[Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify-presence); set `CHAT_PRESENCE=0` to roll back.
 
 ### Other features you switch in `metagame.env`
 
 The kit writes none of the switches that came with the port of Harmonic's fork, so a kit server runs
-them at their defaults: Slayer Links on; Escalation (`ESCALATION_MODE`), the store (`STORE`) and
-friends' online status off. To change one, add the line to `C:\DauntlessRevived\data\config\metagame.env`
+them at their defaults: Slayer Links and friends' online status on; Escalation (`ESCALATION_MODE`)
+and the store (`STORE`) off. To change one, add the line to `C:\DauntlessRevived\data\config\metagame.env`
 (deploy server: `deployserver.env`) from an elevated editor and restart that component when nobody is
 playing. The kit keeps the line across re-runs and updates. What each does and what to check first is
 on [Run it for a group](https://mixutin.github.io/dauntless-revived/setup/admin.html#switching-features-on).
@@ -3417,6 +3434,19 @@ The snippet also leaves these installer changes in place:
 Hosting a modified server for other people comes with the AGPL's source-code obligation; see
 [Credits and license](https://mixutin.github.io/dauntless-revived/legal.html).
 
+## Optional owner dashboard
+
+Run `C:\DauntlessRevived\bin\Install-OwnerDashboard.ps1 -OpenOnLogon` after updating the kit.
+It installs a separate loopback-only LocalService task and sets `BACKEND_HEALTH=1` for the next
+metagame restart. It never opens a public firewall port or restarts games itself. The optional
+browser task opens the locked page at `http://127.0.0.1:61110` in the installing operator's RDP
+session. `Stack.ps1 start` and full `restart` also start the installed dashboard; stopping the
+game stack leaves monitoring available. Use an SSH tunnel from a remote PC.
+
+After code updates, re-run the dashboard installer to refresh its copied files. See
+[tools/DASHBOARD.md](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DASHBOARD.md)
+for account-key fingerprints, invitations, performance CSVs, permissions and disabling the tasks.
+
 ================================================================================
 URL: https://mixutin.github.io/dauntless-revived/setup/upgrading.html
 ================================================================================
@@ -3460,7 +3490,7 @@ start line that begins `features:`.
   | Real Escalation saves | `ESCALATION_MODE=real` | Every player drops from the fake maximum (level 25) to level 0. [Escalation](https://mixutin.github.io/dauntless-revived/findings/escalation.html#switching-it-on) |
   | The free in-game store | `STORE=free` | Free or priced is still to decide (roadmap 3.7), and the store has not been tried in game. [The in-game store](https://mixutin.github.io/dauntless-revived/findings/store.html#open) |
   | Unlimited premium bounty tokens in the store | `STORE_REPEATABLE_TOKENS=1` | Your decision. |
-  | Friends' online status in chat | `CHAT_PRESENCE=1` (with `CHAT=1`) | The two-player test that the party's automatic kick stays asleep. [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify-presence) |
+  | Friends' online status in chat | On by default; `CHAT_PRESENCE=0` disables | Existing opt-outs are preserved. Run the two-player party test. [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify-presence) |
   | A rank confirm also grants the rank's permanent entitlements | `PROGRESSION_CONFIRM_ENTITLEMENTS=1` | Only if the game server turns out not to grant them itself. |
   | Strict Escalation rules | `ESCALATION_STRICT=1` | After Escalation has run a while with clean logs. |
 
@@ -3941,7 +3971,6 @@ development are off.
 | Switch | Component | To turn it on | Why it is off |
 |:-------|:----------|:--------------|:--------------|
 | `CHAT` | metagame | `1` | In-game text chat. Built and tested without the game, not yet tried by two players; it goes on by default after that live test. |
-| `CHAT_PRESENCE` | metagame | `1` (with `CHAT=1`) | Friends' online status. It waits for a two-player test that the party's automatic kick stays asleep, and for chat itself. |
 | `ESCALATION_MODE` | metagame | `real` | Real Escalation saves. Switching it on drops every player from the fake maximum (level 25) to level 0: the owner's decision after the in-game test. |
 | `ESCALATION_STRICT` | metagame | `1` | Makes the Escalation rules that depend on our modelling refuse a save instead of warning. After the logs stay clean. |
 | `STORE` | metagame | `free` | The free in-game store. Waits for the decision free or priced (roadmap 3.7) and an in-game store test. |
@@ -3989,7 +4018,7 @@ also warns while there are players with no stored progression yet; see the
 After that come two lines for the settings added with the port of Harmonic's fork:
 
 ```text
-features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=off verifyStubAccount=off
+features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=on verifyStubAccount=off
 Progression config: bundled, 10 tracks; active Hunt Pass season09b
 ```
 
@@ -4143,7 +4172,7 @@ one `chat: not started ...` error line, and the metagame runs on without chat.
 | `CHAT_BIND_HOST` | `127.0.0.1` | `127.0.0.1` or `::1`; with `GATEWAY_SECRET` set (public mode) only `127.0.0.1` | The listener's address. Anything else, `0.0.0.0` included, keeps chat off. Private mode (Tailscale) is not supported yet. | Kit: always `127.0.0.1` in public mode |
 | `CHAT_NICK_CHECK` | `enforce` | `enforce` or `log`; anything else counts as `enforce` with a warning | `enforce` refuses a room join whose nickname is not `<the account's username>:<its account id>:<its resource>` ([why](https://mixutin.github.io/dauntless-revived/findings/chat.html#nickname-check)). `log` admits a nickname that fails the resource, format or name rule, with one warning line per connection and room: a rollback switch in case the live test shows a real client being refused. A nickname with another account's id is refused in both modes (a real client never builds one). | Nobody by default |
 | `CHAT_TRACE` | off | `1` or anything else | `1` logs every chat frame in and out, cut at 2 KB, with the login, passwords, message text (`[N chars]`) and tokens replaced. For the first live runs only. | Nobody by default |
-| `CHAT_PRESENCE` | off | on/off (`1`, `true`, `on`, `yes` / `0`, `false`, `off`, `no`) | Friends' online status ([how](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence)): each player's own presence is relayed to their online, accepted, unblocked friends, never back to the player's own account, and an HTTP friend accept is pushed over chat. Needs `CHAT=1`; without it the metagame logs `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online` and nothing else happens. Read when the chat server starts. Off: not one presence stanza outside rooms. It stays off until the two-player test that the party's automatic kick stays asleep. | Nobody by default; the kit's `Set-Chat.ps1` does not set it |
+| `CHAT_PRESENCE` | on | on/off (`1`, `true`, `on`, `yes` / `0`, `false`, `off`, `no`) | Friends' online status ([how](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence)): each player's own presence is relayed to their online, accepted, unblocked friends, never back to the player's own account, and an HTTP friend accept is pushed over chat. Needs `CHAT=1`; without it the metagame logs `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online` and nothing else happens. Read when the chat server starts. Off: not one presence stanza outside rooms. On by default; set `CHAT_PRESENCE=0` to roll back. Live two-player party/hunt validation is still required. | Automatic; no player setting needed |
 
 **Limits** (fixed in the code):
 
@@ -5546,6 +5575,7 @@ path under `/undaunted`, including `UsernameAvailable`, `PublicOnlineStats`, `Pa
 | POST | `RegisterInviteCode` | admin key | no | `{NewInviteCode, Uses, InfiniteUses}`: stores a code you chose (`Uses` a whole number of at least 1 unless `InfiniteUses`). The older way; `New-Invite.ps1` uses it only against a metagame without `CreateInvite`. |
 | DELETE | `InviteCode/:code` | admin key | no | Revokes a code. Always 200. |
 | GET | `GetAllUsers` | admin key | no | `{Users: [{Username, UserId}]}`. |
+| GET | `DashboardAccounts` | admin key | no | `?offset=0` → `{accounts: [{id, name, admin, keyFingerprint}], nextOffset}`. Up to 100 accounts ordered by UID; fingerprint is the first 16 hex characters of the active key's SHA-256 hash, or null. Never returns keys/full hashes. Offset must be an integer 0–10000000. No-store; shares the 120/min health read limit. |
 | POST | `RenameUser` | admin key | no | `{UserId}` or `{Username}` (the current name, any case) plus `{NewUsername}` → `{UserId, OldUsername, Username}`. Renames the account and its characters together; the player sees it after logging in again. |
 | POST | `GenerateJWTForUserId` | admin key | no | `{UserId}` → `{JWT}`: a 24-hour player token for any account, which amounts to playing as them. The id is not checked. |
 | GET | `PrivateOnlineStats` | admin key | no | A list of `{UserId, Map, HuntId, EnteredHuntAt}` for players with a heartbeat in the last 90 seconds. |
@@ -12648,7 +12678,7 @@ The method for reading JSON field names out of the executable is on
 |:---------------------|:------|:----|:-----|
 | A party invite reached the other player's client (the invite poll answered it twice) but never appeared under PARTY INVITES. | Before the panel shows an invite, the client asks `POST /accountinfo/public` about the sender. Our reply, inherited from upstream, described the **caller** instead: the caller's id in `accountId` and in `linkedAccounts`. The client files user info under the reply's `accountId` and keeps the first reply per id, so the sender never got any user info, was invalidated, and the invite was dropped (B `0x140b74870`, `0x1409ede50`). | `/accountinfo/public` answers for the asked account. | H in the code, M that nothing else stands in the way |
 | Add Friends "found nothing". | Add Friends is not a search. It is a name box and an Add button. The name was found (`GET /account/api/public/account/displayName/<name>`), but the next step, `POST /account/mapping`, first got 404 and then a reply shape the client does not read. With no mapping, the client drops the friend request without a message. No friend request ever reached the server (0 calls, L). | `/account/mapping` answers in the shape the client parses. | H |
-| Everyone, the players themselves included, showed as Offline. | Online status comes only from XMPP presence, pushed over the chat connection. There is no HTTP presence route, and our chat server sent no presence outside chat rooms. | Built on 23 September 2026, off by default: friends' presence in the chat server (`CHAT=1` and `CHAT_PRESENCE=1`, [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence)), waiting for the two-player test that the party's automatic kick stays asleep. | H for the cause, M for the fix |
+| Everyone, the players themselves included, showed as Offline. | Online status comes only from XMPP presence, pushed over the chat connection. There is no HTTP presence route, and our chat server sent no presence outside chat rooms. | Built on 23 September 2026, on by default since 30 September: friends' presence in the chat server (`CHAT=1` and `CHAT_PRESENCE=1`, [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence)), waiting for the two-player test that the party's automatic kick stays asleep. | H for the cause, M for the fix |
 | "Unable to create guild." | `POST /guild/validate` (from the client) and `POST /guild` (from the **game server**) both got 404. | The eleven v2 guild routes. | H |
 | Nobody used the in-game party Invite (both invites of the night came from the host's fallback). | The players could not find each other: Hunt Members and friends need the same user-info step as an invite's sender. | Same fix as the first row. | M |
 
@@ -13354,7 +13384,7 @@ The first chat server was written and tested with a real 1.4.4 client by **Vvoid
 ([pull request #9](https://github.com/mixutin/dauntless-revived/pull/9)). His observations are what
 this page explains, and his code is what the server grew from.
 
-**Update (23 September 2026): friends' online status is built into the chat server, off by default**
+**Update (30 September 2026): friends' online status is built into the chat server, on by default**
 (`CHAT_PRESENCE=1`, together with `CHAT=1`): [Friends' online status](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence). The idea of a
 presence service comes from **Harmonic's** 1.4.4 fork; the code is our own and shares nothing with the fork's
 (see [The Harmonic port](https://mixutin.github.io/dauntless-revived/findings/harmonic-fork.html#social)).
@@ -13546,7 +13576,7 @@ while the local player's own Phoenix presence is online (B `0x1415f7562`), and i
 presence. Room presence comes from `muc.<domain>` (or its `conference.<domain>` alias), which the presence module leaves to the room code
 (B `0x143a381d0`). So the server keeps one rule, whatever the settings:
 
-- **By default** (`CHAT_PRESENCE` off) it sends **no presence outside chat rooms** at all: it records
+- **When explicitly disabled** (`CHAT_PRESENCE=0`) it sends **no presence outside chat rooms** at all: it records
   the client's own broadcast presence and drops it, never echoing or relaying it.
 - **With friends' online status on** (`CHAT_PRESENCE=1`) it relays presence between friends, but
   **never sends a player a stanza outside a room whose sender is the player's own account**, not even
@@ -13559,7 +13589,7 @@ with friends' online status on, keeps both members for a minute
 
 ## Friends' online status
 
-**Built and tested without the game, off by default** (`CHAT_PRESENCE=1`, which needs `CHAT=1`; read
+**Built and tested without the game, on by default** (`CHAT_PRESENCE=0` disables it; needs chat enabled; read
 when the chat server starts). With it off, not one presence stanza is sent outside rooms, exactly as
 before. The 1.4.4 client never asks for a roster, never subscribes and never probes: it only knows the
 presence the server pushes (B), so the server does all of the following by itself (C,
@@ -13725,9 +13755,9 @@ The test passes when steps 1-11 go as described and step 12 finds nothing.
 
 ### Friends' online status (after the chat test passes)
 
-Only once steps 1-12 above have passed. The server kit's `Set-Chat.ps1` has no switch for it yet, so
-add `CHAT_PRESENCE=1` to `C:\DauntlessRevived\data\config\metagame.env` by hand and restart the
-metagame when nobody is playing. The start line reads `chat: friends' online status on
+Run after steps 1-12 above. No player setting or manual status change is needed: presence defaults
+on. If the operator previously disabled it, remove `CHAT_PRESENCE=0` from the metagame configuration
+and restart when nobody is playing. The start line reads `chat: friends' online status on
 (CHAT_PRESENCE=1)`. A and B must be accepted friends.
 
 1. **Both start the game.** Each gets `chat: presence c=<id> uid=<X> online: told N friend session(s),
@@ -13742,9 +13772,9 @@ metagame when nobody is playing. The start line reads `chat: friends' online sta
    accepts; `chat: presence: <A> and <C> are friends now: told N and M session(s)`, and both see the
    other at once, without a new login.
 
-The test passes when all four go as described. **The way back:** remove `CHAT_PRESENCE=1` (or set it to
-0) and restart the metagame; chat itself keeps working. Only after this test does
-`CHAT_PRESENCE` go on by default, and only once chat itself is on by default.
+The test passes when all four go as described. **The way back:** set `CHAT_PRESENCE=0`
+and restart the metagame; chat itself keeps working. Automated tests cover login, logout,
+disconnects and self-presence protection; the live two-player party/hunt test is still required.
 
 ## Still unconfirmed
 
@@ -14320,7 +14350,7 @@ held bounties, and `/bounty/game-data` keeps an empty bounty list).
 |:---------|:---------|:----|
 | XMPP transport (WebSocket on the metagame port and raw TCP on 60002) | **Keep ours** | The 1.4.4 client connects over WebSocket only (B `0x143a1eb8e`). The fork's limits were not enforced and every frame was captured. The files derive from Mystic Paradox. |
 | Chat rooms and whispers | **Keep ours** | The fork's server never delivered a room message or a whisper. Our usernames fix stays as it is. |
-| Friends' online status | **Merge: rebuilt in our chat server** | The fork's service sent no status text, never passed changes on, and marked players offline from an address the client ignores (B `0x143a382b0`), so friends stayed online forever. We kept only the moments that trigger an update. Off (`CHAT_PRESENCE`) until a two-player test shows the party's automatic kick stays asleep. [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence) |
+| Friends' online status | **Merge: rebuilt in our chat server** | The fork's service sent no status text, never passed changes on, and marked players offline from an address the client ignores (B `0x143a382b0`), so friends stayed online forever. We kept only the moments that trigger an update. On by default since 30 September (`CHAT_PRESENCE=0` rolls back); the live two-player party test remains required. [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence) |
 | The friends routes | **Keep ours** | The fork's block list is sent under a key the client does not read (`blocklistedUsers`; the client reads `blockedUsers`, B `0x1443fd258`), and its friends route uses the Mystic Paradox-derived presence code. |
 | Parties | **Keep ours, merge the accept retry** | The fork's accept looks up an invite id the client never sends (it sends the party id, B `0x140b35384`), and it had no decline, leader removal or party status. We took its tolerance for an accept that arrives twice. |
 | Guilds | **Keep ours** | The fork has upstream's stub. |
@@ -14451,7 +14481,7 @@ remains pending. This supersedes older "off by default" chat notes below.
 
 > **Update, 2026-09-23 (the port of Harmonic's 1.4.4 fork):**
 > - **Harmonic's fork of Undaunted for 1.4.4** ([github.com/Harmonicrain/Undaunted](https://github.com/Harmonicrain/Undaunted), commit `895f7c7`, AGPL-3.0) was compared with ours feature by feature. What adds something is in, rewritten on our code, apart from a few platform items left out with their reasons (the DLL-side ones, the server-mode hook with `METAGAME_ADDRESS` and HuntDiag, wait for the decision on shipping a DLL we build; the deploy server's port wait and game-server log files were skipped); where that fork rewrote something we had already built and tried in game, we kept ours, and each such choice is written down with its reason on [The Harmonic port](https://mixutin.github.io/dauntless-revived/findings/harmonic-fork.html).
-> - **New, off by default until a decision or an in-game test:** real Escalation saves (2.16; `ESCALATION_MODE=real` drops every player from the fake maximum to level 0), a free in-game store (3.7; `STORE=free`, waiting for the free-or-priced decision), friends' online status inside our chat server (3.10; `CHAT_PRESENCE=1`), and granting the Elite ranks' entitlements on confirm (`PROGRESSION_CONFIRM_ENTITLEMENTS=1`).
+> - **New, off by default until a decision or an in-game test:** real Escalation saves (2.16; `ESCALATION_MODE=real` drops every player from the fake maximum to level 0), a free in-game store (3.7; `STORE=free`, waiting for the free-or-priced decision), and granting the Elite ranks' entitlements on confirm (`PROGRESSION_CONFIRM_ENTITLEMENTS=1`).
 > - **New, on by default:** Slayer Links (3.15; off with `SLAYER_LINKS=0`), a dead Ramsgate started again when a player travels there (4.1; `PERSISTENT_WORLD_LIVENESS=0`) and a repeated party accept (no switch), each answering only where the server gave an error or a 404 before; and three changes to replies that already worked: `/balance` from the character's real currencies (2.17; `BALANCE_FROM_INVENTORY=0`), `oauth/verify` naming the player's own account (`VERIFY_STUB_ACCOUNT=1` for the old reply), and protection against retried XP grants, which changes only a grant repeated byte for byte less than 5 seconds after the last one (`PROGRESSION_REPLAY_WINDOW_S=0`).
 > - Migrations `0014`-`0016` add six tables and change nothing that exists; the previous build still starts on the migrated database. 103 of Harmonic's 119 test cases were ported and 7 turned around to assert our behaviour; the metagame now has 567 tests and the deploy server 26. The DLL project compiles with the installed Build Tools (4.4), but nothing built here ships.
 > - **Not deployed or tried in game yet.** The live tests and the owner's decisions are listed under 2.16, 3.7, 3.10, 3.15 and "Decisions only you can make". Credits: Harmonic is on the Credits pages and in `NOTICE.md`.
@@ -15069,8 +15099,8 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
   - **Done when:** two friends can whisper each other in game.
   - **First chat server (2026-09-22, Vvoidddd, [PR #9](https://github.com/mixutin/dauntless-revived/pull/9)):** an opt-in XMPP-over-WebSocket listener in the metagame that logs in with the player's own token. With one real 1.4.4 client, Ramsgate messages went through, but the sender showed as `UID-...`; answering from the username instead left room joins pending ("Another operation already pending"), even with MUC status 210; sending messages from the username showed `[unknown]`; an XEP-0172 `<nick>` was ignored. His conclusion was to keep the UID in the room address. The cause, read later from the executable: the client joins with the nickname `<name>:<account id>:<resource>` and reads both the name and the account id from it, and its "is this me?" test looks for its account id in the nickname. So the account id does belong there, but together with the name, exactly as the client sent it. Each result is explained on [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#attempts).
   - **Built (2026-09-22), off by default:** each nickname kept byte for byte, `<item jid>` on every occupant presence, occupants told about each other both ways, every line sent back to its sender; a join refused unless its nickname carries the player's own account id and username; `City-`, `Hunt-` and `General` rooms for everyone, `Party-` and `Guild-` rooms for their members only (checked at every message and every 60 s); blocks for room lines and whispers; up to two sessions per account, and a reconnect takes each room over from the lingering old connection, so the others keep seeing the player's name (the client keeps one room member per account); pings that let a long map load pass; a crash guard, limits before login and on unread output, and a 60 s login hold-back so reconnect loops cannot hurt the metagame or a player's game traffic; no presence outside rooms, so the dormant party auto-kick stays asleep. `CHAT_NICK_CHECK=log` (it never admits another account's id), `Set-Chat.ps1 -Off` and, for the code, `Update-DauntlessServer.ps1 -Rollback` are the rollbacks. Tests: a model of how the client reads chat reproduces Vvoidddd's three observations and shows usernames for both players with our replies. The server kit has `-Chat On/Off`, and the gateway counts chat connections in a rate bucket of their own (`GATEWAY_RATE_WS`).
-  - **Built (2026-09-23), off by default: friends' online status** (`CHAT_PRESENCE=1`, with `CHAT=1`), inside our chat server; the idea of a presence service came from Harmonic's fork, but that service did not relay changes and marked players offline from an address the client ignores, so none of its code is used. A player's own presence goes, exactly as sent and from the full address, to the sessions of each accepted, unblocked friend; a new session hears of its friends; going offline sends unavailable (and the account's other session's presence, if any); an HTTP friend accept is pushed as the client's friends-list message from `xmpp-admin`. **Never** is a stanza outside a room sent to a player from their own account, not even from their second session, so the party's automatic kick (`0x1415f7562`) stays asleep; three checks enforce it, one of them over every stanza in every chat test. With it off, not one presence stanza goes outside rooms, as before. Details: [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence).
-  - **Next:** update the rented server, switch chat on (a second run), and the live two-player test ([How to verify](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify)), then chat on by default. Then the presence test ([steps](https://mixutin.github.io/dauntless-revived/findings/chat.html#how-to-verify-presence)): two players in a party with `CHAT_PRESENCE=1` for 60 s in Ramsgate plus one hunt trip, with no `DELETE /party/member/...` or `/party/leader/...`, the friend shown online, then "In Ramsgate", then offline after they quit; only then presence on by default (and only once chat is). After that: a shared Ramsgate channel for players who are not in a party (today each player's Ramsgate session has its own room), a presence switch in `Set-Chat.ps1`, and private mode (Tailscale).
+  - **Built (2026-09-23), on by default since 2026-09-30: friends' online status** (`CHAT_PRESENCE=1`, with `CHAT=1`), inside our chat server; the idea of a presence service came from Harmonic's fork, but that service did not relay changes and marked players offline from an address the client ignores, so none of its code is used. A player's own presence goes, exactly as sent and from the full address, to the sessions of each accepted, unblocked friend; a new session hears of its friends; going offline sends unavailable (and the account's other session's presence, if any); an HTTP friend accept is pushed as the client's friends-list message from `xmpp-admin`. **Never** is a stanza outside a room sent to a player from their own account, not even from their second session, so the party's automatic kick (`0x1415f7562`) stays asleep; three checks enforce it, one of them over every stanza in every chat test. With it off, not one presence stanza goes outside rooms, as before. Details: [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html#presence).
+  - **Next:** deploy default-on chat and friends' presence, then run the live two-player party/hunt check: both friends online in Ramsgate, one hunt, quit/reconnect, and no unexpected party removal. Automated coverage is not an in-game verification. Operators can roll back presence with `CHAT_PRESENCE=0`; players need no manual status setting. New friend-request notifications and private-mode remote chat remain separate work.
 
 - [ ] **3.11 Guilds** (L) — *Update 2026-09-22: **built** and running on the rented server since 22 September 2026, not yet tried in game: the eleven v2 routes the 1.4.4 client uses (validate, create, invites, accept, decline, leave, kick, ranks with leader hand-over, disband), stored in SQLite (migration `0013_guilds`, three new tables), with the client's own error codes and name rules. The Create button is an RPC to the Ramsgate game server, which sends the create with its key; it costs nothing in 1.4.4. The game server sends no token of the player (only its own, if any), so the metagame accepts a create only when the leader validated that exact name and nameplate with their own token in the last 15 minutes (`GUILD_CREATE_ACTIVITY_FALLBACK=1` loosens it, only if the live test shows the client never validates the final name). Staff and project words are reserved (`GUILD_RESERVED_NAMES=0`). A block, a decline (24 hours for that guild) and a demoted, kicked or departed Officer each end the invites concerned. Other members see changes at their next login or world load (no push). `GUILDS=0` restores the old stubs. Passes HTTP tests with the client's bodies (`test/guildhttp.test.ts`); not yet tried in game. Guild chat is built with 3.10 (the room `Guild-<guildId>`, members only), off by default like the rest of chat.*
   - **What:** guild, member and invite tables, and about 11 v2 routes (create, invite, join, leave, kick, ranks).
@@ -15246,7 +15276,7 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
 
 ---
 
-- [ ] **4.18 Owner dashboard** — *Built 2026-09-28 as a separate opt-in Node process (`tools/dashboard.mjs`): five-second CPU/RAM and player graphs, protected player/world lists, account totals, newly observed accounts since startup, and bounded on-demand log tails. Loopback only; owner key required for data; remote access through SSH. One hour of memory-only history. See `tools/DASHBOARD.md`. Not yet tried on the VPS. Historical registrations, persistent metrics and actual game ping remain future work.*
+- [ ] **4.18 Owner dashboard** — *Built as a separate opt-in Node process (`tools/dashboard.mjs`), expanded 2026-09-30: lightweight Overview / Backend health / Players & accounts / Invites / Logs views; five-second host and backend graphs; paginated launcher-account-to-key fingerprints (never full keys); protected invite creation; bounded log tails. Reuses the kit's minute performance CSV for game-process CPU/private memory, disk and network, with stale timestamps and whole-host CPU normalization. `Install-OwnerDashboard.ps1 -OpenOnLogon` installs private boot autostart and interactive browser opening and enables backend health for the next restart. Loopback only, owner-authenticated, SSH access remotely. See `tools/DASHBOARD.md`. **Still open:** actual engine tick/frame-time telemetry, historical registrations, persistent graph history, player ping and longer multi-player soak tests. No blanket claim of leak-free operation.*
 
 - [ ] **4.19 Multi-region server coordination** — *Deferred until additional hosts are needed. Design authenticated communication between regional deploy servers and matchmaking, shared account/save ownership, region selection, host health/capacity reporting, and routing players to available game instances. Establish database consistency, outage handling and deployment boundaries before adding regional hosts; a web load balancer alone cannot distribute existing game sessions. No runtime changes enabled.*
 

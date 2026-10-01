@@ -626,7 +626,7 @@ describe("chat listener", () => {
             assert.equal(ReadChatConfig({ CHAT: " " }).Enabled, true);
             assert.equal(ReadChatConfig({ CHAT: "0" }).Enabled, false);
             assert.equal(ReadChatConfig({ CHAT: "wrong" }).Enabled, false);
-            assert.equal(ReadChatConfig({ CHAT: "wrong" }).Warnings.length, 1);
+            assert.equal(ReadChatConfig({ CHAT: "wrong" }).Warnings.length, 2);
             assert.deepEqual(ReadChatConfig({ CHAT: "1" }), { Enabled: true, Port: 61099, Host: "127.0.0.1", NickCheck: "enforce", Trace: false, Errors: [], Warnings: [] });
             assert.equal(ReadChatConfig({ CHAT: "1", CHAT_NICK_CHECK: "log" }).NickCheck, "log");
             assert.equal(ReadChatConfig({ CHAT: "1", CHAT_NICK_CHECK: "off" }).NickCheck, "enforce");

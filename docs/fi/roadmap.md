@@ -193,12 +193,12 @@ käyttäjänimet.
   toisena. Ryhmä- ja kiltahuoneet ovat vain jäsenille, ja estot koskevat huonerivejä ja kuiskauksia.
 - Palvelin ei lähetä läsnäolotietoja huoneiden ulkopuolella, joten peliohjelman automaattinen
   ryhmäpotku pysyy lepotilassa.
-- **Kavereiden paikalla olo on rakennettu 23.9.2026, oletuksena pois päältä** (`CHAT_PRESENCE=1`
+- **Kavereiden paikalla olo on rakennettu 23.9.2026, oletuksena päällä 30.9.2026 alkaen** (`CHAT_PRESENCE=1`
   yhdessä asetuksen `CHAT=1` kanssa). Pelaajan oma läsnäolotieto välitetään hänen hyväksytyille,
   estämättömille kavereilleen, ja poistuminen kerrotaan heille. Palvelin ei koskaan lähetä pelaajalle
   huoneen ulkopuolista viestiä hänen omalta tililtään, ei edes hänen toisesta istunnostaan, joten
-  ryhmäpotku pysyy unessa. Se kytketään oletukseksi vasta, kun chat itse on käytössä ja kaksi pelaajaa
-  on ollut ryhmässä minuutin sen ollessa päällä ilman potkua.
+  ryhmäpotku pysyy unessa. Kahden pelaajan ryhmä- ja metsästystesti tarvitaan edelleen.
+  `CHAT_PRESENCE=0` palauttaa aiemman toiminnan; pelaajan ei tarvitse muuttaa tilaansa käsin.
 - Kun pelaajan yhteys katkeaa ja peli yhdistää uudelleen, uusi yhteys ottaa huoneet vanhalta, joten
   muut näkevät pelaajan nimen edelleen. Pingit sallivat pitkän kartan latauksen.
 - **Ei vielä viety palvelimelle eikä kokeiltu kahdella pelaajalla.** Seuraavaksi, kun kukaan ei pelaa:

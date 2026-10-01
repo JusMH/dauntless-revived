@@ -41,7 +41,7 @@ Ensimmäisen chat-palvelimen kirjoitti ja testasi oikealla 1.4.4-pelillä **Vvoi
 ([pull request #9](https://github.com/mixutin/dauntless-revived/pull/9)). Tämä sivu selittää hänen
 havaintonsa, ja palvelin on kasvanut hänen koodistaan.
 
-**Päivitys 23.9.2026: kavereiden paikalla olo on rakennettu chat-palvelimeen, oletuksena pois päältä**
+**Päivitys 30.9.2026: kavereiden paikalla olo on rakennettu chat-palvelimeen, oletuksena päällä**
 (`CHAT_PRESENCE=1` yhdessä asetuksen `CHAT=1` kanssa): [Kavereiden paikalla olo](#presence).
 Läsnäolopalvelun idea on **Harmonicin** 1.4.4-haarasta; koodi on omaamme eikä jaa mitään hänen
 koodistaan (katso [Harmonicin työn siirto]({{ harmonic_page.url | relative_url }}#social)).
@@ -254,7 +254,7 @@ Peliohjelmassa on automaattinen potku ryhmän jäsenille, jotka näyttävät ole
 `muc.<verkkotunnus>` (tai sen `conference.<verkkotunnus>`-aliaksesta), jonka läsnäolomoduuli jättää huonekoodille (B `0x143a381d0`). Siksi palvelin
 noudattaa yhtä sääntöä asetuksista riippumatta:
 
-- **Oletuksena** (`CHAT_PRESENCE` pois) se **ei lähetä läsnäolotietoja chat-huoneiden ulkopuolella**
+- **Erikseen poistettuna käytöstä** (`CHAT_PRESENCE=0`) se **ei lähetä läsnäolotietoja chat-huoneiden ulkopuolella**
   lainkaan: se kirjaa peliohjelman oman yleisläsnäolotiedon ja pudottaa sen, eikä koskaan kaiuta tai
   välitä sitä.
 - **Kun kavereiden paikalla olo on päällä** (`CHAT_PRESENCE=1`), se välittää läsnäolotietoja kavereiden
@@ -268,7 +268,7 @@ päällä ([Kaverit, ryhmät ja killat]({{ social_page.url | relative_url }}#par
 
 ## Kavereiden paikalla olo {#presence}
 
-**Rakennettu ja testattu ilman peliä, oletuksena pois päältä** (`CHAT_PRESENCE=1`, joka tarvitsee
+**Rakennettu ja testattu ilman peliä, oletuksena päällä** (`CHAT_PRESENCE=1`, joka tarvitsee
 asetuksen `CHAT=1`; luetaan chat-palvelimen käynnistyessä). Kun se on pois, huoneiden ulkopuolella ei
 lähetetä yhtäkään läsnäoloviestiä, täsmälleen kuten ennenkin. 1.4.4-peliohjelma ei koskaan pyydä
 kaverilistaa (roster), ei tilaa läsnäolotietoja eikä kysele niitä: se tietää vain sen, minkä palvelin
@@ -445,8 +445,8 @@ Testi on läpäisty, kun vaiheet 1-11 menevät kuvatusti ja vaihe 12 ei löydä 
 
 ### Kavereiden paikalla olo (kun chat-testi on läpäisty) {#how-to-verify-presence}
 
-Vasta kun yllä olevat vaiheet 1–12 on läpäisty. Palvelinpaketin `Set-Chat.ps1`:ssä ei ole sille vielä
-kytkintä, joten lisää `CHAT_PRESENCE=1` käsin tiedostoon
+Kun yllä olevat vaiheet 1–12 on läpäisty, testaa oletuksena päällä oleva läsnäolo.
+Pelaajan ei tarvitse muuttaa asetuksia. Jos palvelimella on `CHAT_PRESENCE=0`, poista se tiedostosta
 `C:\DauntlessRevived\data\config\metagame.env` ja käynnistä metagame uudelleen, kun kukaan ei pelaa.
 Käynnistysrivi on `chat: friends' online status on (CHAT_PRESENCE=1)`. A:n ja B:n on oltava
 hyväksyttyjä kavereita.
@@ -464,9 +464,9 @@ hyväksyttyjä kavereita.
    lähetetä), C hyväksyy; `chat: presence: <A> and <C> are friends now: told N and M session(s)`, ja
    kumpikin näkee toisen heti ilman uutta kirjautumista.
 
-Testi on läpäisty, kun kaikki neljä menevät kuvatusti. **Paluutie:** poista `CHAT_PRESENCE=1` (tai
-aseta 0) ja käynnistä metagame uudelleen; chat itse jatkaa toimintaansa. Vasta tämän testin jälkeen
-`CHAT_PRESENCE` tulee oletukseksi, ja vasta kun chat itse on oletuksena päällä.
+Testi on läpäisty, kun kaikki neljä menevät kuvatusti. **Paluutie:** aseta `CHAT_PRESENCE=0`
+ja käynnistä metagame uudelleen; chat itse jatkaa toimintaansa. Automaattiset testit eivät korvaa
+kahden pelaajan pelitestiä.
 
 ## Vielä vahvistamatta {#unconfirmed}
 

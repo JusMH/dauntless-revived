@@ -31,6 +31,20 @@ const A = "UID-real-a", B = "UID-real-b", C = "UID-stub-c", ADMIN = "UID-admin";
 type Player = { UserId: string, Key: string, Token: string, CharacterId: string };
 const Players: Record<string, Player> = {};
 
+it('dashboard account directory exposes names and short fingerprints, never login keys or full hashes', async () => {
+    const reply = await Call('GET', '/undaunted/api/DashboardAccounts?offset=0', {key: Players[ADMIN].Key});
+    assert.equal(reply.status, 200);
+    const account = reply.json.accounts.find((a: any) => a.id === A);
+    assert.equal(account.name, A.replace(/-/g, '_').slice(0, 16));
+    assert.equal(account.keyFingerprint, HashUserAPIKey(Players[A].Key).slice(0, 16));
+    assert.equal(account.admin, false);
+    assert.equal(reply.text.includes(Players[A].Key), false);
+    assert.equal(reply.text.includes(HashUserAPIKey(Players[A].Key)), false);
+    assert.equal((await Call('GET', '/undaunted/api/DashboardAccounts?offset=-1', {key: Players[ADMIN].Key})).status, 400);
+    const empty = await Call('GET', '/undaunted/api/DashboardAccounts?offset=99999', {key: Players[ADMIN].Key});
+    assert.deepEqual(empty.json, {accounts: [], nextOffset: null});
+});
+
 type Reply = { status: number, text: string, json: any };
 type CallOptions = { as?: string, gs?: boolean | string, key?: string, body?: unknown, emptyJson?: boolean, headers?: Record<string, string> };
 
@@ -261,6 +275,7 @@ const EXPECTED_ROUTES = [
     "GET /loadout/:userId/:characterId/all [HasUndauntedMetagameAuth]",
     "POST /loadout/:userId/:characterId/:index [HasUndauntedMetagameAuth]",
     "GET /undaunted/api/BackendHealth [HasUndauntedAdminApiKey]",
+    "GET /undaunted/api/DashboardAccounts [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/RegistrationStatus []",
     "POST /undaunted/api/RegistrationStatus [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/InviteCodes [HasUndauntedAdminApiKey]",
@@ -438,6 +453,7 @@ const ADMIN_ROUTES = (): [string, string, unknown][] => [
     ["POST", "/undaunted/api/GenerateJWTForUserId", { UserId: C }],
     ["GET", "/undaunted/api/GetAllUsers", undefined],
     ["GET", "/undaunted/api/BackendHealth", undefined],
+    ["GET", "/undaunted/api/DashboardAccounts", undefined],
     ["POST", "/undaunted/api/RegisterInviteCode", { NewInviteCode: "PERM-TEST-CODE", Uses: 1 }],
     ["DELETE", "/undaunted/api/InviteCode/PERM-TEST-CODE", undefined],
     ["POST", "/undaunted/api/CreateInvite", {}],

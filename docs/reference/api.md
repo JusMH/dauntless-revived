@@ -644,6 +644,7 @@ path under `/undaunted`, including `UsernameAvailable`, `PublicOnlineStats`, `Pa
 | POST | `RegisterInviteCode` | admin key | no | `{NewInviteCode, Uses, InfiniteUses}`: stores a code you chose (`Uses` a whole number of at least 1 unless `InfiniteUses`). The older way; `New-Invite.ps1` uses it only against a metagame without `CreateInvite`. |
 | DELETE | `InviteCode/:code` | admin key | no | Revokes a code. Always 200. |
 | GET | `GetAllUsers` | admin key | no | `{Users: [{Username, UserId}]}`. |
+| GET | `DashboardAccounts` | admin key | no | `?offset=0` → `{accounts: [{id, name, admin, keyFingerprint}], nextOffset}`. Up to 100 accounts ordered by UID; fingerprint is the first 16 hex characters of the active key's SHA-256 hash, or null. Never returns keys/full hashes. Offset must be an integer 0–10000000. No-store; shares the 120/min health read limit. |
 | POST | `RenameUser` | admin key | no | `{UserId}` or `{Username}` (the current name, any case) plus `{NewUsername}` → `{UserId, OldUsername, Username}`. Renames the account and its characters together; the player sees it after logging in again. |
 | POST | `GenerateJWTForUserId` | admin key | no | `{UserId}` → `{JWT}`: a 24-hour player token for any account, which amounts to playing as them. The id is not checked. |
 | GET | `PrivateOnlineStats` | admin key | no | A list of `{UserId, Map, HuntId, EnteredHuntAt}` for players with a heartbeat in the last 90 seconds. |

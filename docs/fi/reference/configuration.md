@@ -141,7 +141,6 @@ vielä todistamattomia, riskialttiita tai vain kehitystä varten, ovat pois pä�
 | Kytkin | Osa | Näin päälle | Miksi se on pois päältä |
 |:-------|:----|:------------|:------------------------|
 | `CHAT` | metagame | `1` | Pelin tekstichat. Rakennettu ja testattu ilman peliä, kaksi pelaajaa ei ole vielä kokeillut; se tulee oletuksena päälle tämän testin jälkeen. |
-| `CHAT_PRESENCE` | metagame | `1` (yhdessä `CHAT=1` kanssa) | Kavereiden paikalla olo. Odottaa kahden pelaajan testiä, joka näyttää, että ryhmän automaattinen potku pysyy unessa, sekä itse chattia. |
 | `ESCALATION_MODE` | metagame | `real` | Oikeat Escalation-tallennukset. Käyttöönotto pudottaa jokaisen pelaajan tekaistusta maksimista (taso 25) tasolle 0: ylläpitäjän päätös pelitestin jälkeen. |
 | `ESCALATION_STRICT` | metagame | `1` | Saa mallinnuksestamme riippuvat Escalation-säännöt torjumaan tallennuksen varoittamisen sijaan. Kun lokit pysyvät puhtaina. |
 | `STORE` | metagame | `free` | Ilmainen pelin kauppa. Odottaa päätöstä ilmaisesta tai hinnoitellusta (tiekartan kohta 3.7) ja kaupan testiä pelissä. |
@@ -192,7 +191,7 @@ muuttujan kohdalla.
 Sen jälkeen tulee kaksi riviä Harmonicin forkin siirron mukana tulleista asetuksista:
 
 ```text
-features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=off verifyStubAccount=off
+features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=on verifyStubAccount=off
 Progression config: bundled, 10 tracks; active Hunt Pass season09b
 ```
 
@@ -350,7 +349,7 @@ metagame jatkaa ilman chattia.
 | `CHAT_BIND_HOST` | `127.0.0.1` | `127.0.0.1` tai `::1`; kun `GATEWAY_SECRET` on asetettu (julkinen tila), vain `127.0.0.1` | Kuuntelijan osoite. Mikä tahansa muu, myös `0.0.0.0`, pitää chatin pois päältä. Yksityistä tilaa (Tailscale) ei vielä tueta. | Paketti: aina `127.0.0.1` julkisessa tilassa |
 | `CHAT_NICK_CHECK` | `enforce` | `enforce` tai `log`; muu arvo lasketaan arvoksi `enforce` ja kirjoittaa varoituksen | `enforce` hylkää huoneeseen liittymisen, jos nimimerkki ei ole `<tilin käyttäjänimi>:<sen tilitunnus>:<sen resurssi>` ([miksi]({{ '/fi/findings/chat.html' | relative_url }}#nickname-check)). `log` päästää sisään nimimerkin, joka rikkoo resurssi-, muoto- tai nimisääntöä, ja kirjoittaa yhden varoitusrivin yhteyttä ja huonetta kohden: paluukytkin siltä varalta, että oikea peliohjelma hylätään. Nimimerkki, jossa on toisen tilin tunnus, hylätään molemmissa tiloissa (oikea peliohjelma ei koskaan rakenna sellaista). | Oletuksena ei kukaan |
 | `CHAT_TRACE` | pois | `1` tai mikä tahansa muu | `1` kirjaa jokaisen chat-kehyksen molempiin suuntiin 2 kt:n mittaan leikattuna niin, että kirjautuminen, salasanat, viestien teksti (`[N chars]`) ja tunnisteet on korvattu. Vain ensimmäisiin oikeisiin ajoihin. | Oletuksena ei kukaan |
-| `CHAT_PRESENCE` | pois | päällä/pois (`1`, `true`, `on`, `yes` / `0`, `false`, `off`, `no`) | Kavereiden paikalla olo ([miten]({{ '/fi/findings/chat.html' | relative_url }}#presence)): jokaisen pelaajan oma läsnäolotieto välitetään hänen paikalla oleville, hyväksytyille, estämättömille kavereilleen, ei koskaan takaisin pelaajan omalle tilille, ja HTTP:n kautta hyväksytty kaveripyyntö lähetetään chatin kautta. Tarvitsee asetuksen `CHAT=1`; ilman sitä metagame kirjaa rivin `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online`, eikä muuta tapahdu. Luetaan chat-palvelimen käynnistyessä. Pois: huoneiden ulkopuolella ei yhtäkään läsnäoloviestiä. Pysyy pois, kunnes kahden pelaajan testi näyttää, että ryhmän automaattinen potku pysyy unessa. | Oletuksena ei kukaan; paketin `Set-Chat.ps1` ei aseta sitä |
+| `CHAT_PRESENCE` | päällä | päällä/pois (`1`, `true`, `on`, `yes` / `0`, `false`, `off`, `no`) | Kavereiden paikalla olo ([miten]({{ '/fi/findings/chat.html' | relative_url }}#presence)): jokaisen pelaajan oma läsnäolotieto välitetään hänen paikalla oleville, hyväksytyille, estämättömille kavereilleen, ei koskaan takaisin pelaajan omalle tilille, ja HTTP:n kautta hyväksytty kaveripyyntö lähetetään chatin kautta. Tarvitsee asetuksen `CHAT=1`; ilman sitä metagame kirjaa rivin `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online`, eikä muuta tapahdu. Luetaan chat-palvelimen käynnistyessä. Pois: huoneiden ulkopuolella ei yhtäkään läsnäoloviestiä. Oletuksena päällä; `CHAT_PRESENCE=0` poistaa käytöstä. Kahden pelaajan pelitesti tarvitaan edelleen. | Automaattisesti; pelaajan ei tarvitse muuttaa asetuksia |
 
 **Rajat** (kiinteät koodissa):
 

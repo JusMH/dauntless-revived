@@ -632,7 +632,7 @@ Only with `CHAT=1` and `CHAT_PRESENCE=1` ([how it works]({{ chat_page.url | rela
 
 | Line | Meaning |
 |:-----|:--------|
-| `chat: friends' online status off: no presence is sent outside rooms` | The default: nobody shows as online. |
+| `chat: friends' online status off: no presence is sent outside rooms` | Explicitly disabled: remove `CHAT_PRESENCE=0` or set it to `1`, then restart the metagame. |
 | `chat: friends' online status on (CHAT_PRESENCE=1): ...` | On. |
 | `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online` | Set `CHAT=1` too, or remove `CHAT_PRESENCE`. |
 | `chat: presence c=<id> uid=<account> online: told N friend session(s), heard of M` | A player's game sent its first presence; N friends were told, and the player heard of M. |

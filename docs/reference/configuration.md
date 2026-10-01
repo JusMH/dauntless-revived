@@ -133,7 +133,6 @@ development are off.
 | Switch | Component | To turn it on | Why it is off |
 |:-------|:----------|:--------------|:--------------|
 | `CHAT` | metagame | `1` | In-game text chat. Built and tested without the game, not yet tried by two players; it goes on by default after that live test. |
-| `CHAT_PRESENCE` | metagame | `1` (with `CHAT=1`) | Friends' online status. It waits for a two-player test that the party's automatic kick stays asleep, and for chat itself. |
 | `ESCALATION_MODE` | metagame | `real` | Real Escalation saves. Switching it on drops every player from the fake maximum (level 25) to level 0: the owner's decision after the in-game test. |
 | `ESCALATION_STRICT` | metagame | `1` | Makes the Escalation rules that depend on our modelling refuse a save instead of warning. After the logs stay clean. |
 | `STORE` | metagame | `free` | The free in-game store. Waits for the decision free or priced (roadmap 3.7) and an in-game store test. |
@@ -181,7 +180,7 @@ also warns while there are players with no stored progression yet; see the
 After that come two lines for the settings added with the port of Harmonic's fork:
 
 ```text
-features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=off verifyStubAccount=off
+features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=on verifyStubAccount=off
 Progression config: bundled, 10 tracks; active Hunt Pass season09b
 ```
 
@@ -335,7 +334,7 @@ one `chat: not started ...` error line, and the metagame runs on without chat.
 | `CHAT_BIND_HOST` | `127.0.0.1` | `127.0.0.1` or `::1`; with `GATEWAY_SECRET` set (public mode) only `127.0.0.1` | The listener's address. Anything else, `0.0.0.0` included, keeps chat off. Private mode (Tailscale) is not supported yet. | Kit: always `127.0.0.1` in public mode |
 | `CHAT_NICK_CHECK` | `enforce` | `enforce` or `log`; anything else counts as `enforce` with a warning | `enforce` refuses a room join whose nickname is not `<the account's username>:<its account id>:<its resource>` ([why]({{ '/findings/chat.html' | relative_url }}#nickname-check)). `log` admits a nickname that fails the resource, format or name rule, with one warning line per connection and room: a rollback switch in case the live test shows a real client being refused. A nickname with another account's id is refused in both modes (a real client never builds one). | Nobody by default |
 | `CHAT_TRACE` | off | `1` or anything else | `1` logs every chat frame in and out, cut at 2 KB, with the login, passwords, message text (`[N chars]`) and tokens replaced. For the first live runs only. | Nobody by default |
-| `CHAT_PRESENCE` | off | on/off (`1`, `true`, `on`, `yes` / `0`, `false`, `off`, `no`) | Friends' online status ([how]({{ '/findings/chat.html' | relative_url }}#presence)): each player's own presence is relayed to their online, accepted, unblocked friends, never back to the player's own account, and an HTTP friend accept is pushed over chat. Needs `CHAT=1`; without it the metagame logs `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online` and nothing else happens. Read when the chat server starts. Off: not one presence stanza outside rooms. It stays off until the two-player test that the party's automatic kick stays asleep. | Nobody by default; the kit's `Set-Chat.ps1` does not set it |
+| `CHAT_PRESENCE` | on | on/off (`1`, `true`, `on`, `yes` / `0`, `false`, `off`, `no`) | Friends' online status ([how]({{ '/findings/chat.html' | relative_url }}#presence)): each player's own presence is relayed to their online, accepted, unblocked friends, never back to the player's own account, and an HTTP friend accept is pushed over chat. Needs `CHAT=1`; without it the metagame logs `chat: CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online` and nothing else happens. Read when the chat server starts. Off: not one presence stanza outside rooms. On by default; set `CHAT_PRESENCE=0` to roll back. Live two-player party/hunt validation is still required. | Automatic; no player setting needed |
 
 **Limits** (fixed in the code):
 

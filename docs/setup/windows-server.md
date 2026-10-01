@@ -387,17 +387,17 @@ harmlessly, as before chat existed. If the chat code itself is at fault,
 `Update-DauntlessServer.ps1 -Rollback` goes back to the build before the update; older code ignores
 `CHAT`. Private mode has no chat yet.
 
-**Friends' online status** is a second switch, `CHAT_PRESENCE=1`, which `Set-Chat.ps1` does not set:
-add it to `metagame.env` by hand once chat works, and restart the metagame when nobody is playing
-(`Stack.ps1 restart -Only metagame`). The metagame log then says `chat: friends' online status on`.
-Test it as described on [Text chat]({{ chat_page.url | relative_url }}#how-to-verify-presence) before
-you leave it on; taking the line out again turns it off.
+**Friends' online status** is automatic and on by default. Players need no manual status setting.
+An existing `CHAT_PRESENCE=0` in `metagame.env` remains an explicit opt-out: remove it and restart
+the metagame when nobody is playing (`Stack.ps1 restart -Only metagame`). The log says
+`chat: friends' online status on`. Run the two-player party/hunt test on
+[Text chat]({{ chat_page.url | relative_url }}#how-to-verify-presence); set `CHAT_PRESENCE=0` to roll back.
 
 ### Other features you switch in `metagame.env` {#other-switches}
 
 The kit writes none of the switches that came with the port of Harmonic's fork, so a kit server runs
-them at their defaults: Slayer Links on; Escalation (`ESCALATION_MODE`), the store (`STORE`) and
-friends' online status off. To change one, add the line to `C:\DauntlessRevived\data\config\metagame.env`
+them at their defaults: Slayer Links and friends' online status on; Escalation (`ESCALATION_MODE`)
+and the store (`STORE`) off. To change one, add the line to `C:\DauntlessRevived\data\config\metagame.env`
 (deploy server: `deployserver.env`) from an elevated editor and restart that component when nobody is
 playing. The kit keeps the line across re-runs and updates. What each does and what to check first is
 on [Run it for a group]({{ admin_page.url | relative_url }}#switching-features-on).
@@ -532,3 +532,16 @@ The snippet also leaves these installer changes in place:
 
 Hosting a modified server for other people comes with the AGPL's source-code obligation; see
 [Credits and license]({{ legal_page.url | relative_url }}).
+
+## Optional owner dashboard
+
+Run `C:\DauntlessRevived\bin\Install-OwnerDashboard.ps1 -OpenOnLogon` after updating the kit.
+It installs a separate loopback-only LocalService task and sets `BACKEND_HEALTH=1` for the next
+metagame restart. It never opens a public firewall port or restarts games itself. The optional
+browser task opens the locked page at `http://127.0.0.1:61110` in the installing operator's RDP
+session. `Stack.ps1 start` and full `restart` also start the installed dashboard; stopping the
+game stack leaves monitoring available. Use an SSH tunnel from a remote PC.
+
+After code updates, re-run the dashboard installer to refresh its copied files. See
+[tools/DASHBOARD.md](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DASHBOARD.md)
+for account-key fingerprints, invitations, performance CSVs, permissions and disabling the tasks.

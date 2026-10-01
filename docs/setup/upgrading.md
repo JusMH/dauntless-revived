@@ -67,7 +67,7 @@ start line that begins `features:`.
   | Real Escalation saves | `ESCALATION_MODE=real` | Every player drops from the fake maximum (level 25) to level 0. [Escalation]({{ escalation_page.url | relative_url }}#switching-it-on) |
   | The free in-game store | `STORE=free` | Free or priced is still to decide (roadmap 3.7), and the store has not been tried in game. [The in-game store]({{ store_page.url | relative_url }}#open) |
   | Unlimited premium bounty tokens in the store | `STORE_REPEATABLE_TOKENS=1` | Your decision. |
-  | Friends' online status in chat | `CHAT_PRESENCE=1` (with `CHAT=1`) | The two-player test that the party's automatic kick stays asleep. [Text chat]({{ chat_page.url | relative_url }}#how-to-verify-presence) |
+  | Friends' online status in chat | On by default; `CHAT_PRESENCE=0` disables | Existing opt-outs are preserved. Run the two-player party test. [Text chat]({{ chat_page.url | relative_url }}#how-to-verify-presence) |
   | A rank confirm also grants the rank's permanent entitlements | `PROGRESSION_CONFIRM_ENTITLEMENTS=1` | Only if the game server turns out not to grant them itself. |
   | Strict Escalation rules | `ESCALATION_STRICT=1` | After Escalation has run a while with clean logs. |
 

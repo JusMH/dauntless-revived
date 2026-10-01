@@ -1002,7 +1002,7 @@ export function ReadChatConfig(Env: NodeJS.ProcessEnv = process.env): ChatConfig
         Warnings.push("CHAT is not 0 or 1; chat stays off. Unset it or use CHAT=1 to enable in-game chat.");
     }
 
-    if(!Enabled && ParseOnOff((Env.CHAT_PRESENCE ?? "").trim()) === true){
+    if(!Enabled && (ParseOnOff((Env.CHAT_PRESENCE ?? "").trim()) ?? true)){
         Warnings.push("CHAT_PRESENCE is on but chat is off (CHAT=1 is needed); nobody shows as online");
     }
 

@@ -177,14 +177,13 @@ export const SlayerLinks = DefineSwitch({
 });
 
 // Friends' online status in chat (realtime/presence.ts; needs CHAT=1): the chat server relays each
-// player's own presence to their online friends and tells them when the player goes offline. Off by
-// default: with it off, chat sends no presence outside rooms at all. It waits for the two-player test
-// that the party's automatic kick stays asleep (docs/findings/chat.md, party safety). Read when the chat
-// server starts.
+// player's own presence to their online friends and tells them when the player goes offline. On by
+// default; CHAT_PRESENCE=0 is an operator rollback switch. Self-presence guards remain enforced
+// (docs/findings/chat.md, party safety). Read when the chat server starts.
 export const ChatPresence = DefineSwitch({
     Env: "CHAT_PRESENCE",
     Label: "chatPresence",
-    Default: false,
+    Default: true,
     Parse: ParseOnOff,
     Show: ShowOnOff
 });

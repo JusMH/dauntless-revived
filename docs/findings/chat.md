@@ -38,7 +38,7 @@ The first chat server was written and tested with a real 1.4.4 client by **Vvoid
 ([pull request #9](https://github.com/mixutin/dauntless-revived/pull/9)). His observations are what
 this page explains, and his code is what the server grew from.
 
-**Update (23 September 2026): friends' online status is built into the chat server, off by default**
+**Update (30 September 2026): friends' online status is built into the chat server, on by default**
 (`CHAT_PRESENCE=1`, together with `CHAT=1`): [Friends' online status](#presence). The idea of a
 presence service comes from **Harmonic's** 1.4.4 fork; the code is our own and shares nothing with the fork's
 (see [The Harmonic port]({{ harmonic_page.url | relative_url }}#social)).
@@ -237,7 +237,7 @@ while the local player's own Phoenix presence is online (B `0x1415f7562`), and i
 presence. Room presence comes from `muc.<domain>` (or its `conference.<domain>` alias), which the presence module leaves to the room code
 (B `0x143a381d0`). So the server keeps one rule, whatever the settings:
 
-- **By default** (`CHAT_PRESENCE` off) it sends **no presence outside chat rooms** at all: it records
+- **When explicitly disabled** (`CHAT_PRESENCE=0`) it sends **no presence outside chat rooms** at all: it records
   the client's own broadcast presence and drops it, never echoing or relaying it.
 - **With friends' online status on** (`CHAT_PRESENCE=1`) it relays presence between friends, but
   **never sends a player a stanza outside a room whose sender is the player's own account**, not even
@@ -250,7 +250,7 @@ with friends' online status on, keeps both members for a minute
 
 ## Friends' online status {#presence}
 
-**Built and tested without the game, off by default** (`CHAT_PRESENCE=1`, which needs `CHAT=1`; read
+**Built and tested without the game, on by default** (`CHAT_PRESENCE=0` disables it; needs chat enabled; read
 when the chat server starts). With it off, not one presence stanza is sent outside rooms, exactly as
 before. The 1.4.4 client never asks for a roster, never subscribes and never probes: it only knows the
 presence the server pushes (B), so the server does all of the following by itself (C,
@@ -416,9 +416,9 @@ The test passes when steps 1-11 go as described and step 12 finds nothing.
 
 ### Friends' online status (after the chat test passes) {#how-to-verify-presence}
 
-Only once steps 1-12 above have passed. The server kit's `Set-Chat.ps1` has no switch for it yet, so
-add `CHAT_PRESENCE=1` to `C:\DauntlessRevived\data\config\metagame.env` by hand and restart the
-metagame when nobody is playing. The start line reads `chat: friends' online status on
+Run after steps 1-12 above. No player setting or manual status change is needed: presence defaults
+on. If the operator previously disabled it, remove `CHAT_PRESENCE=0` from the metagame configuration
+and restart when nobody is playing. The start line reads `chat: friends' online status on
 (CHAT_PRESENCE=1)`. A and B must be accepted friends.
 
 1. **Both start the game.** Each gets `chat: presence c=<id> uid=<X> online: told N friend session(s),
@@ -433,9 +433,9 @@ metagame when nobody is playing. The start line reads `chat: friends' online sta
    accepts; `chat: presence: <A> and <C> are friends now: told N and M session(s)`, and both see the
    other at once, without a new login.
 
-The test passes when all four go as described. **The way back:** remove `CHAT_PRESENCE=1` (or set it to
-0) and restart the metagame; chat itself keeps working. Only after this test does
-`CHAT_PRESENCE` go on by default, and only once chat itself is on by default.
+The test passes when all four go as described. **The way back:** set `CHAT_PRESENCE=0`
+and restart the metagame; chat itself keeps working. Automated tests cover login, logout,
+disconnects and self-presence protection; the live two-player party/hunt test is still required.
 
 ## Still unconfirmed {#unconfirmed}
 
