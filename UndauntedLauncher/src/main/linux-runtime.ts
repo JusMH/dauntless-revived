@@ -38,7 +38,7 @@ function executable(file: string): boolean {
 }
 
 function fromPath(name: string, env: NodeJS.ProcessEnv): string | null {
-  if (name.includes("/")) return executable(name) ? path.resolve(name) : null;
+  if (path.isAbsolute(name) || name.includes("/") || name.includes("\\")) return executable(name) ? path.resolve(name) : null;
   for (const dir of (env.PATH ?? "").split(path.delimiter)) {
     if (!dir) continue;
     const file = path.join(dir, name);
