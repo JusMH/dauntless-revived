@@ -141,7 +141,7 @@ describe("allowlist helper configuration", () => {
         assert.equal(Config.minIntervalMs, 3000);
         assert.equal(Config.ports, "8770-8777");
         assert.equal(Config.allowPrivate, false);
-        assert.match(Config.powershell, /System32\\WindowsPowerShell\\v1\.0\\powershell\.exe$/i);
+        assert.match(Config.powershell, /System32[\\/]WindowsPowerShell[\\/]v1\.0[\\/]powershell\.exe$/i);
         for(const Bind of ["0.0.0.0", "::", "192.168.1.5", "localhost"]){
             assert.throws(() => LoadAllowlistConfig({ ...Base, ALLOWLIST_BIND: Bind }), /ALLOWLIST_BIND/);
         }

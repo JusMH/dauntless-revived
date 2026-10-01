@@ -1,6 +1,7 @@
 # Checks every push and pull request:
 #  - the four server packages: npm ci, build, unit tests
 #  - the launcher: typecheck, unit tests and the Windows installer, kept as a download for 7 days
+#  - the separate Linux and OpenBSD server ports (native Node services, Wine/SSH game launch wrappers, nftables/PF)
 #  - the Windows Server kit under Windows PowerShell 5.1: parse check, PSScriptAnalyzer errors, and the
 #    kit's own tests (unit checks, remote deployment against a local folder, an end-to-end sandbox install)
 #  - the docs site: generated files current, and the same Jekyll build GitHub Pages runs
@@ -165,6 +166,90 @@ jobs:
           path: UndauntedLauncher/release-linux/
           if-no-files-found: error
           retention-days: 7
+
+
+  server-port-linux:
+    name: Server port (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            UndauntedMetagame/package-lock.json
+            UndauntedGateway/package-lock.json
+            UndauntedContent/package-lock.json
+            UndauntedDeployServer/package-lock.json
+
+      - name: Build and test the native server services on Linux
+        run: |
+          set -euo pipefail
+          for pkg in UndauntedMetagame UndauntedGateway UndauntedContent UndauntedDeployServer; do
+            echo "::group::$pkg"
+            (cd "$pkg" && npm ci --no-audit --no-fund && npm run build && npm test)
+            echo "::endgroup::"
+          done
+
+      - name: Test the Unix game-worker and platform config ports
+        run: node --test deploy/linux-server/tests/*.test.mjs
+
+      - name: Parse the Linux and OpenBSD service scripts
+        run: |
+          set -euo pipefail
+          sh -n deploy/linux-server/install.sh deploy/linux-server/install-worker.sh deploy/linux-server/prepare-game.sh deploy/linux-server/stack.sh
+          for file in deploy/openbsd-server/*.ksh deploy/openbsd-server/rc.d/*; do
+            bash -n "$file"
+          done
+          node --check deploy/unix-common/*.mjs
+          node --check deploy/linux-server/*.mjs
+          node --check deploy/openbsd-server/*.mjs
+
+  server-port-openbsd:
+    name: Server port (OpenBSD 7.9)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and test inside OpenBSD
+        uses: vmactions/openbsd-vm@5f7b2c933b8846a138361d6843c52af4bef5d945 # v1.4.8
+        with:
+          release: "7.9"
+          copyback: false
+          prepare: |
+            pkg_add node git
+          run: |
+            set -eu
+            node --version
+            npm --version
+            for pkg in UndauntedMetagame UndauntedGateway UndauntedContent UndauntedDeployServer; do
+              echo "=== $pkg ==="
+              (cd "$pkg" && npm ci --no-audit --no-fund && npm run build && npm test)
+            done
+            node --test deploy/linux-server/tests/game-runner.test.mjs
+            for file in deploy/openbsd-server/*.ksh deploy/openbsd-server/rc.d/*; do
+              ksh -n "$file"
+            done
+            node --check deploy/unix-common/generate-config.mjs
+            node --check deploy/unix-common/new-invite.mjs
+            node --check deploy/openbsd-server/allowlist.mjs
+            node --check deploy/openbsd-server/launch-gameserver.mjs
+            tmp="$(mktemp -d /tmp/dr-openbsd-ci.XXXXXX)"
+            mkdir -p "$tmp/game"
+            printf '%s\n' dummy > "$tmp/worker.key"
+            node deploy/unix-common/generate-config.mjs               --platform openbsd --root "$PWD" --data "$tmp/data" --config "$tmp/config"               --game-dir "$tmp/game" --my-ip 203.0.113.10 --mode public               --worker-host 10.0.0.2 --worker-user dauntless --worker-key "$tmp/worker.key"               --worker-node /usr/local/bin/node               --worker-launcher /opt/dauntless-revived/deploy/linux-server/worker-launch.mjs
+            (cd UndauntedMetagame && node --env-file="$tmp/config/metagame.env" -e 'require("./dist/db.js").GetDb()')
+            node deploy/unix-common/dr-db.cjs integrity "$PWD/UndauntedMetagame" "$tmp/data/undaunted.db"
+            ksh deploy/openbsd-server/configure-pf.ksh               --mode public --interface vio0 --worker-interface vio0 --worker-ip 10.0.0.2               --output "$tmp/pf.conf"
+            pfctl -nf "$tmp/pf.conf"
 
   server-kit:
     name: Server kit (Windows PowerShell 5.1)
@@ -340,7 +425,7 @@ jobs:
   # On by default; the repository variable LAUNCHER_AUTO_RELEASE=false pauses it (see the top of this file).
   release-check:
     name: Launcher release needed?
-    needs: [node-packages, launcher, launcher-linux, server-kit, docs, repo-hygiene]
+    needs: [node-packages, launcher, launcher-linux, server-port-linux, server-port-openbsd, server-kit, docs, repo-hygiene]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/dauntless-revived' &&
       github.repository == 'mixutin/dauntless-revived' && vars.LAUNCHER_AUTO_RELEASE != 'false'
