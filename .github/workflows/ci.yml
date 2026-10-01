@@ -226,6 +226,11 @@ jobs:
           copyback: false
           prepare: |
             pkg_add node git
+            # Unlike Linux, OpenBSD requires every synthetic 127.0.0.x test peer to be
+            # assigned explicitly. Gateway tests use these aliases to model independent clients.
+            for n in 2 3 4 5 6 20 21 22 23 24 25 30 31 32 40 42; do
+              ifconfig lo0 inet 127.0.0.$n/32 alias
+            done
           run: |
             set -eu
             node --version
@@ -245,10 +250,16 @@ jobs:
             tmp="$(mktemp -d /tmp/dr-openbsd-ci.XXXXXX)"
             mkdir -p "$tmp/game"
             printf '%s\n' dummy > "$tmp/worker.key"
-            node deploy/unix-common/generate-config.mjs               --platform openbsd --root "$PWD" --data "$tmp/data" --config "$tmp/config"               --game-dir "$tmp/game" --my-ip 203.0.113.10 --mode public               --worker-host 10.0.0.2 --worker-user dauntless --worker-key "$tmp/worker.key"               --worker-node /usr/local/bin/node               --worker-launcher /opt/dauntless-revived/deploy/linux-server/worker-launch.mjs
+            node deploy/unix-common/generate-config.mjs \
+              --platform openbsd --root "$PWD" --data "$tmp/data" --config "$tmp/config" \
+              --game-dir "$tmp/game" --my-ip 203.0.113.10 --mode public \
+              --worker-host 10.0.0.2 --worker-user dauntless --worker-key "$tmp/worker.key" \
+              --worker-command dr-game-worker
             (cd UndauntedMetagame && node --env-file="$tmp/config/metagame.env" -e 'require("./dist/db.js").GetDb()')
             node deploy/unix-common/dr-db.cjs integrity "$PWD/UndauntedMetagame" "$tmp/data/undaunted.db"
-            ksh deploy/openbsd-server/configure-pf.ksh               --mode public --interface vio0 --worker-interface vio0 --worker-ip 10.0.0.2               --output "$tmp/pf.conf"
+            ksh deploy/openbsd-server/configure-pf.ksh \
+              --mode public --interface vio0 --worker-interface vio0 --worker-ip 10.0.0.2 \
+              --output "$tmp/pf.conf"
             pfctl -nf "$tmp/pf.conf"
 
   server-kit:

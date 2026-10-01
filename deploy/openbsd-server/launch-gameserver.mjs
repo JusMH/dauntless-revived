@@ -31,8 +31,8 @@ export function buildSshLaunch(gameArgs, env = process.env) {
   if (!ssh) throw new Error("ssh was not found");
   const host = required(env, "DR_WORKER_HOST", /^[A-Za-z0-9_.:-]{1,255}$/);
   const user = required(env, "DR_WORKER_USER", /^[A-Za-z0-9_.-]{1,64}$/);
-  const node = required(env, "DR_WORKER_NODE", /^\/[A-Za-z0-9_./-]+$/);
-  const launcher = required(env, "DR_WORKER_LAUNCHER", /^\/[A-Za-z0-9_./-]+$/);
+  const remoteCommand = env.DR_WORKER_COMMAND || "dr-game-worker";
+  if (!/^[A-Za-z0-9_./-]{1,255}$/.test(remoteCommand)) throw new Error("DR_WORKER_COMMAND is invalid");
   const payload = Buffer.from(JSON.stringify(gameArgs), "utf8").toString("base64url");
   const args = [
     "-T",
@@ -46,7 +46,7 @@ export function buildSshLaunch(gameArgs, env = process.env) {
     if (!path.isAbsolute(key)) throw new Error("DR_WORKER_KEY must be an absolute path");
     args.push("-i", key);
   }
-  args.push(user + "@" + host, node, launcher, payload);
+  args.push(user + "@" + host, remoteCommand, payload);
   return { command: ssh, args, payload };
 }
 

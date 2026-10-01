@@ -93,8 +93,7 @@ test("OpenBSD launcher sends one encoded payload over batch SSH", () => {
       PATH: path.dirname(ssh),
       DR_WORKER_HOST: "10.0.0.2",
       DR_WORKER_USER: "dauntless",
-      DR_WORKER_NODE: "/usr/bin/node",
-      DR_WORKER_LAUNCHER: "/opt/dauntless/deploy/linux-server/worker-launch.mjs",
+      DR_WORKER_COMMAND: "dr-game-worker",
     });
     assert.equal(spec.command, ssh);
     assert.ok(spec.args.includes("dauntless@10.0.0.2"));

@@ -158,8 +158,7 @@ if (platform === "linux") {
   deploy.DR_WORKER_HOST = required(args, "worker-host");
   deploy.DR_WORKER_USER = args["worker-user"] || "dauntless";
   deploy.DR_WORKER_KEY = path.resolve(required(args, "worker-key"));
-  deploy.DR_WORKER_NODE = args["worker-node"] || "/usr/bin/node";
-  deploy.DR_WORKER_LAUNCHER = args["worker-launcher"] || "/opt/dauntless-revived/deploy/linux-server/worker-launch.mjs";
+  deploy.DR_WORKER_COMMAND = args["worker-command"] || "dr-game-worker";
 }
 writeEnv(path.join(config, "deployserver.env"), deploy);
 

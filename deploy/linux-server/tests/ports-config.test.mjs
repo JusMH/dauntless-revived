@@ -70,15 +70,14 @@ test("OpenBSD config keeps gateway unprivileged and launches games through SSH w
       "--worker-host", "10.0.0.2",
       "--worker-user", "dauntless",
       "--worker-key", key,
-      "--worker-node", "/usr/local/bin/node",
-      "--worker-launcher", "/opt/dr/deploy/linux-server/worker-launch.mjs",
+      "--worker-command", "dr-game-worker",
     ]);
     const deploy = envFile(path.join(config, "deployserver.env"));
     const gateway = envFile(path.join(config, "gateway.env"));
     const allowlist = envFile(path.join(config, "allowlist.env"));
     assert.match(deploy.GAMESERVER_BINARY_PATH, /deploy\/openbsd-server\/launch-gameserver\.mjs$/);
     assert.equal(deploy.DR_WORKER_HOST, "10.0.0.2");
-    assert.equal(deploy.DR_WORKER_NODE, "/usr/local/bin/node");
+    assert.equal(deploy.DR_WORKER_COMMAND, "dr-game-worker");
     assert.equal(gateway.GATEWAY_BIND, "127.0.0.1");
     assert.equal(gateway.GATEWAY_PORT, "61443");
     assert.equal(allowlist.DR_PF_ANCHOR, "dauntless-revived");

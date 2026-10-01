@@ -8,6 +8,7 @@ usage: $0 --game-dir <Dauntless folder> [options]
   --install-root <dir>          default /opt/dauntless-revived
   --worker-user <user>          default dauntless
   --env-file <file>             default /etc/dauntless-revived-worker.env
+  --command-link <path>          default /usr/local/bin/dr-game-worker
   --proton <path>               explicit Proton/GE-Proton script (preferred)
   --proton-data <dir>           default /var/lib/dauntless-revived-worker/proton
   --wine <path>                 explicit wine/wine64 path
@@ -23,6 +24,7 @@ source_root=$(CDPATH= cd -- "$script_dir/../.." && pwd)
 install_root=/opt/dauntless-revived
 worker_user=dauntless
 env_file=/etc/dauntless-revived-worker.env
+command_link=/usr/local/bin/dr-game-worker
 wineprefix=/var/lib/dauntless-revived-worker/wineprefix
 proton_data=/var/lib/dauntless-revived-worker/proton
 game_dir=
@@ -38,6 +40,7 @@ while [ "$#" -gt 0 ]; do
     --install-root) install_root=$2; shift 2 ;;
     --worker-user) worker_user=$2; shift 2 ;;
     --env-file) env_file=$2; shift 2 ;;
+    --command-link) command_link=$2; shift 2 ;;
     --proton) proton=$2; shift 2 ;;
     --proton-data) proton_data=$2; shift 2 ;;
     --wine) wine=$2; shift 2 ;;
@@ -71,7 +74,7 @@ if [ "$source_root" != "$install_root" ]; then
   mkdir -p "$install_root"
   (cd "$source_root" && tar --exclude=.git --exclude="*/node_modules" --exclude="*/dist" --exclude="*/build" -cf - deploy UndauntedLauncher/assets) | (cd "$install_root" && tar -xf -)
 fi
-chmod +x "$install_root/deploy/linux-server/worker-launch.mjs" "$install_root/deploy/linux-server/prepare-game.sh"
+chmod +x "$install_root/deploy/linux-server/worker-launch.mjs" "$install_root/deploy/linux-server/ssh-worker-command.sh" "$install_root/deploy/linux-server/prepare-game.sh"
 "$install_root/deploy/linux-server/prepare-game.sh" --game-dir "$game_dir" --repo "$install_root"
 
 game_exe="$game_dir/Archon/Binaries/Win64/Dauntless-Win64-Shipping.exe"
@@ -98,11 +101,17 @@ WINEDLLOVERRIDES=dxgi=n,b
 EOF
 mv "$env_file.tmp" "$env_file"
 chmod 600 "$env_file"
-if [ "$no_system" -eq 0 ]; then chown root:"$(id -gn "$worker_user")" "$env_file"; chmod 640 "$env_file"; fi
+if [ "$no_system" -eq 0 ]; then
+  chown root:"$(id -gn "$worker_user")" "$env_file"; chmod 640 "$env_file"
+  mkdir -p "$(dirname "$command_link")"
+  ln -sf "$install_root/deploy/linux-server/ssh-worker-command.sh" "$command_link"
+fi
 
 echo "Linux game worker configured."
 echo "Worker launcher: $install_root/deploy/linux-server/worker-launch.mjs"
 echo "Environment: $env_file"
 echo "Game: $game_dir"
 if [ -n "$proton" ]; then echo "Proton: $proton"; else echo "Wine: $wine"; fi
-echo "Use an SSH key restricted to: $install_root/deploy/linux-server/worker-launch.mjs"
+echo "Remote command: $command_link"
+echo "Recommended authorized_keys prefix:"
+echo "restrict,command=\"$install_root/deploy/linux-server/ssh-worker-command.sh\" <your-worker-public-key>"

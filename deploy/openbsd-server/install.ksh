@@ -6,8 +6,7 @@ usage() {
 usage: $0 --game-dir <Dauntless folder> --my-ip <advertised IP> --worker-host <host> --worker-ip <IPv4> --worker-key <SSH private key> --interface <pf interface> --worker-interface <pf interface> [options]
   --mode private|public          default public
   --worker-user <user>           default dauntless
-  --worker-node <path>           default /usr/bin/node
-  --worker-launcher <path>       default /opt/dauntless-revived/deploy/linux-server/worker-launch.mjs
+  --worker-command <command>     remote command; default dr-game-worker
   --source <repo>                source checkout; default repository containing this script
   --install-root <dir>           default /opt/dauntless-revived
   --data-dir <dir>               default /var/dauntless-revived
@@ -32,8 +31,7 @@ config_dir=/etc/dauntless-revived
 service_user=_dauntless
 mode=public
 worker_user=dauntless
-worker_node=/usr/bin/node
-worker_launcher=/opt/dauntless-revived/deploy/linux-server/worker-launch.mjs
+worker_command=dr-game-worker
 server_name="Dauntless Revived"
 gateway_port=443
 udp_begin=8770
@@ -58,8 +56,7 @@ while [ "$#" -gt 0 ]; do
     --worker-ip) worker_ip=$2; shift 2 ;;
     --worker-key) worker_key=$2; shift 2 ;;
     --worker-user) worker_user=$2; shift 2 ;;
-    --worker-node) worker_node=$2; shift 2 ;;
-    --worker-launcher) worker_launcher=$2; shift 2 ;;
+    --worker-command) worker_command=$2; shift 2 ;;
     --interface) interface=$2; shift 2 ;;
     --worker-interface) worker_interface=$2; shift 2 ;;
     --source) source_root=$2; shift 2 ;;
@@ -112,7 +109,7 @@ if [ "$skip_build" -eq 0 ]; then
   done
 fi
 
-node "$install_root/deploy/unix-common/generate-config.mjs" --platform openbsd --root "$install_root" --data "$data_dir" --config "$config_dir" --game-dir "$game_dir" --my-ip "$my_ip" --mode "$mode" --server-name "$server_name" --gateway-port "$gateway_port" --udp-begin "$udp_begin" --udp-end "$udp_end" --worker-host "$worker_host" --worker-user "$worker_user" --worker-key "$worker_key_installed" --worker-node "$worker_node" --worker-launcher "$worker_launcher"
+node "$install_root/deploy/unix-common/generate-config.mjs" --platform openbsd --root "$install_root" --data "$data_dir" --config "$config_dir" --game-dir "$game_dir" --my-ip "$my_ip" --mode "$mode" --server-name "$server_name" --gateway-port "$gateway_port" --udp-begin "$udp_begin" --udp-end "$udp_end" --worker-host "$worker_host" --worker-user "$worker_user" --worker-key "$worker_key_installed" --worker-command "$worker_command"
 
 if [ "$mode" = public ]; then
   cert="$data_dir/tls/gateway-cert.pem"; key="$data_dir/tls/gateway-key.pem"
