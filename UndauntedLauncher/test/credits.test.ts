@@ -165,6 +165,7 @@ test("the page opens links by name only, and community/source controls are in th
     eugamehost_game5: true,
     eugamehost_5800x: true,
     discord: true,
+    patreon: true,
   };
   const dir = path.join(ROOT, "src", "renderer");
   let opens = 0;

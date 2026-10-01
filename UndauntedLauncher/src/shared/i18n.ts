@@ -242,6 +242,7 @@ const en = {
   // the GitHub button and the Credits page (names and notes are in shared/credits.ts)
   github_link: "Source code on GitHub",
   discord_link: "Join our Discord",
+  patreon_link: "Optional support on Patreon",
   nav_credits: "Credits",
   credits_title: "Credits",
   credits_intro: "Dauntless Revived is a volunteer fan project, built on work that other people published first. Thank you, all of you.",
@@ -635,6 +636,7 @@ const fi: Record<StringKey, string> = {
   // the GitHub button and the Credits page (names and notes are in shared/credits.ts)
   github_link: "Lähdekoodi GitHubissa",
   discord_link: "Liity Discordiin",
+  patreon_link: "Tue halutessasi Patreonissa",
   nav_credits: "Tekijät",
   credits_title: "Tekijät",
   credits_intro: "Dauntless Revived on vapaaehtoisten faniprojekti, joka on rakennettu muiden ensin julkaiseman työn varaan. Kiitos teille kaikille.",

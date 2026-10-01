@@ -36,6 +36,7 @@ is written up here.
 [Read the findings]({{ '/findings/' | relative_url }}){: .btn .mr-2 }
 [Reference]({{ '/reference/' | relative_url }}){: .btn .mr-2 }
 [Join Discord](https://discord.gg/ZJRprHzsgu){: .btn .btn-primary .mr-2 }
+[Optional Patreon support](https://patreon.com/DauntlessRevived){: .btn .mr-2 }
 [Roadmap]({{ roadmap_page.url | relative_url }}){: .btn }
 
 ---

@@ -1751,6 +1751,7 @@ function initChrome(): void {
   github.addEventListener("click", () => open("project_source"));
   $("#eugamehost-btn").addEventListener("click", () => open("eugamehost"));
   $("#discord-btn").addEventListener("click", () => open("discord"));
+  $("#patreon-btn").addEventListener("click", () => open("patreon"));
   document.addEventListener("visibilitychange", () => void api.setStatusPolling(!document.hidden));
   window.setInterval(() => {
     renderPanel();

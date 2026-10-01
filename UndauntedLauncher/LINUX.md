@@ -114,7 +114,9 @@ Private/Tailscale servers work on Linux too; the launcher searches the normal Li
 
 ## Updates and limitations
 
-Windows uses the existing Squirrel self-update feed. Linux packages do not modify that feed: update the Linux launcher through a newer GitHub release or your package format.
+The Linux launcher now checks the latest stable GitHub launcher release at startup and every hour. When an update is available, the existing update banner appears. AppImage installs replace and relaunch themselves; .deb and .rpm installs download the matching package and request administrator approval through PolicyKit before handing the update to the system package manager. Prereleases are not offered automatically.
+
+Windows continues to use the existing Squirrel self-update feed.
 
 The supported game target is x86_64. ARM64 Linux is not advertised because the Windows x86_64 game would need an additional CPU-translation layer that this launcher does not manage.
 

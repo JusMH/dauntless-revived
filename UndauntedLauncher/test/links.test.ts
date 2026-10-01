@@ -36,6 +36,7 @@ const EXPECTED: Record<FixedTarget, string> = {
   eugamehost_game5: "https://www.eugamehost.com/clients/cart.php?a=add&pid=242&promocode=SIGNUP6MONTH&skipconfig=1",
   eugamehost_5800x: "https://www.eugamehost.com/clients/cart.php?a=add&pid=500",
   discord: "https://discord.gg/ZJRprHzsgu",
+  patreon: "https://patreon.com/DauntlessRevived",
 };
 
 // A Record, so the compiler fails this file when a link name is added without a test here.
@@ -55,6 +56,7 @@ const ALL_TARGETS: Record<ExternalTarget, true> = {
   eugamehost_game5: true,
   eugamehost_5800x: true,
   discord: true,
+  patreon: true,
 };
 
 // Raw URLs and tricks: none of these may ever be opened.

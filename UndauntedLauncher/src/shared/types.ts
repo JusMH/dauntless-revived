@@ -189,7 +189,8 @@ export type ExternalTarget =
   | "eugamehost_game3"
   | "eugamehost_game5"
   | "eugamehost_5800x"
-  | "discord";
+  | "discord"
+  | "patreon";
 
 export type RegisterOutcome =
   | { ok: true; username: string }

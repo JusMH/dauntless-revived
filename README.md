@@ -8,6 +8,7 @@
   <a href="LICENSE.txt"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-0D669C?style=flat-square&labelColor=031523"></a>
   <a href="https://mixutin.github.io/dauntless-revived/"><img alt="Documentation site" src="https://img.shields.io/badge/docs-mixutin.github.io-0D669C?style=flat-square&labelColor=031523"></a>
   <a href="https://discord.gg/ZJRprHzsgu"><img alt="Join the Dauntless Revived Discord" src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?style=flat-square&logo=discord&logoColor=white"></a>
+  <a href="https://patreon.com/DauntlessRevived"><img alt="Optional support on Patreon" src="https://img.shields.io/badge/Patreon-optional%20support-FF424D?style=flat-square&logo=patreon&logoColor=white"></a>
   <a href="https://github.com/mixutin/dauntless-revived/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/discussions-ask%20%26%20share-0D669C?style=flat-square&labelColor=031523&logo=github"></a>
   <a href="https://github.com/mixutin/dauntless-revived/commits/dauntless-revived"><img alt="Last commit on the dauntless-revived branch" src="https://img.shields.io/github/last-commit/mixutin/dauntless-revived/dauntless-revived?style=flat-square&labelColor=031523&color=0D669C"></a>
   <a href="https://github.com/mixutin/dauntless-revived/actions/workflows/ci.yml?query=branch%3Adauntless-revived"><img alt="CI status on the dauntless-revived branch" src="https://img.shields.io/github/actions/workflow/status/mixutin/dauntless-revived/ci.yml?branch=dauntless-revived&event=push&style=flat-square&labelColor=031523&label=CI"></a>
@@ -27,6 +28,10 @@ distributed in this repository or on the docs site: you need your own copy of th
 
 > **This is not a public server.** It is run for a few friends. Anyone can host their own copy from
 > this repository.
+
+## Optional project support
+
+Dauntless Revived is free. If you would like to support ongoing development and community costs, you can [support the project on Patreon](https://patreon.com/DauntlessRevived). Patreon is entirely optional and does not provide paid access to the game or gameplay advantages.
 
 ## Hosting partner — EU Gamehost
 
