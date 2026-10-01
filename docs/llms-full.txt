@@ -12332,7 +12332,7 @@ and exits. The `<ip:port>` argument is parsed but never used. The DLL then does 
 
 Other server-side hooks:
 
-- The player start is simply the first `APlayerStart` found.
+- **Player-start selection (fixed in source on 1 October 2026, live confirmation pending).** Upstream's hook replaced Phoenix's native `GetPlayerStartForPlayer` with the first `APlayerStart` in the global UObject table. Reverse engineering the original 1.4.4 function at RVA `0x1368660` shows that Phoenix filters `AArchonPlayerStart::GroupName` and chooses among the matching starts with `AArchonPlayerState::PlayerStartSlot`. Ignoring both can select the wrong start/world; it is the leading cause of the observed bug where a player who falls off the map respawns underneath it. Our source now calls Phoenix's original selector first, and only if it returns null falls back to an `AArchonPlayerStart` in the same `UWorld`, preferring the requested group and the same slot rule. A VS2022 x64 candidate DLL builds successfully; it still needs the fall/respawn case verified in game before replacing the pinned DLL for everyone.
 - Ability activation RPCs are handled directly, and then also passed to the original handler.
 - Stamina is ticked for every player pawn.
 - `HasFinishedLoading` is forced true.

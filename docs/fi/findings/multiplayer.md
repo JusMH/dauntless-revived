@@ -163,7 +163,7 @@ koskaan. DLL tekee sen jälkeen seuraavat asiat:
 
 Muut palvelinpuolen koukut:
 
-- Pelaajan aloituspaikka on yksinkertaisesti ensimmäinen löytyvä `APlayerStart`.
+- **Pelaajan aloituspaikan valinta (korjattu lähdekoodissa 1.10.2026, oikean pelin vahvistus puuttuu).** Alkuperäinen hook korvasi Phoenixin oman `GetPlayerStartForPlayer`-valinnan UObject-taulukon ensimmäisellä `APlayerStart`-oliolla. 1.4.4:n alkuperäisen funktion käänteinen analyysi RVA:ssa `0x1368660` näyttää, että Phoenix suodattaa `AArchonPlayerStart::GroupName`-arvolla ja valitsee sopivista paikoista `AArchonPlayerState::PlayerStartSlot`-arvon perusteella. Molempien ohittaminen voi valita väärän aloituspaikan tai jopa väärän maailman; tämä on tällä hetkellä vahvin selitys bugille, jossa kartalta pudonnut pelaaja respawnaa kartan alle. Meidän lähdekoodimme kutsuu nyt ensin Phoenixin alkuperäistä valintaa ja käyttää vain null-palautuksessa varavaihtoehtoa, joka rajoittuu samaan `UWorld`-maailmaan, suosii pyydettyä ryhmää ja käyttää samaa slot-sääntöä. VS2022 x64 -testi-DLL kääntyy onnistuneesti, mutta kartalta putoaminen pitää vielä kokeilla oikeassa pelissä ennen kuin uusi DLL korvaa kaikille jaettavan kiinnitetyn version.
 - Kykyjen aktivoinnin RPC-kutsut (etäkutsut) käsitellään suoraan ja välitetään sen jälkeen myös
   alkuperäiselle käsittelijälle.
 - Kestävyys (stamina) päivitetään jokaiselle pelaajan hahmolle (pawn).

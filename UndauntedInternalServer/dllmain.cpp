@@ -459,6 +459,9 @@ bool IsLevelInitForActorHook(void* a1, char a2) {
 
 void* OrigGetStartSpot = nullptr;
 
+// 0x1368660 is Phoenix's GetPlayerStartForPlayer: it filters AArchonPlayerStart::GroupName and
+// selects with AArchonPlayerState::PlayerStartSlot. Do not replace it with the first global
+// APlayerStart: that can select a start from the wrong group/world and breaks fall/respawn recovery.
 static UWorld* GetObjectWorld(UObject* Object) {
     for (UObject* Current = Object; Current; Current = Current->Outer) {
         if (Current->IsA(SDK::UWorld::StaticClass()))
