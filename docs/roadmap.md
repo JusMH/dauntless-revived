@@ -865,6 +865,12 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
 
 - [ ] **4.19 Multi-region server coordination** — *Deferred until additional hosts are needed. Design authenticated communication between regional deploy servers and matchmaking, shared account/save ownership, region selection, host health/capacity reporting, and routing players to available game instances. Establish database consistency, outage handling and deployment boundaries before adding regional hosts; a web load balancer alone cannot distribute existing game sessions. No runtime changes enabled.*
 
+Dashboard follow-up, 2026-10-01 (4.18): verified the private Windows dashboard's
+live backend metrics and account directory; fixed LocalService parent-directory
+access without recursive secret access. Invite-only registration already generates
+personal keys automatically; added regression coverage for distinct keys, hash-only
+storage and rejection of altered keys. Owners share join links, not login keys.
+
 Dashboard update, 2026-09-28 (4.12/4.18): optional `BACKEND_HEALTH=1` now supplies aggregate
 60-second request/error/latency metrics and event-loop delay, plus backend memory and uptime.
 The dashboard separates host/backend/dashboard uptime and Ramsgate/hunt/Dojo/tutorial/menu counts.

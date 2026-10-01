@@ -2050,6 +2050,18 @@ minute CSV rather than repeatedly launching scanners. Re-run the dashboard insta
 updates. See [the dashboard operator guide](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DASHBOARD.md)
 for security, limitations and disabling autostart.
 
+Keep `REGISTRATION_MODE=INVITECODE`: generate a join link in **Invites** and share
+that link, not a login key. Registration automatically creates a personal random
+key that the launcher saves encrypted. The server stores only its SHA-256 hash.
+**Players & accounts** maps each username and UID to a short key fingerprint;
+original keys cannot be recovered from this directory. Editing a key invalidates
+it, but anyone who steals a valid key can use it, so keep player keys private.
+
+The Windows dashboard installer grants LocalService read/execute access to the
+required parent folders only (not recursively), plus read access to the selected
+configuration and log files. This avoids startup failures on hardened installs
+without running the dashboard as Administrator or opening another public port.
+
 This page covers how we open our Undaunted-based stack (client build **1.4.4**) to a handful of
 friends: network access, firewall, addresses, accounts, capacity and backups. It assumes the stack
 already runs for you locally, with the metagame, the deploy server and a Ramsgate server.
@@ -16146,6 +16158,12 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
 - [ ] **4.18 Owner dashboard** — *Built as a separate opt-in Node process (`tools/dashboard.mjs`), expanded 2026-09-30: lightweight Overview / Backend health / Players & accounts / Invites / Logs views; five-second host and backend graphs; paginated launcher-account-to-key fingerprints (never full keys); protected invite creation; bounded log tails. Reuses the kit's minute performance CSV for game-process CPU/private memory, disk and network, with stale timestamps and whole-host CPU normalization. `Install-OwnerDashboard.ps1 -OpenOnLogon` installs private boot autostart and interactive browser opening and enables backend health for the next restart. Loopback only, owner-authenticated, SSH access remotely. See `tools/DASHBOARD.md`. **Still open:** actual engine tick/frame-time telemetry, historical registrations, persistent graph history, player ping and longer multi-player soak tests. No blanket claim of leak-free operation.*
 
 - [ ] **4.19 Multi-region server coordination** — *Deferred until additional hosts are needed. Design authenticated communication between regional deploy servers and matchmaking, shared account/save ownership, region selection, host health/capacity reporting, and routing players to available game instances. Establish database consistency, outage handling and deployment boundaries before adding regional hosts; a web load balancer alone cannot distribute existing game sessions. No runtime changes enabled.*
+
+Dashboard follow-up, 2026-10-01 (4.18): verified the private Windows dashboard's
+live backend metrics and account directory; fixed LocalService parent-directory
+access without recursive secret access. Invite-only registration already generates
+personal keys automatically; added regression coverage for distinct keys, hash-only
+storage and rejection of altered keys. Owners share join links, not login keys.
 
 Dashboard update, 2026-09-28 (4.12/4.18): optional `BACKEND_HEALTH=1` now supplies aggregate
 60-second request/error/latency metrics and event-loop delay, plus backend memory and uptime.

@@ -13,7 +13,7 @@ if (-not $PSCmdlet.ShouldProcess($Root, 'Install private dashboard task and enab
 if (-not (Test-DRAdmin)) { throw 'Run this installer as Administrator.' }
 $dir = Join-Path $Root 'dashboard'
 # Refuse service-writable links before making privileged copies or ACL changes.
-foreach ($path in @($Root, $dir, $P.Config, $P.Keys, $P.Logs, $P.OwnerKey, $P.ServerJson, $P.MetaEnv)) {
+foreach ($path in @($Root, (Join-Path $Root 'data'), $dir, $P.Config, $P.Keys, $P.Logs, $P.OwnerKey, $P.ServerJson, $P.MetaEnv)) {
     if (Test-DRReparsePoint $path) { throw "Refusing linked path: $path" }
 }
 $files = @('dashboard.mjs','dashboard-performance.mjs','dashboard-client.js','dashboard.html')
@@ -44,6 +44,12 @@ $envMap = [ordered]@{
 }
 if ((Get-DRMode $Cfg) -eq 'Public') { $envMap['DASHBOARD_SERVER_CONFIG'] = $P.ServerJson.Replace('\', '/') }
 [void](Write-DREnv (Join-Path $dir 'dashboard.env') $envMap @('Private owner dashboard. No credentials in this file.'))
+# Node resolves parent directories before reading its configuration. Grant only
+# these directories RX: no inheritance and no recursive access to other secrets.
+foreach ($path in @($Root, (Join-Path $Root 'data'), $P.Config, $P.Keys)) {
+    icacls.exe $path /grant '*S-1-5-19:RX' | Out-Null
+    if ($LASTEXITCODE -ne 0) { throw 'Dashboard parent directory ACL failed' }
+}
 foreach ($path in @($P.OwnerKey, $P.ServerJson)) {
     icacls.exe $path /grant '*S-1-5-19:R' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Dashboard read ACL failed' }

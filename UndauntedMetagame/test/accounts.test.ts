@@ -2,6 +2,7 @@ import { RemoveTestDb } from "./setup";
 import "./authenv";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { GetDb } from "../src/db";
 import { invitecodes, userapikeys, users } from "../src/db/schema";
@@ -39,6 +40,23 @@ describe("username rules", () => {
 });
 
 describe("RegisterAccount", () => {
+    it("invite-only signup issues distinct personal keys, stores only hashes, and rejects altered keys", async () => {
+        await RegisterInviteCode("TEST-AUTO-KEYS", 2, false);
+        const A = RegisterAccount("INVITECODE", "AutoKey_A", "TEST-AUTO-KEYS");
+        const B = RegisterAccount("INVITECODE", "AutoKey_B", "TEST-AUTO-KEYS");
+        assert.ok(A.ok && B.ok);
+        assert.notEqual(A.UUK, B.UUK);
+        for (const Account of [A, B]) {
+            const Stored = GetDb().select().from(userapikeys).where(eq(userapikeys.userId, Account.UserId)).get();
+            assert.deepEqual(Stored, { userId: Account.UserId, keyHash: createHash("sha256").update(Account.UUK).digest("hex") });
+            assert.deepEqual(await GetUserInfoForApiKey(Account.UUK), { UserId: Account.UserId, Username: Account.Username, IsAdmin: false });
+            const Altered = Account.UUK.slice(0, -1) + (Account.UUK.endsWith("0") ? "1" : "0");
+            assert.equal(await GetUserInfoForApiKey(Altered), undefined);
+        }
+        assert.equal(UsesLeft("TEST-AUTO-KEYS"), 0);
+        assert.equal(RegisterAccount("INVITECODE", "AutoKey_NoInvite", undefined).ok, false);
+    });
+
     it("registers a valid name with an account and its key in one go (OPEN)", async () => {
         const Result = RegisterAccount("OPEN", "Friend_One", undefined);
 

@@ -38,6 +38,18 @@ minute CSV rather than repeatedly launching scanners. Re-run the dashboard insta
 updates. See [the dashboard operator guide](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DASHBOARD.md)
 for security, limitations and disabling autostart.
 
+Keep `REGISTRATION_MODE=INVITECODE`: generate a join link in **Invites** and share
+that link, not a login key. Registration automatically creates a personal random
+key that the launcher saves encrypted. The server stores only its SHA-256 hash.
+**Players & accounts** maps each username and UID to a short key fingerprint;
+original keys cannot be recovered from this directory. Editing a key invalidates
+it, but anyone who steals a valid key can use it, so keep player keys private.
+
+The Windows dashboard installer grants LocalService read/execute access to the
+required parent folders only (not recursively), plus read access to the selected
+configuration and log files. This avoids startup failures on hardened installs
+without running the dashboard as Administrator or opening another public port.
+
 This page covers how we open our Undaunted-based stack (client build **1.4.4**) to a handful of
 friends: network access, firewall, addresses, accounts, capacity and backups. It assumes the stack
 already runs for you locally, with the metagame, the deploy server and a Ramsgate server.

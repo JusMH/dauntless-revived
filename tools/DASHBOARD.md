@@ -58,6 +58,15 @@ Never share an owner key with a player. Page content uses text nodes, not player
 
 ## Player invites
 
+Keep registration in `INVITECODE` mode. Share a dashboard-generated join link,
+not a personal login key. At signup the backend creates a random 192-bit personal
+key, stores its SHA-256 hash, and returns the key to the launcher to save in its
+encrypted key store. Each account gets its own key even when an invite has multiple
+uses. Changing a key makes authentication fail; it does not change the account.
+The **Players & Accounts** directory links usernames and UIDs to short key
+fingerprints, not recoverable passwords. A stolen valid key can still authenticate:
+keep keys private and use the launcher's backup/recovery options carefully.
+
 Set `DASHBOARD_SERVER_CONFIG=C:\DauntlessRevived\data\config\server.json` before starting the
 dashboard to enable public-mode invites. After unlocking, enter an optional label and 1–100 uses,
 then press **Generate invite** and **Copy link**. The address, port and certificate fingerprint
