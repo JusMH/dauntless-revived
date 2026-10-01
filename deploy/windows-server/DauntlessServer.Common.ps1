@@ -995,6 +995,12 @@ function Test-DRSignature([string]$Path, [string]$Publisher) {
 # npm ci + npm run build for every package, then swapped in (the previous build stays as app.prev).
 # Returns the list of packages that were built.
 # ---------------------------------------------------------------------------------------------
+function Get-DRBuildEnvironment([string]$NodeExe) {
+    # SSH services can retain the PATH from before Node's MSI installation. npm itself is
+    # invoked by absolute path, but dependency install scripts still execute "node".
+    return @{ NODE_ENV = 'development'; npm_config_update_notifier = 'false'; npm_config_fund = 'false'; npm_config_audit = 'false'; Path = "$(Split-Path $NodeExe -Parent);$env:Path" }
+}
+
 function Build-DRApp {
     param($Paths, [string]$From, [string]$NodeExe, [hashtable]$Version)
     $appNew = "$($Paths.App).new"
@@ -1021,7 +1027,7 @@ function Build-DRApp {
             continue
         }
         # NODE_ENV=production would make npm ci skip the TypeScript compiler.
-        $envs = @{ NODE_ENV = 'development'; npm_config_update_notifier = 'false'; npm_config_fund = 'false'; npm_config_audit = 'false' }
+        $envs = Get-DRBuildEnvironment $NodeExe
         Write-DRInfo "npm ci + build: $pkg (a few minutes) ..."
         $code = Invoke-DRNative -FilePath $NodeExe -Arguments @($npmCli, 'ci', '--no-audit', '--no-fund') -WorkingDirectory $dir -LogBase (Join-Path $Paths.Logs "install\npm-ci-$pkg") -Environment $envs -LowPriority
         if ($code -ne 0) { Show-DRLogTail (Join-Path $Paths.Logs "install\npm-ci-$pkg"); Stop-DR "npm ci failed in $pkg" }

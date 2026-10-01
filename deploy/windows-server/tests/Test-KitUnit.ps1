@@ -36,6 +36,10 @@ foreach ($f in @(Get-ChildItem -LiteralPath $Kit -Filter *.ps1) + @(Get-ChildIte
 }
 
 Write-Host '== invite strings'
+$pathBefore = $env:Path
+$buildEnv = Get-DRBuildEnvironment 'C:\Program Files\nodejs\node.exe'
+Check 'build PATH finds the configured Node in an old SSH session' ($buildEnv.Path.StartsWith('C:\Program Files\nodejs;') -and $buildEnv.NODE_ENV -eq 'development')
+Check 'build environment does not change the operator PATH' ($env:Path -ceq $pathBefore)
 $fp = 'ab' * 32
 $v2 = New-DRInviteString -Mode Public -ServerHost '203.0.113.7' -Port 443 -Fingerprint $fp -Code 'ABCD-EFGH-JKLM' -Name "Alex's Ramsgate"
 Check 'v2 layout' ($v2 -ceq "dauntless-revived://join?v=2&mode=public&host=203.0.113.7&port=443&fp=$fp&code=ABCD-EFGH-JKLM&name=Alex's%20Ramsgate") $v2
