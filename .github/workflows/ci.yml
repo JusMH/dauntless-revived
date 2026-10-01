@@ -262,6 +262,45 @@ jobs:
               --output "$tmp/pf.conf"
             pfctl -nf "$tmp/pf.conf"
 
+  internal-server-dll:
+    name: Server DLL (Windows x64)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build Release x64 with Visual Studio 2022
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+          if (-not $msbuild) { throw 'MSBuild not found' }
+          & $msbuild UndauntedInternalServer\UndauntedInternalServer.sln /m /t:Build /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Verify DLL output
+        run: |
+          $dll = Get-ChildItem -Path UndauntedInternalServer -Filter UndauntedInternalServer.dll -Recurse |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]Release[\\/]' } |
+            Select-Object -First 1
+          if (-not $dll) { throw 'Release x64 DLL not found' }
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $dll.FullName).Hash.ToLowerInvariant()
+          Write-Output "DLL: $($dll.FullName)"
+          Write-Output "SHA256: $hash"
+          Copy-Item -LiteralPath $dll.FullName -Destination "$env:RUNNER_TEMP\UndauntedInternalServer.dll"
+
+      - name: Keep candidate DLL
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: internal-server-dll
+          path: ${{ runner.temp }}/UndauntedInternalServer.dll
+          if-no-files-found: error
+          retention-days: 7
+
   server-kit:
     name: Server kit (Windows PowerShell 5.1)
     runs-on: windows-latest
@@ -436,7 +475,7 @@ jobs:
   # On by default; the repository variable LAUNCHER_AUTO_RELEASE=false pauses it (see the top of this file).
   release-check:
     name: Launcher release needed?
-    needs: [node-packages, launcher, launcher-linux, server-port-linux, server-port-openbsd, server-kit, docs, repo-hygiene]
+    needs: [node-packages, launcher, launcher-linux, server-port-linux, server-port-openbsd, internal-server-dll, server-kit, docs, repo-hygiene]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/dauntless-revived' &&
       github.repository == 'mixutin/dauntless-revived' && vars.LAUNCHER_AUTO_RELEASE != 'false'

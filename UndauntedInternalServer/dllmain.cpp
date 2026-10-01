@@ -459,27 +459,64 @@ bool IsLevelInitForActorHook(void* a1, char a2) {
 
 void* OrigGetStartSpot = nullptr;
 
-APlayerStart* GetStartSpotHook(void* a1, void* a2, void* a3) {
-    for (int i = 0; i < SDK::UObject::GObjects->Num(); i++)
-    {
+static UWorld* GetObjectWorld(UObject* Object) {
+    for (UObject* Current = Object; Current; Current = Current->Outer) {
+        if (Current->IsA(SDK::UWorld::StaticClass()))
+            return static_cast<UWorld*>(Current);
+    }
+
+    return nullptr;
+}
+
+static AArchonPlayerStart* PickPlayerStartFallback(AArchonPlayerState* PlayerState, const FName& StartGroup, bool MatchGroup) {
+    UWorld* PlayerWorld = GetObjectWorld(PlayerState);
+    std::vector<AArchonPlayerStart*> Candidates;
+
+    for (int i = 0; i < SDK::UObject::GObjects->Num(); i++) {
         SDK::UObject* Obj = SDK::UObject::GObjects->GetByIndex(i);
-
-        if (!Obj)
+        if (!Obj || Obj->IsDefaultObject() || !Obj->IsA(SDK::AArchonPlayerStart::StaticClass()))
             continue;
 
-        if (Obj->IsDefaultObject())
+        auto* Start = static_cast<AArchonPlayerStart*>(Obj);
+        if (PlayerWorld && GetObjectWorld(Start) != PlayerWorld)
+            continue;
+        if (MatchGroup && Start->GroupName != StartGroup)
             continue;
 
-        if (Obj->IsA(SDK::APlayerStart::StaticClass()))
-        {
-            return (APlayerStart*)Obj;
+        Candidates.push_back(Start);
+    }
+
+    if (Candidates.empty())
+        return nullptr;
+
+    const int32 Slot = PlayerState ? PlayerState->PlayerStartSlot : -1;
+    const size_t Index = Slot >= 0 ? static_cast<size_t>(Slot) % Candidates.size() : 0;
+    return Candidates[Index];
+}
+
+AArchonPlayerStart* GetStartSpotHook(AArchonPlayerState* PlayerState, FName StartGroup) {
+    using GetPlayerStartForPlayerFn = AArchonPlayerStart* (*)(AArchonPlayerState*, FName);
+    auto* Start = reinterpret_cast<GetPlayerStartForPlayerFn>(OrigGetStartSpot)(PlayerState, StartGroup);
+    if (Start)
+        return Start;
+
+    Start = PickPlayerStartFallback(PlayerState, StartGroup, true);
+    if (!Start)
+        Start = PickPlayerStartFallback(PlayerState, StartGroup, false);
+
+    if (Globals::EnableLogging) {
+        if (Start) {
+            std::cout << "Native player-start selection returned null; fallback group="
+                      << StartGroup.ToString() << " slot="
+                      << (PlayerState ? PlayerState->PlayerStartSlot : -1) << " -> "
+                      << Start->GetFullName() << std::endl;
+        } else {
+            std::cout << "No player start found for group=" << StartGroup.ToString()
+                      << " slot=" << (PlayerState ? PlayerState->PlayerStartSlot : -1) << std::endl;
         }
     }
 
-    if (Globals::EnableLogging)
-    std::cout << "No startspot found!" << std::endl;
-
-    return nullptr;
+    return Start;
 }
 
 bool ServerTryActivateAbilityInternal(UAbilitySystemComponent* Component, FGameplayAbilitySpecHandle& AbilityHandle, bool InputPressed, FPredictionKey& PredictionKey, FGameplayEventData* TriggerEventData) {
