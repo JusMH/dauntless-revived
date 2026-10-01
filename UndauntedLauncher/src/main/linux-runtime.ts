@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { accessSync, constants as fsConstants, existsSync, readdirSync, statSync } from "node:fs";
+import { accessSync, constants as fsConstants, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { LaunchRuntime } from "./launch";
@@ -178,6 +178,7 @@ function run(command: string, args: string[], env: NodeJS.ProcessEnv, cwd: strin
 async function initialize(runtime: DetectedLinuxRuntime, home: string): Promise<void> {
   if (existsSync(path.join(runtime.prefixDir, "drive_c"))) return;
   if (runtime.kind === "proton") {
+    if (runtime.compatDataDir) mkdirSync(runtime.compatDataDir, { recursive: true });
     await run(runtime.command, ["run", "cmd", "/c", "exit"], runtime.env, home);
     return;
   }
