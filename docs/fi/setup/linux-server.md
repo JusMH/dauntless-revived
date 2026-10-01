@@ -72,6 +72,8 @@ Windowsin deploy-palvelimen prosessirajapintaa ei muutettu. Linuxissa
 
 ## Vaatimukset
 
+> **Hostattu Linux:** EU Gamehost on projektin kumppani. [Hosting-kumppanin opas]({{ "/fi/setup/hosting-partner.html" | relative_url }}) sisältää pakettiesimerkkejä; varmista ennen tilausta tarvitsemasi käyttöjärjestelmä ja virtualisointi.
+
 - x86_64 Linux + glibc
 - Node.js **20.19+** (22 tai 24 suositeltu)
 - npm

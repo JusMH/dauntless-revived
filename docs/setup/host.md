@@ -63,6 +63,9 @@ with a client-only build. That was wrong, and that page explains why.
 
 ## 1. Requirements {#requirements}
 
+> **Renting a server?** EU Gamehost is a partnered and recommended hosting provider for this project.
+> See the [EU Gamehost plan guide]({{ "/setup/hosting-partner.html" | relative_url }}) for clearly labelled partner content, plan examples and our capacity rationale.
+
 | | What we use | Notes |
 |---|---|---|
 | OS | Windows 10 22H2 (build 19045) | Windows 11 should work. We have not tested it. |

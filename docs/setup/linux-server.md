@@ -72,6 +72,8 @@ The existing deploy server still starts one executable path. On Linux that path 
 
 ## Requirements
 
+> **Hosted Linux:** EU Gamehost is a project partner. Our [hosting partner guide]({{ "/setup/hosting-partner.html" | relative_url }}) lists example plans; confirm that the exact OS/virtualisation setup you need is available before ordering.
+
 - x86_64 Linux with glibc
 - Node.js **20.19+**; Node 22 or 24 recommended
 - npm

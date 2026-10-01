@@ -509,6 +509,9 @@ gets 409 `username_taken`.
 
 ## Capacity
 
+> For rented hosting, see our clearly-labelled [EU Gamehost partner recommendations]({{ "/setup/hosting-partner.html" | relative_url }}).
+> The plan mapping there uses the measurements below rather than provider marketing labels.
+
 Measured on our host, an 8-core desktop with 32 GB of RAM, running the 1.4.4 stack:
 
 | Process | RAM | CPU | Notes |

@@ -159,6 +159,11 @@ test("the page opens links by name only, and the GitHub button and Credits are i
     project_contributors: true,
     upstream_source: true,
     upstream_contributors: true,
+    eugamehost: true,
+    eugamehost_game2: true,
+    eugamehost_game3: true,
+    eugamehost_game5: true,
+    eugamehost_5800x: true,
   };
   const dir = path.join(ROOT, "src", "renderer");
   let opens = 0;

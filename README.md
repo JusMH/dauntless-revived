@@ -27,6 +27,18 @@ distributed in this repository or on the docs site: you need your own copy of th
 > **This is not a public server.** It is run for a few friends. Anyone can host their own copy from
 > this repository.
 
+## Hosting partner — EU Gamehost
+
+<p align="center">
+  <a href="https://www.eugamehost.com/"><img src=".github/assets/eugamehost-partner.png" width="620" alt="EU Gamehost"></a>
+</p>
+
+**EU Gamehost is a partnered and recommended hosting provider for Dauntless Revived.** If you want a rented server instead of keeping your own PC online, see the [hosting partner guide](https://mixutin.github.io/dauntless-revived/setup/hosting-partner.html).
+
+For this project's measured footprint, our practical starting points are **VDS GAME 2 (8 GB)** for a small friend group, **VDS GAME 3 (12 GB)** as the default balanced option, and **VDS GAME 5 (24 GB)** when you want substantially more headroom. Operators wanting dedicated hardware can look at the **Ryzen 7 5800X / 32 GB** dedicated option.
+
+> **Partner / advertising disclosure:** EU Gamehost partners with this project. These recommendations use the project's own measured server footprint, not an independent hosting benchmark. Prices, hardware and availability can change; verify the current offer with EU Gamehost before ordering.
+
 ## Quick answers
 
 ### Can you still play Dauntless?
