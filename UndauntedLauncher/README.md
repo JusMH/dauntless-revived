@@ -12,6 +12,8 @@ own server, sets everything up and starts the game. English and Finnish.
 and every file is checked against the list of 410 files, sizes and SHA-256 hashes compiled into the
 launcher (`UndauntedContent/data/dauntless-1.4.4.json`). A server that offers anything else is refused.
 
+**Community:** [Join the Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu) for help, players and project updates. The launcher also keeps a Discord button in its sidebar.
+
 ## For friends
 
 1. Install a launcher package from the project's release. On Windows use

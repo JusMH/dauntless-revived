@@ -7,6 +7,8 @@
 <p align="center">
   <a href="LICENSE.txt"><img alt="License: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-0D669C?style=flat-square&labelColor=031523"></a>
   <a href="https://mixutin.github.io/dauntless-revived/"><img alt="Documentation site" src="https://img.shields.io/badge/docs-mixutin.github.io-0D669C?style=flat-square&labelColor=031523"></a>
+  <a href="https://discord.gg/ZJRprHzsgu"><img alt="Join the Dauntless Revived Discord" src="https://img.shields.io/badge/Discord-join%20the%20community-5865F2?style=flat-square&logo=discord&logoColor=white"></a>
+  <a href="https://patreon.com/DauntlessRevived"><img alt="Optional support on Patreon" src="https://img.shields.io/badge/Patreon-optional%20support-FF424D?style=flat-square&logo=patreon&logoColor=white"></a>
   <a href="https://github.com/mixutin/dauntless-revived/discussions"><img alt="GitHub Discussions" src="https://img.shields.io/badge/discussions-ask%20%26%20share-0D669C?style=flat-square&labelColor=031523&logo=github"></a>
   <a href="https://github.com/mixutin/dauntless-revived/commits/dauntless-revived"><img alt="Last commit on the dauntless-revived branch" src="https://img.shields.io/github/last-commit/mixutin/dauntless-revived/dauntless-revived?style=flat-square&labelColor=031523&color=0D669C"></a>
   <a href="https://github.com/mixutin/dauntless-revived/actions/workflows/ci.yml?query=branch%3Adauntless-revived"><img alt="CI status on the dauntless-revived branch" src="https://img.shields.io/github/actions/workflow/status/mixutin/dauntless-revived/ci.yml?branch=dauntless-revived&event=push&style=flat-square&labelColor=031523&label=CI"></a>
@@ -26,6 +28,22 @@ distributed in this repository or on the docs site: you need your own copy of th
 
 > **This is not a public server.** It is run for a few friends. Anyone can host their own copy from
 > this repository.
+
+## Optional project support
+
+Dauntless Revived is free. If you would like to support ongoing development and community costs, you can [support the project on Patreon](https://patreon.com/DauntlessRevived). Patreon is entirely optional and does not provide paid access to the game or gameplay advantages.
+
+## Hosting partner — EU Gamehost
+
+<p align="center">
+  <a href="https://www.eugamehost.com/"><img src=".github/assets/eugamehost-partner.png" width="620" alt="EU Gamehost"></a>
+</p>
+
+**EU Gamehost is a partnered and recommended hosting provider for Dauntless Revived.** If you want a rented server instead of keeping your own PC online, see the [hosting partner guide](https://mixutin.github.io/dauntless-revived/setup/hosting-partner.html).
+
+For this project's measured footprint, our practical starting points are **VDS GAME 2 (8 GB)** for a small friend group, **VDS GAME 3 (12 GB)** as the default balanced option, and **VDS GAME 5 (24 GB)** when you want substantially more headroom. Operators wanting dedicated hardware can look at the **Ryzen 7 5800X / 32 GB** dedicated option.
+
+> **Partner / advertising disclosure:** EU Gamehost partners with this project. These recommendations use the project's own measured server footprint, not an independent hosting benchmark. Prices, hardware and availability can change; verify the current offer with EU Gamehost before ordering.
 
 ## Quick answers
 
@@ -83,7 +101,7 @@ played solo on the host and rented server, then tested with two players over the
 | Backups | Works on our hosts | Hourly, plus one around every server start and stop. The Windows server kit has its own backup task (running on the rented server). The scripts of our original host PC, where a restore was tested, are not in this repository ([do-it-yourself version](https://mixutin.github.io/dauntless-revived/setup/admin.html#back-up-the-database)) |
 | Friend kit | Built | The Tailscale-only fallback: hash-checked setup and play scripts. Not used by a friend yet |
 | Bounties | Not yet | Stored with real progression; drafting and claiming not yet tried in game |
-| Text chat and online status | Built, awaiting a live test; both off by default | Ramsgate, hunt, party and guild chat and whispers, with usernames, in the metagame itself; off by default until two players have tried it (`Set-Chat.ps1 -On` on a kit server). The first chat server was written and tested by Vvoidddd; why it showed `UID-...` instead of names, and the fix: [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html). Friends' online status is built into the chat server since 23 September 2026 (the idea came from Harmonic's fork) and stays off (`CHAT_PRESENCE=1`) until two players have shown that the party's automatic kick stays asleep. Use Discord meanwhile |
+| Text chat and online status | Built, awaiting a live test; both off by default | Ramsgate, hunt, party and guild chat and whispers, with usernames, in the metagame itself; off by default until two players have tried it (`Set-Chat.ps1 -On` on a kit server). The first chat server was written and tested by Vvoidddd; why it showed `UID-...` instead of names, and the fix: [Text chat](https://mixutin.github.io/dauntless-revived/findings/chat.html). Friends' online status is built into the chat server since 23 September 2026 (the idea came from Harmonic's fork) and stays off (`CHAT_PRESENCE=1`) until two players have shown that the party's automatic kick stays asleep. Use the [Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu) meanwhile |
 | Slayer Links | Built, on by default, awaiting a live test | The My Links tab: two friends link up for a week. From Harmonic's fork, corrected against the 1.4.4 executable (23 September 2026); not tried in game yet, and the game may keep the tab hidden ([details](https://mixutin.github.io/dauntless-revived/findings/social.html#slayer-links)) |
 | Escalation | Built, off by default | Real Escalation saves from Harmonic's fork: the season registry read from the client and its save rules (23 September 2026). Off (`ESCALATION_MODE=real`) because switching it on drops every player from the fake maximum to level 0; not tried in game ([details](https://mixutin.github.io/dauntless-revived/findings/escalation.html)) |
 | Store | Built, off by default | A free store from Harmonic's fork: 200 free cosmetics, bought with the game's own purchase flow (23 September 2026). Off (`STORE=free`) until the owner decides whether it stays free and it has been tried in game ([details](https://mixutin.github.io/dauntless-revived/findings/store.html)) |
@@ -104,6 +122,7 @@ The live checklist, with every step and what "done" means for it, is [ROADMAP.md
 | [Roadmap](ROADMAP.md) | Milestones M0 to M4 and the live checklist |
 | [FAQ](https://mixutin.github.io/dauntless-revived/faq.html) | Short answers to common questions |
 | [Suomeksi](https://mixutin.github.io/dauntless-revived/fi/) | The documentation in Finnish |
+| [Discord](https://discord.gg/ZJRprHzsgu) | Community chat, finding players, help and project updates |
 | [Discussions](https://github.com/mixutin/dauntless-revived/discussions) | Questions, ideas and your own setups |
 
 ## How it works

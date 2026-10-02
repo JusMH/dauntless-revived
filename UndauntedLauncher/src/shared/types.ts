@@ -183,7 +183,14 @@ export type ExternalTarget =
   | "project_license"
   | "project_contributors"
   | "upstream_source"
-  | "upstream_contributors";
+  | "upstream_contributors"
+  | "eugamehost"
+  | "eugamehost_game2"
+  | "eugamehost_game3"
+  | "eugamehost_game5"
+  | "eugamehost_5800x"
+  | "discord"
+  | "patreon";
 
 export type RegisterOutcome =
   | { ok: true; username: string }

@@ -5,6 +5,8 @@ are short.
 
 🇫🇮 [Suomeksi alempana](#suomeksi)
 
+Community chat: **[Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu)**. For code changes, still start with a GitHub Discussion so decisions stay searchable.
+
 1. **Start with a Discussion.** Before you write code, open a
    [Discussion](https://github.com/mixutin/dauntless-revived/discussions) that says what you want to
    change and why. Check [ROADMAP.md](ROADMAP.md) first: much of the work is already planned, and
@@ -74,6 +76,8 @@ launchers read is updated in place.
 ## Suomeksi
 
 Kiitos, että haluat auttaa pitämään Dauntlessin pelattavana. Säännöt ovat lyhyet:
+
+Yhteisön chat: **[Dauntless Revived Discord](https://discord.gg/ZJRprHzsgu)**. Koodimuutokset aloitetaan silti GitHub-keskustelusta, jotta päätökset löytyvät myöhemmin.
 
 1. **Aloita keskustelusta.** Ennen kuin kirjoitat koodia, avaa keskustelu
    [keskustelupalstalla](https://github.com/mixutin/dauntless-revived/discussions) ja kerro, mitä

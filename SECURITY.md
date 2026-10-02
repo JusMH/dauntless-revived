@@ -17,7 +17,7 @@ Report privately through GitHub's private vulnerability reporting:
 (the repository's **Security** tab, then **Report a vulnerability**). Only you and the maintainer
 can see the report.
 
-Please do not open a public issue, discussion or pull request about a vulnerability until a fix
+Please do not open a public issue, discussion, pull request, or Discord message about a vulnerability until a fix
 is released.
 
 Include what you tested (commit, and whether you used the friend kit), what the problem is and
@@ -102,7 +102,7 @@ katso, onko ongelma yhä olemassa.
 - Ilmoita yksityisesti
   [tämän linkin kautta](https://github.com/mixutin/dauntless-revived/security/advisories/new).
   Silloin vain sinä ja ylläpitäjä näette ilmoituksen.
-- Älä kirjoita aukosta julkiseen keskusteluun ennen kuin korjaus on valmis.
+- Älä kirjoita aukosta julkiseen keskusteluun tai Discordiin ennen kuin korjaus on valmis.
 - Kerro, mitä versiota kokeilit, mikä ongelma on ja miten sen saa toistettua.
 - Älä lähetä oikeita avaimia, salasanoja tai muiden ihmisten tietoja.
 

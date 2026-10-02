@@ -71,6 +71,9 @@ pelkkä peliohjelma. Se oli väärin, ja tuo sivu kertoo miksi.
 
 ## 1. Vaatimukset {#requirements}
 
+> **Vuokraatko palvelimen?** EU Gamehost on projektin kumppani ja suositeltu hosting-palvelu.
+> Katso [EU Gamehost -pakettiopas]({{ "/fi/setup/hosting-partner.html" | relative_url }}), jossa kumppanisisältö ja kapasiteettiperusteet on merkitty selvästi.
+
 | | Mitä käytämme | Huomiot |
 |---|---|---|
 | Käyttöjärjestelmä | Windows 10 22H2 (koontiversio 19045) | Windows 11:n pitäisi toimia. Emme ole testanneet sitä. |

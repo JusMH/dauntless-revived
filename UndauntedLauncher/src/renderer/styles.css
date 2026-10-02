@@ -406,6 +406,62 @@ img {
   color: var(--dr-frost);
 }
 
+.partner-mini {
+  width: 100%;
+  display: grid;
+  gap: 5px;
+  justify-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--dr-azure);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--dr-deep) 58%, var(--dr-ink));
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.partner-mini:hover {
+  border-color: var(--dr-glow);
+  background: var(--dr-deep);
+  transform: translateY(-1px);
+}
+.partner-mini-label {
+  color: var(--dr-glow);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+}
+.partner-mini img {
+  display: block;
+  width: min(164px, 100%);
+  height: auto;
+}
+
+.discord-mini {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid var(--dr-azure);
+  border-radius: 10px;
+  background: var(--dr-deep);
+  color: var(--dr-frost);
+  font-size: 13px;
+  font-weight: 700;
+  transition: border-color 0.15s, color 0.15s, transform 0.15s;
+}
+.discord-mini:hover {
+  border-color: var(--dr-glow);
+  color: var(--dr-glow);
+  transform: translateY(-1px);
+}
+.discord-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dr-glow);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--dr-glow) 45%, transparent);
+}
+
 /* Credits and the GitHub button, under the language switch. */
 .rail-links {
   display: flex;
@@ -999,6 +1055,35 @@ img {
 
 .card-accent {
   border-color: var(--dr-azure);
+}
+
+.partner-card {
+  border-color: var(--dr-azure);
+  box-shadow: inset 3px 0 0 var(--dr-ice), 0 18px 40px var(--shadow);
+}
+.partner-head { display: flex; align-items: center; gap: 18px; margin-bottom: 12px; }
+.partner-logo { width: min(280px, 42%); height: auto; object-fit: contain; }
+.partner-badge { color: var(--dr-glow); border: 1px solid var(--dr-azure); letter-spacing: 0.08em; font-size: 10px; }
+.partner-title { margin: 6px 0 0; font-size: 22px; font-family: var(--font-display); }
+.partner-copy { max-width: 860px; }
+.partner-plans { margin-top: 15px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.partner-plan {
+  display: grid; gap: 4px; text-align: left; padding: 13px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--dr-ink); color: var(--dr-frost);
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.partner-plan:hover { border-color: var(--dr-ice); background: var(--dr-deep); transform: translateY(-1px); }
+.partner-plan.recommended { border-color: var(--dr-ice); box-shadow: 0 0 0 1px color-mix(in srgb, var(--dr-ice) 28%, transparent); }
+.partner-plan-note, .partner-spec { color: var(--dr-steel); font-size: 11.5px; }
+.partner-plan-note { color: var(--dr-glow); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+.partner-price { color: var(--dr-ice); font-size: 17px; font-weight: 800; }
+.partner-cta { margin-top: 4px; color: var(--dr-glow); font-weight: 700; }
+.partner-actions { margin-top: 13px; }
+.partner-disclosure { margin: 12px 0 0; }
+@media (max-width: 980px) {
+  .partner-plans { grid-template-columns: 1fr; }
+  .partner-head { align-items: flex-start; flex-direction: column; }
+  .partner-logo { width: min(320px, 80%); }
 }
 
 .field {

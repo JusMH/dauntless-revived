@@ -31,6 +31,7 @@ plugins:
 social:
   links:
     - https://github.com/mixutin/dauntless-revived
+    - https://discord.gg/ZJRprHzsgu
 
 # Set the layout explicitly. GitHub Pages adds it implicitly, a plain Jekyll build does not.
 # The default social preview image (docs/assets/og-revived.png, 1200x630: the full logo and one line of text,

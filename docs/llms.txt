@@ -17,6 +17,7 @@
 
 - [Setup](https://mixutin.github.io/dauntless-revived/setup/): How to run Dauntless Revived on Windows, Linux or OpenBSD, let invited friends join, run it for a group, and fix common problems.
 - [Host a server](https://mixutin.github.io/dauntless-revived/setup/host.html): Step-by-step guide to hosting a Dauntless 1.4.4 private server on one Windows PC: verify the build, place the two DLLs, set up the metagame and deploy server.
+- [Hosting partner](https://mixutin.github.io/dauntless-revived/setup/hosting-partner.html): EU Gamehost partnership and recommended hosting examples for Dauntless Revived.
 - [Join as a friend](https://mixutin.github.io/dauntless-revived/setup/friends.html): How an invited friend joins a Dauntless Revived server: Tailscale, a hash-checked Dauntless 1.4.4 install, the two DLLs, an invite code and the friend kit.
 - [Linux launcher](https://mixutin.github.io/dauntless-revived/setup/linux.html): Install and run Dauntless Revived on Linux: Ubuntu, Debian, Mint, Pop!_OS, Fedora, openSUSE, Arch, EndeavourOS, CachyOS, Manjaro, NixOS, Gentoo, Void and other x86_64 distributions.
 - [Run it for a group](https://mixutin.github.io/dauntless-revived/setup/admin.html): Opening a Dauntless Revived server to a few friends: Tailscale sharing, firewall rules, invite codes, admin accounts, capacity figures and database backups.
@@ -67,6 +68,7 @@
 - [Dauntless Revived suomeksi](https://mixutin.github.io/dauntless-revived/fi/): Dauntless Revived on yksityinen palvelin, jolla Dauntlessia voi taas pelata: aito 1.4.4-versio ja muokattu Undaunted. Mikä toimii ja miten sen saa käyttöön.
 - [Asennus](https://mixutin.github.io/dauntless-revived/fi/setup/): Dauntless Revived Windowsissa, Linuxissa tai OpenBSD:ssa: palvelimen pystytys, kavereiden liittyminen, ryhmäkäyttö ja vianetsintä.
 - [Pystytä palvelin](https://mixutin.github.io/dauntless-revived/fi/setup/host.html): Vaiheittainen ohje Dauntless 1.4.4 -yksityispalvelimen pystyttämiseen Windows-koneelle: version tarkistus, kaksi DLL-tiedostoa, metagame ja deploy-palvelin.
+- [Hosting-kumppani](https://mixutin.github.io/dauntless-revived/fi/setup/hosting-partner.html): EU Gamehost -kumppanuus ja Dauntless Revivedille suositellut hosting-esimerkit.
 - [Liity kaverina](https://mixutin.github.io/dauntless-revived/fi/setup/friends.html): Näin kutsuttu kaveri liittyy Dauntless Revived -palvelimelle: Tailscale, tarkistettu Dauntless 1.4.4, kaksi DLL-tiedostoa, kutsukoodi ja kaveripaketti.
 - [Linux-käynnistin](https://mixutin.github.io/dauntless-revived/fi/setup/linux.html): Dauntless Revived Linuxissa: Ubuntu, Debian, Mint, Pop!_OS, Fedora, openSUSE, Arch, EndeavourOS, CachyOS, Manjaro, NixOS, Gentoo, Void ja muut x86_64-jakelut.
 - [Palvelin ryhmälle](https://mixutin.github.io/dauntless-revived/fi/setup/admin.html): Dauntless Revived -palvelin kavereille: Tailscale-jako, palomuurisäännöt, kutsukoodit, ylläpitäjän tilit, kapasiteetti ja tietokannan varmuuskopiot.

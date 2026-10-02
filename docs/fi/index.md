@@ -48,6 +48,7 @@ molemmista versioista, on kirjoitettu tälle sivustolle.
 [Asennusohjeet]({{ setup_page.url | relative_url }}){: .btn .btn-primary .mr-2 }
 [Lue löydökset]({{ findings_page.url | relative_url }}){: .btn .mr-2 }
 [Tekninen viite]({{ reference_page.url | relative_url }}){: .btn .mr-2 }
+[Liity Discordiin](https://discord.gg/ZJRprHzsgu){: .btn .btn-primary .mr-2 }
 [Tiekartta]({{ roadmap_page.url | relative_url }}){: .btn }
 
 ---
@@ -97,7 +98,7 @@ oma peliohjelma 1,5–2,3 Gt (suurempi luku Cinematic-grafiikka-asetuksilla).
   [Kaverit, ryhmät ja killat]({{ '/fi/findings/social.html' | relative_url }}).
 - **Tekstichat.** Rakennettu ja testattu ilman peliä: Ramsgaten, metsästysten, ryhmän ja killan chat
   sekä kuiskaukset käyttäjänimin, metagamen itsensä sisällä. Se on oletuksena pois päältä, kunnes kaksi
-  pelaajaa on kokeillut sitä vuokratulla palvelimella. Käytä sillä välin Discordia. Yksityiskohdat ovat
+  pelaajaa on kokeillut sitä vuokratulla palvelimella. Käytä sillä välin [Dauntless Revived Discordia](https://discord.gg/ZJRprHzsgu). Yksityiskohdat ovat
   sivulla [Tekstichat]({{ '/fi/findings/chat.html' | relative_url }}).
 - **Palkkiotehtävät (bounties), odotusajat (cooldowns) ja Escalation.** Oikean etenemisen kanssa
   palkkiotehtävät ja odotusajat tallentuvat tilikohtaisesti, mutta palkkiotehtävän valitsemista ja
@@ -115,7 +116,7 @@ oma peliohjelma 1,5–2,3 Gt (suurempi luku Cinematic-grafiikka-asetuksilla).
 
 [Tiekartassa]({{ roadmap_page.url | relative_url }}) on järjestys, jossa aiomme edetä, sekä oikeissa
 pelikerroissa nähdyt virheet. Kaikki ei voi palata. Äänichat toimi Vivoxilla, joka on maksullinen
-ulkopuolinen palvelu, joten käytä sen sijaan Discordia. Marraskuun 2020 jälkeen julkaistu sisältö ei
+ulkopuolinen palvelu, joten käytä sen sijaan [Dauntless Revived Discordia](https://discord.gg/ZJRprHzsgu). Marraskuun 2020 jälkeen julkaistu sisältö ei
 ole versiossa 1.4.4.
 
 ---

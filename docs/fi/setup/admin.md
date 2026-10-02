@@ -509,6 +509,9 @@ joka on jo toisella tilillä, saa vastauksen 409 `username_taken`.
 
 ## Kapasiteetti {#capacity}
 
+> Vuokrattua hostingia varten katso selkeästi merkitty [EU Gamehost -kumppanisuositus]({{ "/fi/setup/hosting-partner.html" | relative_url }}).
+> Pakettivalinnat perustuvat alla oleviin mittauksiin, eivät pelkkiin markkinointinimiin.
+
 Mitattu palvelinkoneellamme, 8-ytimisellä pöytäkoneella, jossa on 32 Gt keskusmuistia (RAM), kun
 1.4.4-kokonaisuus oli käynnissä:
 

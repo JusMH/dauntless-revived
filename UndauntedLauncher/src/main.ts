@@ -19,6 +19,7 @@ import {
   repairLinuxDesktopEnvironment,
   runLinuxDependencyInstall,
 } from "./main/linux-dependencies";
+import { findLinuxUpdate, installLinuxUpdate, type LinuxUpdate } from "./main/linux-updater";
 import { findTailscale } from "./main/system";
 import { describeError, log, logToFile } from "./main/log";
 import { boundedString, externalTarget, isTrustedPageUrl, relayPortOverride, settingsPatch } from "./main/ipc-validate";
@@ -62,6 +63,7 @@ let mainWindow: BrowserWindow | null = null;
 let controller: Controller | null = null;
 let pendingInviteLink: string | null = null;
 let quitting = false;
+let linuxUpdate: LinuxUpdate | null = null;
 
 function resourcesDir(): string {
   return app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "assets");
@@ -417,6 +419,8 @@ function makePlatform(): Platform {
       if (app.isPackaged && process.platform === "win32") {
         quitting = true;
         autoUpdater.quitAndInstall();
+      } else if (app.isPackaged && process.platform === "linux" && linuxUpdate) {
+        void installLinuxUpdate(linuxUpdate).then(() => { quitting = true; app.quit(); }).catch((e) => log.error(`update: Linux install failed: ${describeError(e)}`));
       }
     },
   };
@@ -458,6 +462,19 @@ if (!started) {
       registerIpc(controller);
       createWindow();
       await controller.init();
+
+      if (app.isPackaged && process.platform === "linux") {
+        const check = async () => {
+          try {
+            linuxUpdate = await findLinuxUpdate();
+            if (linuxUpdate) controller?.setUpdateReady();
+          } catch (e) {
+            log.warn(`update: Linux check failed: ${describeError(e)}`);
+          }
+        };
+        void check();
+        setInterval(() => void check(), 60 * 60 * 1000).unref();
+      }
 
       if (app.isPackaged && process.platform === "win32") {
         updateElectronApp({

@@ -990,6 +990,64 @@ function renderNews(): void {
 
 // ------------------------------------------------------------------ server page
 
+function partnerHostingCard(): HTMLElement {
+  const fi = state.lang === "fi";
+  const plans: readonly { name: string; price: string; spec: string; target: ExternalTarget; note: string }[] = [
+    { name: "VDS GAME 2", price: "£34.99/mo", spec: "2 vCPU · 8 GB RAM · 120 GB NVMe", target: "eugamehost_game2", note: fi ? "Pieni kaveriporukka" : "Small friend group" },
+    { name: "VDS GAME 3", price: "£44.99/mo", spec: "3 vCPU · 12 GB RAM · 180 GB NVMe", target: "eugamehost_game3", note: fi ? "Suositeltu lähtötaso" : "Recommended starting point" },
+    { name: "VDS GAME 5", price: "£66.99/mo", spec: "6 vCPU · 24 GB RAM · 360 GB NVMe", target: "eugamehost_game5", note: fi ? "Enemmän kapasiteettivaraa" : "More capacity headroom" },
+  ];
+  const grid = h("div", { class: "partner-plans" });
+  for (const p of plans) {
+    const b = h(
+      "button",
+      { type: "button", class: `partner-plan${p.name === "VDS GAME 3" ? " recommended" : ""}` },
+      h("span", { class: "partner-plan-note" }, p.note),
+      h("strong", {}, p.name),
+      h("span", { class: "partner-price" }, p.price),
+      h("span", { class: "partner-spec" }, p.spec),
+      h("span", { class: "partner-cta" }, fi ? "Ota käyttöön →" : "Deploy →"),
+    );
+    b.addEventListener("click", () => open(p.target));
+    grid.append(b);
+  }
+  return card(
+    "partner-card",
+    h(
+      "div",
+      { class: "partner-head" },
+      h("img", { class: "partner-logo", src: "./src/renderer/brand/eugamehost-partner.png", alt: "EU Gamehost" }),
+      h(
+        "div",
+        {},
+        h("span", { class: "badge partner-badge" }, fi ? "PROJEKTIN KUMPPANI" : "PROJECT PARTNER"),
+        h("h2", { class: "partner-title" }, fi ? "Suositeltu hosting-palvelu" : "Recommended hosting provider"),
+      ),
+    ),
+    h(
+      "p",
+      { class: "card-text partner-copy" },
+      fi
+        ? "EU Gamehost on Dauntless Revivedin hosting-kumppani. Paketit on valittu projektin mitattujen RAM-tarpeiden perusteella; todellinen kapasiteetti riippuu pelaajamäärästä ja samanaikaisista metsästyksistä."
+        : "EU Gamehost is a hosting partner of Dauntless Revived. These plans are selected against the project's measured RAM footprint; real capacity still depends on player count and concurrent hunts.",
+    ),
+    grid,
+    h(
+      "div",
+      { class: "card-row partner-actions" },
+      linkButton(fi ? "Katso EU Gamehost" : "Explore EU Gamehost", () => open("eugamehost"), { icon: "external", fk: "host-all" }),
+      linkButton("Dedicated: Ryzen 5800X", () => open("eugamehost_5800x"), { icon: "external", fk: "host-dedicated" }),
+    ),
+    h(
+      "p",
+      { class: "small-print partner-disclosure" },
+      fi
+        ? "Kumppanuus / mainos: EU Gamehost on projektin kumppani. Hinnat ja saatavuus voivat muuttua; tarkista ajantasaiset ehdot palveluntarjoajalta."
+        : "Partner / advertising disclosure: EU Gamehost partners with this project. Prices and availability can change; confirm current terms with the provider.",
+    ),
+  );
+}
+
 function renderServer(): void {
   const container = $("#view-server");
   const snap = state.snap;
@@ -1016,6 +1074,7 @@ function renderServer(): void {
     const parts: HTMLElement[] = [
       h("h1", { class: "page-title", id: "server-title" }, serverName()),
       h("p", { class: "page-sub" }, t("server_auto")),
+      partnerHostingCard(),
       card("", kv, h("div", { class: "card-row", style: undefined }, button(t("sp_refresh"), () => void api.refreshStatus(), { icon: "refresh", fk: "srv-refresh" }), status?.sourceUrl ? linkButton(t("sp_source"), () => open("server_source"), { icon: "external", fk: "srv-source" }) : null)),
     ];
     if (status?.limited) {
@@ -1127,6 +1186,7 @@ function renderSettings(): void {
         { class: "card-row" },
         linkButton(t("about_source"), () => open("project_source"), { icon: "external", fk: "about-src" }),
         linkButton(t("about_license_link"), () => open("project_license"), { icon: "external", fk: "about-lic" }),
+        linkButton(t("discord_link"), () => open("discord"), { icon: "external", fk: "about-discord" }),
       ),
       h("div", { class: "card-row" }, h("span", { class: "small-print" }, t("about_credits")), linkButton(t("nav_credits"), () => setView("credits"), { fk: "about-credits" })),
       h("p", { class: "small-print" }, t("about_disclaimer")),
@@ -1682,13 +1742,16 @@ function initChrome(): void {
   for (const b of Array.from(document.querySelectorAll<HTMLButtonElement>("#lang-switch .lang-btn"))) {
     b.addEventListener("click", () => void api.setSettings({ language: b.dataset.lang === "fi" ? "fi" : "en" }));
   }
-  // Credits and the GitHub button: in the rail, so they are there on every page, invite or not.
+  // Credits, Discord and GitHub live in the rail, so they are available on every page, invite or not.
   const credits = $("#credits-btn");
   credits.prepend(icon("heart"));
   credits.addEventListener("click", () => setView("credits"));
   const github = $("#github-btn");
   github.appendChild(githubMark());
   github.addEventListener("click", () => open("project_source"));
+  $("#eugamehost-btn").addEventListener("click", () => open("eugamehost"));
+  $("#discord-btn").addEventListener("click", () => open("discord"));
+  $("#patreon-btn").addEventListener("click", () => open("patreon"));
   document.addEventListener("visibilitychange", () => void api.setStatusPolling(!document.hidden));
   window.setInterval(() => {
     renderPanel();

@@ -7,6 +7,7 @@
 <p align="center">
   <a href="LICENSE.txt"><img alt="Lisenssi: AGPL-3.0-only" src="https://img.shields.io/badge/license-AGPL--3.0--only-0D669C?style=flat-square&labelColor=031523"></a>
   <a href="https://mixutin.github.io/dauntless-revived/fi/"><img alt="Ohjeet suomeksi" src="https://img.shields.io/badge/ohjeet-suomeksi-0D669C?style=flat-square&labelColor=031523"></a>
+  <a href="https://discord.gg/ZJRprHzsgu"><img alt="Liity Dauntless Revived Discordiin" src="https://img.shields.io/badge/Discord-liity%20yhteisöön-5865F2?style=flat-square&logo=discord&logoColor=white"></a>
   <a href="https://github.com/mixutin/dauntless-revived/discussions"><img alt="Keskustelupalsta (GitHub Discussions)" src="https://img.shields.io/badge/discussions-kysy%20%26%20kerro-0D669C?style=flat-square&labelColor=031523&logo=github"></a>
   <a href="https://github.com/mixutin/dauntless-revived/commits/dauntless-revived"><img alt="Viimeisin muutos dauntless-revived-haarassa" src="https://img.shields.io/github/last-commit/mixutin/dauntless-revived/dauntless-revived?style=flat-square&labelColor=031523&color=0D669C"></a>
   <a href="https://github.com/mixutin/dauntless-revived/actions/workflows/ci.yml?query=branch%3Adauntless-revived"><img alt="Automaattiset tarkistukset (CI) dauntless-revived-haarassa" src="https://img.shields.io/github/actions/workflow/status/mixutin/dauntless-revived/ci.yml?branch=dauntless-revived&event=push&style=flat-square&labelColor=031523&label=CI"></a>
@@ -33,6 +34,18 @@ pelitiedostoja. Tarvitset oman kopion Dauntless 1.4.4 -pelistä.
 
 > **Tämä ei ole julkinen palvelin.** Sitä pyöritetään muutamalle kaverille. Kuka tahansa voi
 > pystyttää oman palvelimensa tämän koodin avulla.
+
+## Hosting-kumppani — EU Gamehost
+
+<p align="center">
+  <a href="https://www.eugamehost.com/"><img src=".github/assets/eugamehost-partner.png" width="620" alt="EU Gamehost"></a>
+</p>
+
+**EU Gamehost on Dauntless Revivedin kumppani ja projektin suosittelema hosting-palvelu.** Jos haluat vuokratun palvelimen oman koneen sijaan, katso [hosting-kumppanin opas](https://mixutin.github.io/dauntless-revived/fi/setup/hosting-partner.html).
+
+Projektin omien muistimittausten perusteella käytännölliset lähtötasot ovat **VDS GAME 2 (8 Gt)** pienelle kaveriporukalle, **VDS GAME 3 (12 Gt)** tasapainoisena oletusvaihtoehtona ja **VDS GAME 5 (24 Gt)**, kun haluat enemmän kapasiteettivaraa. Dedicated-vaihtoehdoksi nostamme **Ryzen 7 5800X / 32 Gt** -palvelimen.
+
+> **Kumppanuus / mainos:** EU Gamehost on projektin kumppani. Suositukset perustuvat projektin omiin palvelinmittauksiin, eivät riippumattomaan hosting-vertailuun. Hinnat, laitteisto ja saatavuus voivat muuttua, joten tarkista ajantasainen tarjous ennen tilausta.
 
 ## Lyhyet vastaukset
 
@@ -92,7 +105,7 @@ Merkintä ”(yksin)” tarkoittaa juuri sitä.
 | Varmuuskopiot | Toimii palvelimillamme | Joka tunti sekä aina palvelimen käynnistyessä ja sammuessa. Windows-palvelinpaketissa on oma varmuuskopiotehtävä (käynnissä vuokratulla palvelimella). Alkuperäisen palvelinkoneemme varmuuskopio-ohjelmat, joilla palautus on kokeiltu, eivät ole tässä koodivarastossa ([ohje oman varmuuskopion tekemiseen](https://mixutin.github.io/dauntless-revived/fi/setup/admin.html#back-up-the-database)) |
 | Kavereiden asennuspaketti | Valmis | Vain Tailscalea käyttävä varavaihtoehto: tiedostot tarkistava asennus ja käynnistys. Kukaan kaveri ei ole vielä käyttänyt sitä |
 | Bounty-tehtävät (lisätehtävät, joista saa palkintoja) | Ei vielä | Tallentuvat oikean etenemisen kanssa; valintaa ja lunastusta ei ole vielä kokeiltu pelissä |
-| Tekstichat ja paikalla olo | Rakennettu, odottaa testiä pelissä; molemmat oletuksena pois päältä | Ramsgaten, metsästysten, ryhmän ja killan chat sekä kuiskaukset käyttäjänimin, metagamen itsensä sisällä; oletuksena pois päältä, kunnes kaksi pelaajaa on kokeillut sitä (palvelinpaketissa `Set-Chat.ps1 -On`). Ensimmäisen chat-palvelimen kirjoitti ja testasi Vvoidddd; miksi se näytti nimien sijaan `UID-...`, ja korjaus: [Tekstichat](https://mixutin.github.io/dauntless-revived/fi/findings/chat.html). Kavereiden näyttäminen paikalla on rakennettu chat-palvelimeen 23.9.2026 (idea Harmonicin haarasta), ja se pysyy pois päältä (`CHAT_PRESENCE=1`), kunnes kaksi pelaajaa on näyttänyt, että ryhmän automaattinen potku pysyy unessa. Käytä sillä välin Discordia |
+| Tekstichat ja paikalla olo | Rakennettu, odottaa testiä pelissä; molemmat oletuksena pois päältä | Ramsgaten, metsästysten, ryhmän ja killan chat sekä kuiskaukset käyttäjänimin, metagamen itsensä sisällä; oletuksena pois päältä, kunnes kaksi pelaajaa on kokeillut sitä (palvelinpaketissa `Set-Chat.ps1 -On`). Ensimmäisen chat-palvelimen kirjoitti ja testasi Vvoidddd; miksi se näytti nimien sijaan `UID-...`, ja korjaus: [Tekstichat](https://mixutin.github.io/dauntless-revived/fi/findings/chat.html). Kavereiden näyttäminen paikalla on rakennettu chat-palvelimeen 23.9.2026 (idea Harmonicin haarasta), ja se pysyy pois päältä (`CHAT_PRESENCE=1`), kunnes kaksi pelaajaa on näyttänyt, että ryhmän automaattinen potku pysyy unessa. Käytä sillä välin [Dauntless Revived Discordia](https://discord.gg/ZJRprHzsgu) |
 | Slayer Links | Rakennettu, oletuksena päällä, odottaa testiä pelissä | My Links -välilehti: kaksi kaveria liittoutuu viikoksi. Harmonicin haarasta, korjattuna 1.4.4-ohjelmatiedostoa vasten (23.9.2026); ei vielä kokeiltu pelissä, ja peli saattaa pitää välilehden piilossa ([tarkemmin](https://mixutin.github.io/dauntless-revived/fi/findings/social.html#slayer-links)) |
 | Escalation | Rakennettu, oletuksena pois päältä | Oikeat Escalation-tallennukset Harmonicin haarasta: peliohjelmasta luettu kausiluettelo ja hänen tallennussääntönsä (23.9.2026). Pois päältä (`ESCALATION_MODE=real`), koska käyttöönotto pudottaa jokaisen pelaajan tekaistusta maksimista tasolle 0; ei kokeiltu pelissä ([tarkemmin](https://mixutin.github.io/dauntless-revived/fi/findings/escalation.html)) |
 | Kauppa | Rakennettu, oletuksena pois päältä | Ilmainen kauppa Harmonicin haarasta: 200 ilmaista kosmeettista tavaraa, jotka ostetaan pelin omalla ostotavalla (23.9.2026). Pois päältä (`STORE=free`), kunnes omistaja päättää, pysyykö kauppa ilmaisena, ja sitä on kokeiltu pelissä ([tarkemmin](https://mixutin.github.io/dauntless-revived/fi/findings/store.html)) |
@@ -114,6 +127,7 @@ ohjesivuston sivulla [Tiekartta](https://mixutin.github.io/dauntless-revived/fi/
 | [Kavereiden asennuspaketti](friend-kit/) | Kertaluonteinen asennus ja pelin käynnistin kutsutuille pelaajille ([ohje](https://mixutin.github.io/dauntless-revived/fi/setup/friends.html)) |
 | [Tehtävälista](ROADMAP.md) | Välitavoitteet M0–M4 ja mitä on jo tehty |
 | [Usein kysytyt kysymykset](https://mixutin.github.io/dauntless-revived/fi/faq.html) | Lyhyet vastaukset yleisiin kysymyksiin |
+| [Discord](https://discord.gg/ZJRprHzsgu) | Yhteisön chat, pelikavereiden etsiminen, apu ja projektin päivitykset |
 | [Keskustelupalsta](https://github.com/mixutin/dauntless-revived/discussions) | Kysymykset, ideat ja omat asennukset |
 
 ## Miten tämä toimii
