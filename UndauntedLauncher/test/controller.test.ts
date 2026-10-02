@@ -606,3 +606,23 @@ async function waitUntil(cond: () => boolean, ms = 5000): Promise<void> {
     await new Promise((r) => setTimeout(r, 20));
   }
 }
+
+test("connected launcher refreshes news without restarting and bounds polling", async () => {
+  const hx = harness();
+  const previous = content.opts.news;
+  try {
+    content.opts.news = { items: [{ date: "2026-10-01", title: "Before", body: "Old" }] };
+    await hx.c.init();
+    await hx.c.submitInvite(invite(cert.fingerprint));
+    await waitUntil(() => hx.c.getNews()[0]?.title === "Before");
+    content.opts.news = { items: [{ date: "2026-10-02", title: "After", body: "New" }] };
+    const count = () => gatewayRequests.filter(r => r === "GET /content/v1/news").length;
+    const before = count();
+    await hx.c.pollStatus();
+    assert.equal(count(), before);
+    (hx.c as any).newsCheckedAt = Date.now() - 61000;
+    await hx.c.pollStatus();
+    await waitUntil(() => hx.c.getNews()[0]?.title === "After");
+    assert.equal(count(), before + 1);
+  } finally { content.opts.news = previous; await hx.c.shutdown(); }
+});

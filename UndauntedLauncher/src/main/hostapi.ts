@@ -188,12 +188,12 @@ export function parseNews(raw: unknown): NewsItem[] {
   return items;
 }
 
-export async function fetchNews(ep: Endpoint): Promise<NewsItem[]> {
+export async function fetchNews(ep: Endpoint, fallback: NewsItem[] = []): Promise<NewsItem[]> {
   try {
     const res = await request(ep, "/content/v1/news", { timeoutMs: 10000, maxBytes: 512 * 1024 });
-    return res.status === 200 ? parseNews(parseJsonBody(res)) : [];
+    return res.status === 200 ? parseNews(parseJsonBody(res)) : fallback;
   } catch {
-    return [];
+    return fallback;
   }
 }
 

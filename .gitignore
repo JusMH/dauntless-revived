@@ -10,9 +10,16 @@
 /.pytest_cache/
 /.test-tmp/
 /.test-tmp-security/
+**/.token-optimizer/
+**/node_modules/
+*.log
+performance*.csv
 
 # Runtime secrets and generated data
 **/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
 /data/
 
 # Also never commit game archives, keys or databases

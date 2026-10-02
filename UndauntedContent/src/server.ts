@@ -78,7 +78,7 @@ async function Main(){
         auth: new AuthCache({ lookup: MetagameLookup(TheConfig.metagameUrl), ttlMs: TheConfig.authCacheSeconds * 1000 }),
         limiter: new StreamLimiter(TheConfig.maxStreamsPerAccount, TheConfig.maxStreamsTotal),
         branding: new Branding(TheConfig.brandingDir),
-        news: new News(TheConfig.newsFile),
+        news: new News(TheConfig.newsFile, Date.now, process.env.CONTENT_NEWS_URL),
     });
 
     const Servers: http.Server[] = [];

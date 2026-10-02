@@ -25,6 +25,16 @@ const MAX_TITLE = 200;
 const MAX_BODY = 10000;
 const MAX_FILE_BYTES = 1024 * 1024;
 const RECHECK_MS = 5 * 1000;
+const REMOTE_RECHECK_MS = 60 * 1000;
+
+export function GitHubNewsUrl(Value: string | undefined): string | undefined {
+    if (!Value) return undefined;
+    const Url = new URL(Value);
+    if (Url.protocol !== "https:" || Url.hostname !== "raw.githubusercontent.com" || Url.port || Url.username || Url.password || Url.search || Url.hash || Url.pathname.split("/").length < 5) {
+        throw new Error("CONTENT_NEWS_URL must be a raw.githubusercontent.com HTTPS file URL");
+    }
+    return Url.href;
+}
 
 function CleanText(Value: string, Max: number, KeepNewlines: boolean): string {
     let Text = Value.replace(/\r\n?/g, "\n");
@@ -88,15 +98,57 @@ export class News {
     private Items: NewsItem[] = [];
     private Signature = "";
     private CheckedAt = -Infinity;
+    private RemoteCheckedAt = -Infinity;
+    private RemoteBusy = false;
+    private RemoteItems: NewsItem[] | undefined;
+    private Etag: string | undefined;
+    private readonly RemoteUrl: string | undefined;
 
-    constructor(File: string | undefined, Now: () => number = Date.now){
+    constructor(File: string | undefined, Now: () => number = Date.now, RemoteUrl?: string, private readonly Fetch: typeof fetch = fetch){
         this.File = File;
         this.Now = Now;
+        this.RemoteUrl = GitHubNewsUrl(RemoteUrl);
     }
 
     body(): NewsBody {
         this.Refresh();
-        return { items: this.Items };
+        void this.refreshRemote();
+        return { items: this.RemoteItems ?? this.Items };
+    }
+
+    // One bounded background fetch per minute; game downloads and launcher polling never wait on GitHub.
+    async refreshRemote(): Promise<void> {
+        if (!this.RemoteUrl || this.RemoteBusy || this.Now() - this.RemoteCheckedAt < REMOTE_RECHECK_MS) return;
+        this.RemoteBusy = true;
+        this.RemoteCheckedAt = this.Now();
+        try {
+            const Response = await this.Fetch(this.RemoteUrl, {
+                redirect: "error", signal: AbortSignal.timeout(5000),
+                headers: this.Etag ? { "If-None-Match": this.Etag } : {},
+            });
+            if (Response.status === 304) return;
+            if (!Response.ok || !Response.body) throw new Error(`GitHub news HTTP ${Response.status}`);
+            const Reader = Response.body.getReader();
+            const Chunks: Uint8Array[] = [];
+            let Bytes = 0;
+            try {
+                while (true) {
+                    const { done, value } = await Reader.read();
+                    if (done) break;
+                    Bytes += value.byteLength;
+                    if (Bytes > MAX_FILE_BYTES) throw new Error("GitHub news exceeds 1 MB");
+                    Chunks.push(value);
+                }
+            } finally { await Reader.cancel(); }
+            const Raw = JSON.parse(Buffer.concat(Chunks).toString("utf8").replace(/^\uFEFF/, ""));
+            const Items = ParseNews(Raw);
+            const Original = Array.isArray(Raw) ? Raw : Raw.items;
+            if (Original.length && !Items.length) throw new Error("GitHub news contains no usable entries");
+            this.RemoteItems = Items;
+            this.Etag = Response.headers.get("etag") ?? undefined;
+        } catch (error) {
+            logger.warn("GitHub news unavailable; keeping last good news", { error: error instanceof Error ? error.message : String(error) });
+        } finally { this.RemoteBusy = false; }
     }
 
     private Refresh(){

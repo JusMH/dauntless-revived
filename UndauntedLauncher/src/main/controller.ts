@@ -145,6 +145,8 @@ export class Controller {
   private polling = false;
   private pollTimer: NodeJS.Timeout | null = null;
   private news: NewsItem[] | null = null;
+  private newsCheckedAt = -Infinity;
+  private newsLoading = false;
   private branding: Branding | null = null;
   private art = new Map<string, { file: string; type: string }>();
   private relay: Relay | null = null;
@@ -542,7 +544,8 @@ export class Controller {
       this.status = res.status;
       this.statusUnsupported = false;
       this.failedPolls = 0;
-      if (this.news === null || this.branding === null) void this.loadExtras();
+      if (this.branding === null) void this.loadExtras();
+      else void this.refreshNews();
     } else if (res.kind === "unsupported") {
       this.statusUnsupported = true;
       this.failedPolls = 0;
@@ -568,12 +571,22 @@ export class Controller {
     await this.pollStatus();
   }
 
+  private async refreshNews(): Promise<void> {
+    const ep = this.contentEndpoint();
+    if (!ep || this.newsLoading || (this.news !== null && Date.now() - this.newsCheckedAt < 60000)) return;
+    this.newsLoading = true;
+    const generation = this.statusGen;
+    this.newsCheckedAt = Date.now();
+    try {
+      const items = await fetchNews(ep, this.news ?? []);
+      if (generation === this.statusGen) { this.news = items; this.publish(); }
+    } finally { this.newsLoading = false; }
+  }
+
   private async loadExtras(): Promise<void> {
     const ep = this.contentEndpoint();
     if (!ep) return;
-    if (this.news === null) {
-      this.news = await fetchNews(ep);
-    }
+    await this.refreshNews();
     if (this.branding === null) {
       const index = await fetchBrandingIndex(ep);
       const backgrounds: Branding["backgrounds"] = [];
