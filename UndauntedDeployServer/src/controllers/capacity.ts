@@ -15,19 +15,21 @@ function setting(name: string, fallback: number) {
 // Reserve estimated startup memory synchronously before spawn: concurrent requests cannot all
 // claim the same free RAM before Windows has charged the new processes for their allocations.
 export class MemoryAdmission {
-    private reservations = new Map<symbol, number>();
+    private reservations = new Map<symbol, {until: number, bytes: number}>();
     constructor(private free = () => os.freemem(), private now = () => Date.now()) {}
-    reserve() {
+    reserve(temporaryHunt = false) {
         if (process.env.GAMESERVER_MEMORY_GUARD === '0') return () => {};
         const floor = setting('GAMESERVER_MIN_FREE_MB', 3072) * 1048576;
-        const cost = setting('GAMESERVER_STARTUP_MB', 1536) * 1048576;
+        const standardMB = setting('GAMESERVER_STARTUP_MB', 1536);
+        const cost = (temporaryHunt ? setting('GAMESERVER_HUNT_STARTUP_MB', standardMB) : standardMB) * 1048576;
         const hold = setting('GAMESERVER_RESERVATION_SECONDS', 60) * 1000;
         const now = this.now();
-        for (const [key, until] of this.reservations) if (until <= now) this.reservations.delete(key);
+        for (const [key, reservation] of this.reservations) if (reservation.until <= now) this.reservations.delete(key);
         const available = this.free();
-        if (!Number.isFinite(available) || available - this.reservations.size * cost < floor + cost) throw new CapacityUnavailable('memory');
+        const reserved = [...this.reservations.values()].reduce((sum, reservation) => sum + reservation.bytes, 0);
+        if (!Number.isFinite(available) || available - reserved < floor + cost) throw new CapacityUnavailable('memory');
         const token = Symbol();
-        this.reservations.set(token, now + hold);
+        this.reservations.set(token, {until: now + hold, bytes: cost});
         return () => { this.reservations.delete(token); };
     }
 }

@@ -390,13 +390,24 @@ reservation can overlap memory already charged by Windows, deliberately erring t
 Existing worlds are never killed by this guard and can still be joined. A missing Ramsgate or
 Dojo also waits for memory before it can be restarted.
 
+`GAMESERVER_HUNT_STARTUP_MB` optionally sets a separate startup estimate for temporary
+hunts/tutorials; it defaults to `GAMESERVER_STARTUP_MB`. Ramsgate and Dojo keep the
+standard estimate. Reservations sum their actual estimated byte counts, even when
+different world kinds start together. On a measured 8 GiB host, a 1536 MiB floor
+plus a 1024 MiB hunt estimate requires 2560 MiB free for a hunt (before reservations),
+while a persistent world with a 1536 MiB estimate still requires 3072 MiB. This is
+operator tuning, not a new global default or a guarantee against native crashes.
+
 Capacity shortages (RAM or hunt ports) return a distinct 503 to the metagame. Active matchmaking
-status polls retry at most once every ten seconds per candidate/queue, for up to five minutes,
+status polls retry at most once every ten seconds per candidate/queue, for up to one minute,
 then report FAILED. There are no background launches or guaranteed FIFO ordering. A full four-player
 hunt queue refuses further joins until resolved. Normal startup failures still fail immediately.
 The existing `MATCHMAKING_CANCEL` switch still controls in-game cancellation; this change does not
 enable it because the client also emits automatic cancel requests during normal joins.
 Update both server packages together. No database migration is involved.
+The normal public grouping window (20 seconds after the last join) and client polling
+are additional; the one-minute bound is specifically the capacity wait, not an
+end-to-end loading-time guarantee. Capacity replies now log their reason and hunt ID.
 
 Starts and watches the game-server processes when the metagame asks. A worked `.env` is in
 [Host a server]({{ host_page.url | relative_url }}#deploy-server).

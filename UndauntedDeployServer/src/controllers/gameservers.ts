@@ -160,7 +160,7 @@ async function StartServer(Map: string, Behemoth: string | undefined, Matchmaker
     await LaunchProc;
 
     if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
-    const ReleaseReservation = memoryAdmission.reserve();
+    const ReleaseReservation = memoryAdmission.reserve(!IsRamsgate && !IsTrainingDojo);
     
     let Port;
 

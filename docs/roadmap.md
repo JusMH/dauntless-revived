@@ -872,6 +872,12 @@ timestamps, persisted message ID and private webhook storage. No public IPs or
 account names. External whole-VPS outage detection remains open. Public-hunt
 airship backfill also remains open; no heap-size or native game changes in this update.
 
+Matchmaking capacity follow-up, 2026-10-01: reduce the five-minute capacity retry
+window to one minute, log RAM/port admission refusals, and allow a separately measured
+temporary-hunt memory estimate while preserving the free-memory floor and larger
+persistent-world estimate. Tested all solo queue paths and mixed-size reservations.
+This addresses capacity-induced pre-airship waits, not native crashes or airship backfill.
+
 Client/loading follow-up, 2026-10-01: launcher 0.1.11 and friend-kit use the pinned
 1.4.4 client's `-NoEAC` switch to avoid the EAC initialization warning on private
 server launches (launch-argument tests; in-game confirmation pending). Live hunt

@@ -68,6 +68,16 @@ async function FormParty(Leader: string, ...Members: string[]){
 }
 
 describe("a party of one (every player on their own)", () => {
+    it('fails every party member after one minute of unavailable capacity', async () => {
+        await FormParty(B, A, C);
+        Deploy.Capacity = true;
+        await HandlePlayerMatchmaking('ISLAND', '', HUNT, B);
+        Advance(61);
+        for (const member of [A, B, C]) {
+            assert.equal((await DecideCandidateStatus(member)).Kind, 'failed');
+        }
+        assert.equal(Deploy.Calls.length, 1, 'no allocation after the deadline');
+    });
     it('a whole party waits for capacity and retries once with members still present', async () => {
         await FormParty(B, A, C);
         Deploy.Capacity = true;

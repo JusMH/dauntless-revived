@@ -20,6 +20,8 @@ export const REJOIN_PARK_MS = 20 * 1000;
 // player polls), or at once when it reaches QUEUE_FULL_PLAYERS
 const QUEUE_WAIT_MS = 20 * 1000;
 const QUEUE_FULL_PLAYERS = 4;
+// Capacity is not an endless queue. End the attempt promptly when the host stays full.
+export const CAPACITY_WAIT_MS = 60 * 1000;
 
 type MatchmakingQueueData = {
     RetryAfter?: number,
@@ -68,7 +70,7 @@ function ParkCapacity(CandidateId: string, retry: () => Promise<boolean>) {
         if (wait.deadline < PartyNow() || entries.length === 0) CapacityWaits.delete(id);
     }
     if (CapacityWaits.size >= 1000) return false;
-    CapacityWaits.set(CandidateId, {next: PartyNow() + 10000, deadline: PartyNow() + 300000, busy: false, retry});
+    CapacityWaits.set(CandidateId, {next: PartyNow() + 10000, deadline: PartyNow() + CAPACITY_WAIT_MS, busy: false, retry});
     return true;
 }
 
@@ -122,7 +124,10 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
     if (MatchmakingResult.status === 503) {
         try {
             const body = await MatchmakingResult.json();
-            if (body?.error === 'capacity_unavailable' && ['memory', 'ports'].includes(body.reason)) return {...Failed, capacity: true};
+            if (body?.error === 'capacity_unavailable' && ['memory', 'ports'].includes(body.reason)) {
+                logger.warn({reason: body.reason, huntId: HuntId, capacityWaitMs: CAPACITY_WAIT_MS}, 'mm: allocation waiting for capacity');
+                return {...Failed, capacity: true};
+            }
         } catch {}
         return Failed;
     }
@@ -180,7 +185,7 @@ async function PopQueue(HuntId: string){
         : await LaunchGameOnDeployserver("ISLAND", "", HuntId, MatchmakingQueue.Players);
 
     if (GameOnDeployServer.capacity) {
-        MatchmakingQueue.CapacityDeadline ??= PartyNow() + 300000;
+        MatchmakingQueue.CapacityDeadline ??= PartyNow() + CAPACITY_WAIT_MS;
         if (PartyNow() < MatchmakingQueue.CapacityDeadline) {
             MatchmakingQueue.Resolved = false;
             MatchmakingQueue.RetryAfter = PartyNow() + 10000;

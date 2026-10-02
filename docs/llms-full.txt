@@ -5155,13 +5155,24 @@ reservation can overlap memory already charged by Windows, deliberately erring t
 Existing worlds are never killed by this guard and can still be joined. A missing Ramsgate or
 Dojo also waits for memory before it can be restarted.
 
+`GAMESERVER_HUNT_STARTUP_MB` optionally sets a separate startup estimate for temporary
+hunts/tutorials; it defaults to `GAMESERVER_STARTUP_MB`. Ramsgate and Dojo keep the
+standard estimate. Reservations sum their actual estimated byte counts, even when
+different world kinds start together. On a measured 8 GiB host, a 1536 MiB floor
+plus a 1024 MiB hunt estimate requires 2560 MiB free for a hunt (before reservations),
+while a persistent world with a 1536 MiB estimate still requires 3072 MiB. This is
+operator tuning, not a new global default or a guarantee against native crashes.
+
 Capacity shortages (RAM or hunt ports) return a distinct 503 to the metagame. Active matchmaking
-status polls retry at most once every ten seconds per candidate/queue, for up to five minutes,
+status polls retry at most once every ten seconds per candidate/queue, for up to one minute,
 then report FAILED. There are no background launches or guaranteed FIFO ordering. A full four-player
 hunt queue refuses further joins until resolved. Normal startup failures still fail immediately.
 The existing `MATCHMAKING_CANCEL` switch still controls in-game cancellation; this change does not
 enable it because the client also emits automatic cancel requests during normal joins.
 Update both server packages together. No database migration is involved.
+The normal public grouping window (20 seconds after the last join) and client polling
+are additional; the one-minute bound is specifically the capacity wait, not an
+end-to-end loading-time guarantee. Capacity replies now log their reason and hunt ID.
 
 Starts and watches the game-server processes when the metagame asks. A worked `.env` is in
 [Host a server](https://mixutin.github.io/dauntless-revived/setup/host.html#deploy-server).
@@ -16236,6 +16247,12 @@ Five-second checks, 15-second edits with rate-limit backoff, timezone-aware Disc
 timestamps, persisted message ID and private webhook storage. No public IPs or
 account names. External whole-VPS outage detection remains open. Public-hunt
 airship backfill also remains open; no heap-size or native game changes in this update.
+
+Matchmaking capacity follow-up, 2026-10-01: reduce the five-minute capacity retry
+window to one minute, log RAM/port admission refusals, and allow a separately measured
+temporary-hunt memory estimate while preserving the free-memory floor and larger
+persistent-world estimate. Tested all solo queue paths and mixed-size reservations.
+This addresses capacity-induced pre-airship waits, not native crashes or airship backfill.
 
 Client/loading follow-up, 2026-10-01: launcher 0.1.11 and friend-kit use the pinned
 1.4.4 client's `-NoEAC` switch to avoid the EAC initialization warning on private

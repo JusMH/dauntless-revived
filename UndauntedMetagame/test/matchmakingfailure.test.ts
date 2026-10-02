@@ -183,16 +183,19 @@ describe("matchmaking when the deploy server starts no game server", () => {
         assert.equal(await CheckAndUpdateQueueStatus(player.UserId), undefined);
         assert.equal(Calls.length, 1);
     });
-    it('capacity waiting is bounded at five minutes', async () => {
+    it('capacity waiting fails after one minute on every path without another allocation', async () => {
         const { SetPartyClockForTests } = await import('../src/controllers/party');
         let now = Date.now();
         SetPartyClockForTests(() => now);
         try {
             CurrentMode = {Name: 'memory full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))};
-            const [player] = await JoinAll(PATHS[1]);
-            now += 300001;
-            assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'FAILED');
-            assert.equal(Calls.length, 1);
+            for (const path of PATHS) {
+                Calls.length = 0;
+                const players = await JoinAll(path);
+                now += 60001;
+                for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'FAILED');
+                assert.equal(Calls.length, 1);
+            }
         } finally { SetPartyClockForTests(); }
     });
     // from Harmonicrain/Undaunted test/matchmaking.test.js:37
