@@ -20,6 +20,11 @@
 
 using namespace SDK;
 
+static bool IsRunningUnderWine() {
+    HMODULE Ntdll = GetModuleHandleW(L"ntdll.dll");
+    return Ntdll != nullptr && GetProcAddress(Ntdll, "wine_get_version") != nullptr;
+}
+
 namespace Globals {
     static bool AmServer = false;
     static uintptr_t BaseAddress = 0x0;
@@ -964,10 +969,12 @@ void Init() {
         Globals::EnableLogging = true;
 
         if (Globals::EnableLogging) {
-            AllocConsole();
-            FILE* Dummy;
-            freopen_s(&Dummy, "CONOUT$", "w", stdout);
-            freopen_s(&Dummy, "CONIN$", "r", stdin);
+            if (!IsRunningUnderWine()) {
+                AllocConsole();
+                FILE* Dummy;
+                freopen_s(&Dummy, "CONOUT$", "w", stdout);
+                freopen_s(&Dummy, "CONIN$", "r", stdin);
+            }
 
             std::cout << "Welcome to Undaunted v" << UNDAUNTED_INTERNAL_VERSION << "!" << std::endl;
             std::cout << "prod. gwog :3" << std::endl;
