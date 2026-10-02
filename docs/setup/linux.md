@@ -396,11 +396,33 @@ chmod +x DauntlessRevivedLauncher-*-linux-x86_64.AppImage
 On NixOS, use `appimage-run`. On another distro where AppImage/FUSE integration is unavailable,
 use the portable tarball instead.
 
+### Discord says Dauntless is running, but no game window appears
+
+Update to **launcher 0.1.13 or newer** first. Launcher 0.1.12 could start Proton and set Discord
+activity while the game itself remained stuck before Unreal Engine created its window. The injected
+`UndauntedInternalServer.dll` was doing Windows console setup during Wine/Proton DLL initialization;
+under Proton this could leave `Dauntless-Win64-Shipping.exe` alive with only its initial thread and
+no UE log or visible window.
+
+0.1.13 detects Wine/Proton and skips that client debug-console initialization. The launcher still
+installs the normal native `dxgi` override and the Revived DLL; do not remove those files as a
+permanent workaround.
+
+A useful diagnosis is:
+
+```bash
+pgrep -af Dauntless-Win64-Shipping.exe
+```
+
+If the process exists but no window appears, check the launcher version before changing graphics
+drivers or the Proton prefix.
+
 ### The launcher opens, but PLAY fails
 
 Run it from a terminal once so you can see startup errors, then check the launcher's own log directory
 under its Electron user-data folder. Common causes are:
 
+- using launcher 0.1.12 or older with the Proton client-init deadlock above;
 - broken/missing Vulkan drivers;
 - a Proton/Wine runtime that was moved after the launcher found it;
 - a Steam/Flatpak Steam Proton install that is incomplete or was moved;
@@ -408,6 +430,18 @@ under its Electron user-data folder. Common causes are:
 - a game folder that is not the exact pinned 1.4.4 build.
 
 Try a different installed Proton or Wine runtime before modifying the game files.
+
+### Public server starts, but the game never reaches it
+
+Public/v2 invites deliberately do **not** pass the public gateway address straight to the game.
+The launcher starts a local relay on `127.0.0.1:61000`, pins the host's TLS certificate there, writes
+the game config to use that local endpoint and then forwards the game's HTTP/WebSocket traffic to the
+selected public server. Keep the launcher open while playing; closing it stops the relay.
+
+If the launcher log shows `relay listening on 127.0.0.1:61000` followed immediately by
+`relay stopped (0 requests, ...)`, the game never reached the networking stage. On Linux, first
+rule out the 0.1.12 client-init hang above. If the game window is running, then check the selected
+server/invite and certificate instead.
 
 ### Private server cannot connect
 

@@ -382,11 +382,33 @@ chmod +x DauntlessRevivedLauncher-*-linux-x86_64.AppImage
 NixOS:ssa käytä `appimage-run`-työkalua. Jos AppImage/FUSE ei sovi muuhun jakeluun, käytä
 siirrettävää tar-pakettia.
 
+### Discord näyttää Dauntlessin käynnissä, mutta peli-ikkunaa ei näy
+
+Päivitä ensin **käynnistimeen 0.1.13 tai uudempaan**. Versiossa 0.1.12 Proton saattoi käynnistyä ja
+Discord-tila päivittyä, vaikka itse peli jumittui ennen kuin Unreal Engine ehti luoda ikkunan.
+Injektoitu `UndauntedInternalServer.dll` teki Windowsin konsolialustusta Wine/Protonin DLL-latauksen
+aikana. Protonissa tämä saattoi jättää `Dauntless-Win64-Shipping.exe`-prosessin eloon vain yhdellä
+alkusäikeellä ilman UE-lokia tai näkyvää ikkunaa.
+
+Versio 0.1.13 tunnistaa Winen/Protonin ja ohittaa tämän asiakaspuolen debug-konsolin alustuksen.
+Käynnistin asentaa edelleen normaalin natiivin `dxgi`-ohituksen ja Revived-DLL:n; niitä ei pidä
+poistaa pysyväksi kiertotieksi.
+
+Prosessin voi tarkistaa näin:
+
+```bash
+pgrep -af Dauntless-Win64-Shipping.exe
+```
+
+Jos prosessi on olemassa mutta ikkunaa ei näy, tarkista käynnistimen versio ennen näytönohjaimen
+ajureiden tai Proton-prefiksin muuttamista.
+
 ### Käynnistin avautuu mutta PELAA epäonnistuu
 
 Käynnistä sovellus kerran terminaalista ja tarkista käynnistimen lokit Electronin käyttäjätietokansion
 alta. Tavallisia syitä ovat:
 
+- käynnistin 0.1.12 tai vanhempi ja yllä kuvattu Protonin client-init-jumi;
 - puuttuva tai rikkinäinen Vulkan-ajuri;
 - Proton/Wine on siirretty asennuksen jälkeen;
 - Steam/Flatpak Steam -Proton-asennus on keskeneräinen tai siirretty;
@@ -394,6 +416,19 @@ alta. Tavallisia syitä ovat:
 - pelikansio ei ole täsmälleen kiinnitetty 1.4.4-versio.
 
 Kokeile toista asennettua Proton- tai Wine-versiota ennen kuin muutat pelitiedostoja.
+
+### Julkinen palvelin käynnistyy, mutta peli ei yhdistä siihen
+
+Julkisissa/v2-kutsuissa peli ei yhdistä suoraan julkisen yhdyskäytävän osoitteeseen. Käynnistin
+avaa paikallisen välityksen osoitteeseen `127.0.0.1:61000`, kiinnittää siellä palvelimen
+TLS-varmenteen, kirjoittaa pelin käyttämään tätä paikallista osoitetta ja välittää HTTP/WebSocket-
+liikenteen valitulle julkiselle palvelimelle. Pidä käynnistin auki pelaamisen ajan; sen sulkeminen
+pysäyttää välityksen.
+
+Jos lokissa näkyy `relay listening on 127.0.0.1:61000` ja heti perään
+`relay stopped (0 requests, ...)`, peli ei päässyt verkkovaiheeseen asti. Linuxissa sulje ensin
+pois yllä kuvattu 0.1.12:n client-init-jumi. Jos peli-ikkuna toimii, tarkista seuraavaksi valittu
+palvelin/kutsu ja varmenne.
 
 ### Yksityinen palvelin ei yhdistä
 

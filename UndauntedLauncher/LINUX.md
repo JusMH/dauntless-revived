@@ -101,9 +101,9 @@ If the Play button reports that no compatibility runtime exists, install Steam w
 
 ### Flatpak Steam
 
-Native Steam locations are auto-detected. Flatpak Steam normally keeps Proton under
-`~/.var/app/com.valvesoftware.Steam/data/Steam`, which is not currently searched automatically.
-Point the launcher at the actual Proton script, for example:
+Native Steam locations and Flatpak Steam are both auto-detected. Flatpak Steam normally keeps Proton
+under `~/.var/app/com.valvesoftware.Steam/data/Steam`. You can still force one exact runtime when
+troubleshooting:
 
 ```bash
 DAUNTLESS_REVIVED_PROTON="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/steamapps/common/Proton - Experimental/proton" \
@@ -111,6 +111,19 @@ DAUNTLESS_REVIVED_PROTON="$HOME/.var/app/com.valvesoftware.Steam/data/Steam/stea
 ```
 
 Private/Tailscale servers work on Linux too; the launcher searches the normal Linux Tailscale executable locations and `PATH`.
+
+### Game process exists but no window appears
+
+Use **launcher 0.1.13 or newer**. In 0.1.12 the injected client DLL could deadlock during Wine/Proton
+startup while creating its Windows debug console. Proton would stay alive and Discord could show the
+game as running, but Unreal Engine never reached normal window/log initialization.
+
+0.1.13 detects Wine/Proton and skips that client-only console setup. The native `dxgi` override and
+`UndauntedInternalServer.dll` are still required; the launcher verifies and installs both.
+
+For public/v2 servers, the game connects to the launcher's local `127.0.0.1:61000` relay. The relay
+then carries the game's HTTP/WebSocket traffic to the public server with its pinned TLS certificate.
+Keep the launcher open while the game runs.
 
 ## Updates and limitations
 
