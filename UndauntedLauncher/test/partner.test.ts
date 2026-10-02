@@ -20,6 +20,8 @@ test("EU Gamehost partner promotion is present across the launcher", () => {
   assert.match(renderer, /partnerBanner\(\)\)\];/);
   assert.match(css, /\.partner-banner\s*\{/);
   assert.match(css, /\.partner-plan\.recommended/);
+  assert.match(css, /\.partners-page \.card-title\s*\{[\s\S]*display:\s*flex;[\s\S]*align-items:\s*center;/);
+  assert.match(css, /\.partners-page \.card-title \.icon\s*\{[\s\S]*width:\s*16px;[\s\S]*height:\s*16px;/);
 });
 
 test("Discord and Patreon rail buttons use bundled local brand marks", () => {

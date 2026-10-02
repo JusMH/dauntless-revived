@@ -1106,6 +1106,19 @@ img {
 
 .page.partners-page { max-width: 960px; }
 
+.partners-page .card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.25;
+}
+
+.partners-page .card-title .icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
 .partner-card {
   border-color: var(--dr-azure);
   background: linear-gradient(135deg, var(--dr-deep), var(--dr-navy) 48%);
