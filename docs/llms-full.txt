@@ -35,6 +35,12 @@ is written up here.
 [Optional Patreon support](https://patreon.com/DauntlessRevived)
 [Roadmap](https://mixutin.github.io/dauntless-revived/roadmap.html)
 
+## Patreons
+
+A huge thank-you to the people supporting Dauntless Revived on Patreon. Support is optional and never provides gameplay advantages.
+
+- **nasagi** — thank you for becoming a Patreon supporter and helping support the project. ❤️
+
 ---
 
 ## Current status
