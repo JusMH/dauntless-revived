@@ -25,6 +25,9 @@ export const FIXED_ARGS = [
   "-epiclocale=en-US",
   "-epicsandboxid=sandboxidlol",
   "-epicdeploymentid=deploymentidlol",
+  // The pinned 1.4.4 executable explicitly supports this client-mode switch.
+  // Private-server launches do not use the original EAC bootstrapper.
+  "-NoEAC",
 ];
 
 export function buildLaunchArgs(s: LaunchSettings): string[] {

@@ -163,6 +163,22 @@ its own value; this check suggests it is 8777 there too.
 
 ### Client mode
 
+**Hunt loading investigation (1 October 2026).** Live deploy logs show repeated
+native hunt exits with `3221225477` (`0xC0000005`) and `3221226505`
+(`0xC0000409`); saved game crash reports independently contain access violations.
+This is evidence of crashed game processes, not proof that every long load has
+the same cause. A source review also shows hunt allocation returning after process
+creation, without a game-ready acknowledgement. A missing destination can therefore
+leave a client trying to travel. A proper fix needs crash diagnosis and bounded,
+authenticated readiness/liveness handling; do not pretend that spawning a process
+means its map is ready, disable memory admission, or restart occupied worlds as a
+workaround. No live server/DLL change was made during this investigation.
+
+The separate `IGameClient` popup is from the client's EAC initialization. The
+launcher now passes the pinned client's `-NoEAC` switch (0.1.11); that does not
+repair a crashed hunt or alter matchmaking. Player-side confirmation is still
+needed. The public-airship backfill and respawn candidate DLL tests remain open.
+
 The player's client loads the same DLL. In client mode, the first argument is the metagame's
 `host:port`, with no scheme.
 

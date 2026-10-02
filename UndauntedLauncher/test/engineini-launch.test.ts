@@ -161,6 +161,7 @@ test("launch args follow contract 6", () => {
     "-epiclocale=en-US",
     "-epicsandboxid=sandboxidlol",
     "-epicdeploymentid=deploymentidlol",
+    "-NoEAC",
   ]);
   const windowed = buildLaunchArgs({ host: "hostpc.ts.net", port: 61000, key: KEY, windowed: true });
   assert.deepEqual(windowed.slice(-3), ["-windowed", "-ResX=1280", "-ResY=720"]);

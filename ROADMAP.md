@@ -853,6 +853,12 @@ timestamps, persisted message ID and private webhook storage. No public IPs or
 account names. External whole-VPS outage detection remains open. Public-hunt
 airship backfill also remains open; no heap-size or native game changes in this update.
 
+Client/loading follow-up, 2026-10-01: launcher 0.1.11 and friend-kit use the pinned
+1.4.4 client's `-NoEAC` switch to avoid the EAC initialization warning on private
+server launches (launch-argument tests; in-game confirmation pending). Live hunt
+crash exits and premature readiness need separate native diagnosis and readiness
+handling; neither a popup fix nor a heap-size change resolves them. No VPS restart.
+
 Dashboard follow-up, 2026-10-01 (4.18): verified the private Windows dashboard's
 live backend metrics and account directory; fixed LocalService parent-directory
 access without recursive secret access. Invite-only registration already generates

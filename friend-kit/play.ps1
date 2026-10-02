@@ -83,7 +83,7 @@ $key = (Get-Content -LiteralPath $KeyFile -Raw).Trim()
 $a = @($Backend, "-AUTH_PASSWORD=$key", "-AUTH_LOGIN=unused", "-AUTH_TYPE=exchangecode",
   "-epicapp=appidlol", "-epicenv=Prod", "-EpicPortal", "-epicusername=usernamelol",
   "-epicuserid=useridlol", "-epiclocale=en-US", "-epicsandboxid=sandboxidlol",
-  "-epicdeploymentid=deploymentidlol")
+  "-epicdeploymentid=deploymentidlol", "-NoEAC")
 if ($Windowed) { $a += @("-windowed", "-ResX=1280", "-ResY=720") }
 
 if ($DryRun) {

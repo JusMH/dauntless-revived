@@ -31,6 +31,7 @@ is written up here.
 [Read the findings](https://mixutin.github.io/dauntless-revived/findings/)
 [Reference](https://mixutin.github.io/dauntless-revived/reference/)
 [Join Discord](https://discord.gg/ZJRprHzsgu)
+[Optional Patreon support](https://patreon.com/DauntlessRevived)
 [Roadmap](https://mixutin.github.io/dauntless-revived/roadmap.html)
 
 ---
@@ -7775,17 +7776,24 @@ The launcher writes this file with the same encoding rule and the same temporary
 ## Client command line
 
 The three client launchers start the exe directly, with `Archon\Binaries\Win64` as the working
-directory. None of them starts `Dauntless.exe` or the EasyAntiCheat bootstrapper, so EasyAntiCheat
-never runs.
+directory. None of them starts `Dauntless.exe` or the EasyAntiCheat bootstrapper.
+Starting the shipping exe directly can still make its EAC client plugin try to
+initialize and display "Failed to create IGameClient instance". Launcher 0.1.11
+and the friend-kit script pass the executable's supported `-NoEAC` option to skip
+that initialization for the private server. This is a client launch change: the
+player must relaunch their game, but the VPS does not need a restart. Static
+verification found both `NoEAC` and `-NoEAC in the command line, EAC client will not load`
+in the pinned 1.4.4 executable; in-game confirmation remains pending.
 
 ```text
 Dauntless-Win64-Shipping.exe <host>:<port> -AUTH_PASSWORD=<account key> -AUTH_LOGIN=unused
   -AUTH_TYPE=exchangecode -epicapp=appidlol -epicenv=Prod -EpicPortal -epicusername=usernamelol
   -epicuserid=useridlol -epiclocale=en-US -epicsandboxid=sandboxidlol
-  -epicdeploymentid=deploymentidlol [-windowed -ResX=1280 -ResY=720]
+  -epicdeploymentid=deploymentidlol -NoEAC [-windowed -ResX=1280 -ResY=720]
 ```
 
-The order and the values are the same in all three launchers. A launcher test pins the exact list.
+The backend address remains the first argument. A launcher test pins its exact list.
+Older standalone host scripts may not include `-NoEAC` yet.
 
 | Name | Default | Values | What it does | Set by |
 |:-----|:--------|:-------|:-------------|:-------|
@@ -12414,6 +12422,22 @@ its own value; this check suggests it is 8777 there too.
 
 ### Client mode
 
+**Hunt loading investigation (1 October 2026).** Live deploy logs show repeated
+native hunt exits with `3221225477` (`0xC0000005`) and `3221226505`
+(`0xC0000409`); saved game crash reports independently contain access violations.
+This is evidence of crashed game processes, not proof that every long load has
+the same cause. A source review also shows hunt allocation returning after process
+creation, without a game-ready acknowledgement. A missing destination can therefore
+leave a client trying to travel. A proper fix needs crash diagnosis and bounded,
+authenticated readiness/liveness handling; do not pretend that spawning a process
+means its map is ready, disable memory admission, or restart occupied worlds as a
+workaround. No live server/DLL change was made during this investigation.
+
+The separate `IGameClient` popup is from the client's EAC initialization. The
+launcher now passes the pinned client's `-NoEAC` switch (0.1.11); that does not
+repair a crashed hunt or alter matchmaking. Player-side confirmation is still
+needed. The public-airship backfill and respawn candidate DLL tests remain open.
+
 The player's client loads the same DLL. In client mode, the first argument is the metagame's
 `host:port`, with no scheme.
 
@@ -16212,6 +16236,12 @@ Five-second checks, 15-second edits with rate-limit backoff, timezone-aware Disc
 timestamps, persisted message ID and private webhook storage. No public IPs or
 account names. External whole-VPS outage detection remains open. Public-hunt
 airship backfill also remains open; no heap-size or native game changes in this update.
+
+Client/loading follow-up, 2026-10-01: launcher 0.1.11 and friend-kit use the pinned
+1.4.4 client's `-NoEAC` switch to avoid the EAC initialization warning on private
+server launches (launch-argument tests; in-game confirmation pending). Live hunt
+crash exits and premature readiness need separate native diagnosis and readiness
+handling; neither a popup fix nor a heap-size change resolves them. No VPS restart.
 
 Dashboard follow-up, 2026-10-01 (4.18): verified the private Windows dashboard's
 live backend metrics and account directory; fixed LocalService parent-directory

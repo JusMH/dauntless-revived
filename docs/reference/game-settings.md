@@ -377,17 +377,24 @@ The launcher writes this file with the same encoding rule and the same temporary
 ## Client command line {#client-command-line}
 
 The three client launchers start the exe directly, with `Archon\Binaries\Win64` as the working
-directory. None of them starts `Dauntless.exe` or the EasyAntiCheat bootstrapper, so EasyAntiCheat
-never runs.
+directory. None of them starts `Dauntless.exe` or the EasyAntiCheat bootstrapper.
+Starting the shipping exe directly can still make its EAC client plugin try to
+initialize and display "Failed to create IGameClient instance". Launcher 0.1.11
+and the friend-kit script pass the executable's supported `-NoEAC` option to skip
+that initialization for the private server. This is a client launch change: the
+player must relaunch their game, but the VPS does not need a restart. Static
+verification found both `NoEAC` and `-NoEAC in the command line, EAC client will not load`
+in the pinned 1.4.4 executable; in-game confirmation remains pending.
 
 ```text
 Dauntless-Win64-Shipping.exe <host>:<port> -AUTH_PASSWORD=<account key> -AUTH_LOGIN=unused
   -AUTH_TYPE=exchangecode -epicapp=appidlol -epicenv=Prod -EpicPortal -epicusername=usernamelol
   -epicuserid=useridlol -epiclocale=en-US -epicsandboxid=sandboxidlol
-  -epicdeploymentid=deploymentidlol [-windowed -ResX=1280 -ResY=720]
+  -epicdeploymentid=deploymentidlol -NoEAC [-windowed -ResX=1280 -ResY=720]
 ```
 
-The order and the values are the same in all three launchers. A launcher test pins the exact list.
+The backend address remains the first argument. A launcher test pins its exact list.
+Older standalone host scripts may not include `-NoEAC` yet.
 
 | Name | Default | Values | What it does | Set by |
 |:-----|:--------|:-------|:-------------|:-------|
