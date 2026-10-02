@@ -133,13 +133,13 @@
 - id: toimiiko-linuxilla
   q: "Toimiiko se Linuxilla tai Steam Deckillä?"
   a: >-
-    Sitä ei ole kokeiltu. Pelipalvelimet ovat pelin Windows-version kopioita, jotka on kytketty
-    palvelintilaan. Siksi oman palvelimen pystyttäminen vaatii tällä hetkellä Windowsin. Taustapalvelu
-    on tehty Node.js:llä, ja se toimii myös muualla. Suunnitelmissa on kokeilla pelipalvelimia Linuxilla
-    (Windowsin vaihtoehtoinen käyttöjärjestelmä) Wine-ohjelman avulla. Wine on ohjelma, jolla
-    Windows-ohjelmia voi käyttää Linuxissa. Kokeilu kuuluu [tiekartan](fi/roadmap.md) välitavoitteeseen
-    M4. [Englanninkielisessä tarkistuslistassa](roadmap.md) se on kohta 4.11.
-    Pelin käyttämistä Linuxilla tai Steam Deckillä (kannettava pelilaite) ei ole vielä kokeiltu.
+    Linux-asiakasta on nyt kokeiltu Ubuntulla Protonin kautta, mutta tuki on vielä kokeellinen.
+    Käynnistin 0.1.13 korjaa Wine/Proton-jumin, jossa Discord saattoi näyttää Dauntlessin käynnissä,
+    vaikka peli-ikkunaa ei syntynyt, ja käynnistin hoitaa natiivin dxgi-ohituksen sekä
+    GNOME/Waylandin XWayland-valtuutuksen automaattisesti. Steam Deckiä ei ole vielä testattu.
+    Varsinaisten Dauntless-pelipalvelinten ajaminen Wine/Protonilla on eri polku kuin Linux-pelaajan
+    käynnistin; Node.js-taustapalvelu toimii jo Linuxilla, mutta pelipalvelinten Wine-polun
+    live-testit ovat vielä kesken.
 
 - id: voinko-auttaa
   q: "Voinko auttaa?"

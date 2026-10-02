@@ -121,6 +121,12 @@ game as running, but Unreal Engine never reached normal window/log initializatio
 0.1.13 detects Wine/Proton and skips that client-only console setup. The native `dxgi` override and
 `UndauntedInternalServer.dll` are still required; the launcher verifies and installs both.
 
+GNOME/Wayland also needs a valid XWayland authorization cookie. The launcher preserves an existing
+`XAUTHORITY`, and 0.1.13 recovers Mutter's `.mutter-Xwaylandauth.*` file from `XDG_RUNTIME_DIR`
+when a wrapper or stripped environment omitted it. A missing cookie typically produces
+`Authorization required, but no authorization protocol specified` from Wine and no usable game
+window.
+
 For public/v2 servers, the game connects to the launcher's local `127.0.0.1:61000` relay. The relay
 then carries the game's HTTP/WebSocket traffic to the public server with its pinned TLS certificate.
 Keep the launcher open while the game runs.

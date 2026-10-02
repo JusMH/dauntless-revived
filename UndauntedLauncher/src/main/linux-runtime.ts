@@ -119,13 +119,32 @@ function dllOverrides(existing: string | undefined): string {
   return parts.join(";");
 }
 
+function withXwaylandAuthority(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  if (env.XAUTHORITY || env.XDG_SESSION_TYPE?.toLowerCase() !== "wayland" || !env.XDG_RUNTIME_DIR) return env;
+
+  try {
+    const candidates = readdirSync(env.XDG_RUNTIME_DIR)
+      .filter((name) => name.startsWith(".mutter-Xwaylandauth."))
+      .map((name) => path.join(env.XDG_RUNTIME_DIR!, name))
+      .filter((file) => statSync(file).isFile())
+      .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+
+    if (candidates[0]) return { ...env, XAUTHORITY: candidates[0] };
+  } catch {
+    // Keep the original environment; Wine will report the display error if XWayland is unavailable.
+  }
+
+  return env;
+}
+
 export function detectLinuxRuntime(
   userDataDir: string,
   env: NodeJS.ProcessEnv = process.env,
   home: string = env.HOME ?? os.homedir(),
 ): DetectedLinuxRuntime | null {
-  const explicitProton = customRuntime(env.DAUNTLESS_REVIVED_PROTON, env);
-  const explicitWine = customRuntime(env.DAUNTLESS_REVIVED_WINE, env);
+  const runtimeEnv = withXwaylandAuthority(env);
+  const explicitProton = customRuntime(runtimeEnv.DAUNTLESS_REVIVED_PROTON, runtimeEnv);
+  const explicitWine = customRuntime(runtimeEnv.DAUNTLESS_REVIVED_WINE, runtimeEnv);
   const proton = explicitProton ?? (explicitWine ? null : protonCandidates(home)[0] ?? null);
   if (proton) {
     const compatDataDir = path.join(userDataDir, "compat", "proton");
@@ -137,20 +156,20 @@ export function detectLinuxRuntime(
       prefixDir: path.join(compatDataDir, "pfx"),
       compatDataDir,
       env: {
-        ...env,
+        ...runtimeEnv,
         STEAM_COMPAT_DATA_PATH: compatDataDir,
         ...(steamRoot ? { STEAM_COMPAT_CLIENT_INSTALL_PATH: steamRoot } : {}),
         STEAM_COMPAT_APP_ID: "0",
         PROTON_LOG: "0",
-        WINEDLLOVERRIDES: dllOverrides(env.WINEDLLOVERRIDES),
+        WINEDLLOVERRIDES: dllOverrides(runtimeEnv.WINEDLLOVERRIDES),
       },
     };
   }
 
   const wine =
     explicitWine ??
-    fromPath("wine64", env) ??
-    fromPath("wine", env) ??
+    fromPath("wine64", runtimeEnv) ??
+    fromPath("wine", runtimeEnv) ??
     lutrisWineCandidates(home)[0] ??
     null;
   if (!wine) return null;
@@ -162,10 +181,10 @@ export function detectLinuxRuntime(
     prefixDir,
     compatDataDir: null,
     env: {
-      ...env,
+      ...runtimeEnv,
       WINEPREFIX: prefixDir,
-      WINEDEBUG: env.WINEDEBUG ?? "-all",
-      WINEDLLOVERRIDES: dllOverrides(env.WINEDLLOVERRIDES),
+      WINEDEBUG: runtimeEnv.WINEDEBUG ?? "-all",
+      WINEDLLOVERRIDES: dllOverrides(runtimeEnv.WINEDLLOVERRIDES),
     },
   };
 }

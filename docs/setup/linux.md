@@ -408,6 +408,12 @@ no UE log or visible window.
 installs the normal native `dxgi` override and the Revived DLL; do not remove those files as a
 permanent workaround.
 
+On GNOME/Wayland, 0.1.13 also preserves the session's `XAUTHORITY` for Proton. If a wrapper or
+remote shell strips that variable, the launcher recovers Mutter's `.mutter-Xwaylandauth.*` file
+from `XDG_RUNTIME_DIR`. Without a valid XWayland cookie, Wine can reach normal UE/DXVK startup but
+fail to present the game window and print `Authorization required, but no authorization protocol
+specified`.
+
 A useful diagnosis is:
 
 ```bash

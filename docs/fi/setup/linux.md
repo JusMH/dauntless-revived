@@ -394,6 +394,12 @@ Versio 0.1.13 tunnistaa Winen/Protonin ja ohittaa tämän asiakaspuolen debug-ko
 Käynnistin asentaa edelleen normaalin natiivin `dxgi`-ohituksen ja Revived-DLL:n; niitä ei pidä
 poistaa pysyväksi kiertotieksi.
 
+GNOME/Waylandissa 0.1.13 säilyttää myös Protonille työpöytäsession `XAUTHORITY`-arvon. Jos wrapper
+tai etäterminaali poistaa muuttujan, käynnistin etsii Mutterin `.mutter-Xwaylandauth.*`-tiedoston
+`XDG_RUNTIME_DIR`-kansiosta. Ilman kelvollista XWayland-evästettä Wine voi päästä UE/DXVK-
+käynnistykseen asti mutta epäonnistua peli-ikkunan näyttämisessä ja tulostaa virheen
+`Authorization required, but no authorization protocol specified`.
+
 Prosessin voi tarkistaa näin:
 
 ```bash

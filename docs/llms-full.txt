@@ -2033,6 +2033,12 @@ no UE log or visible window.
 installs the normal native `dxgi` override and the Revived DLL; do not remove those files as a
 permanent workaround.
 
+On GNOME/Wayland, 0.1.13 also preserves the session's `XAUTHORITY` for Proton. If a wrapper or
+remote shell strips that variable, the launcher recovers Mutter's `.mutter-Xwaylandauth.*` file
+from `XDG_RUNTIME_DIR`. Without a valid XWayland cookie, Wine can reach normal UE/DXVK startup but
+fail to present the game window and print `Authorization required, but no authorization protocol
+specified`.
+
 A useful diagnosis is:
 
 ```bash
@@ -16437,7 +16443,7 @@ Hunting together, yes. On 22 September 2026 two players saw each other in Ramsga
 
 ## Does it work on Linux or the Steam Deck?
 
-Not tested. The game servers are copies of the Windows 1.4.4 client switched into server mode, so hosting needs Windows today; the backend is Node.js and runs anywhere. An experiment to run the game servers under Wine on Linux is planned (item 4.11 on the [roadmap](https://mixutin.github.io/dauntless-revived/roadmap.html)). Running the client on Linux or a Steam Deck has not been tried.
+Linux client support is experimental but now tested on Ubuntu with Proton. Launcher 0.1.13 fixes a Wine/Proton client-initialization deadlock that could leave Discord showing Dauntless while no game window appeared, and the launcher handles the native dxgi override and GNOME/Wayland XWayland authorization automatically. Steam Deck has not been tested yet. Hosting the actual Dauntless game servers under Wine/Proton is a separate path from the Linux player launcher; the Node.js backend already runs on Linux, while the game-server Wine path is still being validated.
 
 ## Can I help?
 
