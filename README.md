@@ -33,6 +33,12 @@ distributed in this repository or on the docs site: you need your own copy of th
 
 Dauntless Revived is free. If you would like to support ongoing development and community costs, you can [support the project on Patreon](https://patreon.com/DauntlessRevived). Patreon is entirely optional and does not provide paid access to the game or gameplay advantages.
 
+## Patreons
+
+A huge thank-you to the people supporting Dauntless Revived on Patreon. ❤️
+
+- **nasagi** — thank you for becoming a Patreon supporter and helping support the project.
+
 ## Hosting partner — EU Gamehost
 
 <p align="center">

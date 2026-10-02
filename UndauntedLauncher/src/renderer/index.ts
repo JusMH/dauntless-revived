@@ -6,7 +6,7 @@ import { $, forceRender, githubMark, h, icon, renderRegion, type IconName } from
 import partnerLogo from "./brand/eugamehost-partner.png";
 import { buildScene } from "./scene";
 import { isStringKey, translate, type StringKey } from "../shared/i18n";
-import { localized, PROJECT_PEOPLE, SOFTWARE, UPSTREAM_PEOPLE, type CreditPerson, type CreditRole } from "../shared/credits";
+import { localized, PATRONS, PROJECT_PEOPLE, SOFTWARE, UPSTREAM_PEOPLE, type CreditPerson, type CreditRole } from "../shared/credits";
 import { parseInvite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
 import { exposureKey, graphicsKey, primaryButton, shortFile, stepIndex, taskView, updateReason, whereKey } from "../shared/ui-model";
@@ -1247,6 +1247,31 @@ function creditPeople(people: readonly CreditPerson[]): HTMLElement {
   );
 }
 
+function creditPatrons(): HTMLElement {
+  return h(
+    "ul",
+    { class: "credit-list" },
+    ...PATRONS.map((p) =>
+      h(
+        "li",
+        { class: "credit" },
+        h("span", { class: "credit-avatar role-patron", "aria-hidden": "true" }, Array.from(p.name)[0]?.toUpperCase() ?? "?"),
+        h(
+          "div",
+          { class: "credit-text" },
+          h(
+            "div",
+            { class: "credit-head" },
+            h("span", { class: "credit-name" }, p.name),
+            h("span", { class: "badge credit-role role-patron" }, t("credits_role_patron")),
+          ),
+          h("p", { class: "credit-note" }, localized(p.note, state.lang)),
+        ),
+      ),
+    ),
+  );
+}
+
 function creditSoftware(): HTMLElement {
   return h(
     "ul",
@@ -1282,6 +1307,12 @@ function renderCredits(): void {
         h("p", { class: "card-text" }, t("credits_project_text")),
         creditPeople(PROJECT_PEOPLE),
         h("div", { class: "card-row" }, linkButton(t("credits_all_contributors"), () => open("project_contributors"), { icon: "external", fk: "cr-contributors" })),
+      ),
+      card(
+        "settings-section",
+        h("h2", { class: "card-title" }, t("credits_patrons_title")),
+        h("p", { class: "card-text" }, t("credits_patrons_text")),
+        creditPatrons(),
       ),
       card(
         "settings-section",

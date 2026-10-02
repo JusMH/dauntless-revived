@@ -52,6 +52,12 @@ molemmista versioista, on kirjoitettu tälle sivustolle.
 [Liity Discordiin](https://discord.gg/ZJRprHzsgu){: .btn .btn-primary .mr-2 }
 [Tiekartta]({{ roadmap_page.url | relative_url }}){: .btn }
 
+## Patreon-tukijat
+
+Suuri kiitos kaikille, jotka tukevat Dauntless Revivediä Patreonissa. Tuki on vapaaehtoista eikä anna pelillisiä etuja.
+
+- **nasagi** — kiitos Patreon-tukijaksi liittymisestä ja projektin tukemisesta. ❤️
+
 ---
 
 ## Tilanne nyt {#current-status}

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { PROJECT_PEOPLE, SOFTWARE, UPSTREAM_PEOPLE, localized, type CreditPerson } from "../src/shared/credits";
+import { PATRONS, PROJECT_PEOPLE, SOFTWARE, UPSTREAM_PEOPLE, localized, type CreditPerson } from "../src/shared/credits";
 import { STRINGS, type StringKey } from "../src/shared/i18n";
 import type { ExternalTarget } from "../src/shared/types";
 
@@ -71,6 +71,16 @@ test("the credits name every contributor, in order, with their role", () => {
 
   const handles = [...PROJECT_PEOPLE, ...UPSTREAM_PEOPLE].map((p) => p.github);
   assert.equal(new Set(handles).size, handles.length, "nobody is listed twice");
+});
+
+test("patrons are listed separately with localized thanks", () => {
+  assert.deepEqual(PATRONS.map((p) => p.name), ["nasagi"]);
+  for (const p of PATRONS) {
+    assert.ok(p.name.trim(), JSON.stringify(p));
+    assert.match(p.note.en, /Patreon/);
+    assert.match(p.note.fi, /Patreon/);
+    assert.notEqual(p.note.fi, p.note.en, `${p.name}: the Finnish note is not translated`);
+  }
 });
 
 test("every credit has English and Finnish text", () => {
@@ -143,7 +153,7 @@ test("THIRD-PARTY-NOTICES.txt ships with the launcher and has the Octicons, MinH
 });
 
 test("the credits hold no links and no e-mail addresses", () => {
-  const data = JSON.stringify([PROJECT_PEOPLE, UPSTREAM_PEOPLE, SOFTWARE]);
+  const data = JSON.stringify([PATRONS, PROJECT_PEOPLE, UPSTREAM_PEOPLE, SOFTWARE]);
   assert.ok(!data.includes("://"), "the credits must not carry URLs: the page opens links by name");
   assert.ok(!/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/.test(data), "no e-mail addresses on the Credits page");
 });

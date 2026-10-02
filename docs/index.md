@@ -40,6 +40,12 @@ is written up here.
 [Optional Patreon support](https://patreon.com/DauntlessRevived){: .btn .mr-2 }
 [Roadmap]({{ roadmap_page.url | relative_url }}){: .btn }
 
+## Patreons
+
+A huge thank-you to the people supporting Dauntless Revived on Patreon. Support is optional and never provides gameplay advantages.
+
+- **nasagi** — thank you for becoming a Patreon supporter and helping support the project. ❤️
+
 ---
 
 ## Current status

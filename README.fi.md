@@ -35,6 +35,12 @@ pelitiedostoja. Tarvitset oman kopion Dauntless 1.4.4 -pelistä.
 > **Tämä ei ole julkinen palvelin.** Sitä pyöritetään muutamalle kaverille. Kuka tahansa voi
 > pystyttää oman palvelimensa tämän koodin avulla.
 
+## Patreon-tukijat
+
+Suuri kiitos kaikille, jotka tukevat Dauntless Revivediä Patreonissa. ❤️
+
+- **nasagi** — kiitos Patreon-tukijaksi liittymisestä ja projektin tukemisesta.
+
 ## Hosting-kumppani — EU Gamehost
 
 <p align="center">
