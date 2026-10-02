@@ -50,6 +50,16 @@ required parent folders only (not recursively), plus read access to the selected
 configuration and log files. This avoids startup failures on hardened installs
 without running the dashboard as Administrator or opening another public port.
 
+### Discord status message
+
+The optional `Install-DiscordStatus.ps1` installs a separate boot-started worker.
+It checks the local backend every five seconds and edits one Discord message every
+15 seconds, with rate-limit backoff. The message includes aggregate player count,
+backend availability/uptime and local response time only: no IP or account names.
+Discord timestamps adapt to each reader's timezone. A whole-VPS outage leaves a
+stale timestamp; detecting that independently needs an external monitor. Keep the
+webhook secret out of Git. See [installation and recovery instructions](https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/tools/DISCORD-STATUS.md).
+
 This page covers how we open our Undaunted-based stack (client build **1.4.4**) to a handful of
 friends: network access, firewall, addresses, accounts, capacity and backups. It assumes the stack
 already runs for you locally, with the metagame, the deploy server and a Ramsgate server.

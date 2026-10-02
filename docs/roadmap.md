@@ -865,6 +865,13 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
 
 - [ ] **4.19 Multi-region server coordination** — *Deferred until additional hosts are needed. Design authenticated communication between regional deploy servers and matchmaking, shared account/save ownership, region selection, host health/capacity reporting, and routing players to available game instances. Establish database consistency, outage handling and deployment boundaries before adding regional hosts; a web load balancer alone cannot distribute existing game sessions. No runtime changes enabled.*
 
+Discord follow-up, 2026-10-01 (4.18): separate opt-in Windows worker publishes only
+aggregate backend status/count/uptime/local latency to one edited Discord message.
+Five-second checks, 15-second edits with rate-limit backoff, timezone-aware Discord
+timestamps, persisted message ID and private webhook storage. No public IPs or
+account names. External whole-VPS outage detection remains open. Public-hunt
+airship backfill also remains open; no heap-size or native game changes in this update.
+
 Dashboard follow-up, 2026-10-01 (4.18): verified the private Windows dashboard's
 live backend metrics and account directory; fixed LocalService parent-directory
 access without recursive secret access. Invite-only registration already generates
