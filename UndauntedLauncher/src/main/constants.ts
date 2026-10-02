@@ -29,7 +29,7 @@ export interface PinnedDll {
 // Same pins as friend-kit/play.ps1. The files ship in the launcher's resources.
 export const PINNED_DLLS: readonly PinnedDll[] = [
   { name: "dxgi.dll", sha256: "9a431d7b6fd20c43fa92bebd91c3bc023ec7a3fcbc52871c41f4df293d4b0d1f" },
-  { name: "UndauntedInternalServer.dll", sha256: "520ec588a0554e374b2b0d084cd7f7f08d59a9cb80362679845719d64a0d0933" },
+  { name: "UndauntedInternalServer.dll", sha256: "a2c33c51bc3a9f86a2645c671383a54b7629b044271cd27f538e6a4453c47d49" },
 ];
 export const DLL_RELATIVE_PATHS = PINNED_DLLS.map((d) => `${WIN64_RELATIVE_DIR}/${d.name}`);
 
