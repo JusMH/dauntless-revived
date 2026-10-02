@@ -35,6 +35,7 @@ is written up here.
 [Set it up]({{ '/setup/' | relative_url }}){: .btn .btn-primary .mr-2 }
 [Read the findings]({{ '/findings/' | relative_url }}){: .btn .mr-2 }
 [Reference]({{ '/reference/' | relative_url }}){: .btn .mr-2 }
+[Hosting partner · EU Gamehost]({{ '/setup/hosting-partner.html' | relative_url }}){: .btn .mr-2 }
 [Join Discord](https://discord.gg/ZJRprHzsgu){: .btn .btn-primary .mr-2 }
 [Optional Patreon support](https://patreon.com/DauntlessRevived){: .btn .mr-2 }
 [Roadmap]({{ roadmap_page.url | relative_url }}){: .btn }

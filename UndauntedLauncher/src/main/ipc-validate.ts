@@ -33,6 +33,7 @@ const TARGETS: Readonly<Record<ExternalTarget, true>> = {
   upstream_source: true,
   upstream_contributors: true,
   eugamehost: true,
+  eugamehost_game1: true,
   eugamehost_game2: true,
   eugamehost_game3: true,
   eugamehost_game5: true,

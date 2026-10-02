@@ -3,6 +3,7 @@
 // all come through the main process.
 
 import { $, forceRender, githubMark, h, icon, renderRegion, type IconName } from "./dom";
+import partnerLogo from "./brand/eugamehost-partner.png";
 import { buildScene } from "./scene";
 import { isStringKey, translate, type StringKey } from "../shared/i18n";
 import { localized, PROJECT_PEOPLE, SOFTWARE, UPSTREAM_PEOPLE, type CreditPerson, type CreditRole } from "../shared/credits";
@@ -13,8 +14,8 @@ import { formatBytes, formatDate, formatDuration, formatRunningTime } from "../s
 import { sortInstances, type InstanceKind, type ServerStatus, type StatusInstance } from "../shared/status";
 import { EXPOSURE_MODES, GRAPHICS_PRESETS, type Branding, type ExposureMode, type ExternalTarget, type GraphicsPreset, type LauncherError, type NewsItem, type Snapshot, type TaskProgress } from "../shared/types";
 
-type View = "play" | "news" | "server" | "settings" | "credits";
-const VIEWS: readonly View[] = ["play", "news", "server", "settings", "credits"];
+type View = "play" | "news" | "server" | "settings" | "partners" | "credits";
+const VIEWS: readonly View[] = ["play", "news", "server", "settings", "partners", "credits"];
 type Modal =
   | { kind: "invite"; link: string; name: string; host: string; mode: "public" | "private"; fp: string | null }
   // A public invite whose certificate is not the one this PC's key for that server belongs to.
@@ -638,7 +639,7 @@ function renderPlay(): void {
         parts = playRunning(snap);
         break;
     }
-    return [h("div", { class: "play-content" }, ...parts)];
+    return [h("div", { class: "play-content" }, ...parts, partnerBanner())];
   });
 }
 
@@ -984,69 +985,83 @@ function renderNews(): void {
         );
       }
     }
-    return [h("div", { class: "page" }, h("h1", { class: "page-title", id: "news-title" }, title), ...body)];
+    return [h("div", { class: "page" }, h("h1", { class: "page-title", id: "news-title" }, title), ...body, partnerBanner())];
   });
 }
 
-// ------------------------------------------------------------------ server page
+// ------------------------------------------------------------------ partners page
+
+function partnerBanner(): HTMLElement {
+  const banner = h(
+    "button",
+    { type: "button", class: "partner-banner", "data-fk": "partner-banner", "aria-label": t("partner_banner_label") },
+    h("img", { src: partnerLogo, alt: "EU Gamehost", draggable: "false" }),
+    h("span", { class: "partner-banner-copy" },
+      h("span", { class: "partner-mini-label" }, t("partner_ad")),
+      h("strong", {}, t("partner_banner_title")),
+      h("span", { class: "partner-banner-cta" }, t("partner_banner_cta")),
+    ),
+  );
+  banner.addEventListener("click", () => setView("partners"));
+  return banner;
+}
 
 function partnerHostingCard(): HTMLElement {
-  const fi = state.lang === "fi";
-  const plans: readonly { name: string; price: string; spec: string; target: ExternalTarget; note: string }[] = [
-    { name: "VDS GAME 2", price: "£34.99/mo", spec: "2 vCPU · 8 GB RAM · 120 GB NVMe", target: "eugamehost_game2", note: fi ? "Pieni kaveriporukka" : "Small friend group" },
-    { name: "VDS GAME 3", price: "£44.99/mo", spec: "3 vCPU · 12 GB RAM · 180 GB NVMe", target: "eugamehost_game3", note: fi ? "Suositeltu lähtötaso" : "Recommended starting point" },
-    { name: "VDS GAME 5", price: "£66.99/mo", spec: "6 vCPU · 24 GB RAM · 360 GB NVMe", target: "eugamehost_game5", note: fi ? "Enemmän kapasiteettivaraa" : "More capacity headroom" },
+  const plans: readonly { name: string; price: string; spec: string; target: ExternalTarget; note: StringKey }[] = [
+    { name: "VDS GAME 1", price: "£24.99", spec: "1 vCPU · 4 GB RAM · 60 GB NVMe", target: "eugamehost_game1", note: "partner_small" },
+    { name: "VDS GAME 3", price: "£44.99", spec: "3 vCPU · 12 GB RAM · 180 GB NVMe", target: "eugamehost_game3", note: "partner_recommended" },
+    { name: "VDS GAME 5", price: "£66.99", spec: "6 vCPU · 24 GB RAM · 360 GB NVMe", target: "eugamehost_game5", note: "partner_headroom" },
+    { name: "Ryzen 7 5800X", price: "£85", spec: "8c/16t · 32 GB DDR4 · 1 TB NVMe", target: "eugamehost_5800x", note: "partner_dedicated" },
   ];
   const grid = h("div", { class: "partner-plans" });
   for (const p of plans) {
     const b = h(
       "button",
-      { type: "button", class: `partner-plan${p.name === "VDS GAME 3" ? " recommended" : ""}` },
-      h("span", { class: "partner-plan-note" }, p.note),
+      { type: "button", class: `partner-plan${p.note === "partner_recommended" ? " recommended" : ""}`, "data-fk": p.target },
+      h("span", { class: "partner-plan-note" }, t(p.note)),
       h("strong", {}, p.name),
-      h("span", { class: "partner-price" }, p.price),
+      h("span", { class: "partner-price" }, p.price, h("span", {}, t("partner_per_month"))),
       h("span", { class: "partner-spec" }, p.spec),
-      h("span", { class: "partner-cta" }, fi ? "Ota käyttöön →" : "Deploy →"),
+      h("span", { class: "partner-spec" }, t(p.target === "eugamehost_5800x" ? "partner_network_dedicated" : "partner_network_vds")),
+      h("span", { class: "partner-cta" }, t("partner_plan_cta"), icon("external")),
     );
     b.addEventListener("click", () => open(p.target));
     grid.append(b);
   }
   return card(
     "partner-card",
-    h(
-      "div",
-      { class: "partner-head" },
-      h("img", { class: "partner-logo", src: "./src/renderer/brand/eugamehost-partner.png", alt: "EU Gamehost" }),
-      h(
-        "div",
-        {},
-        h("span", { class: "badge partner-badge" }, fi ? "PROJEKTIN KUMPPANI" : "PROJECT PARTNER"),
-        h("h2", { class: "partner-title" }, fi ? "Suositeltu hosting-palvelu" : "Recommended hosting provider"),
+    h("div", { class: "partner-head" },
+      h("img", { class: "partner-logo", src: partnerLogo, alt: "EU Gamehost", draggable: "false" }),
+      h("div", {},
+        h("span", { class: "badge partner-badge" }, t("partner_ad")),
+        h("h2", { class: "partner-title" }, t("partner_title")),
       ),
     ),
-    h(
-      "p",
-      { class: "card-text partner-copy" },
-      fi
-        ? "EU Gamehost on Dauntless Revivedin hosting-kumppani. Paketit on valittu projektin mitattujen RAM-tarpeiden perusteella; todellinen kapasiteetti riippuu pelaajamäärästä ja samanaikaisista metsästyksistä."
-        : "EU Gamehost is a hosting partner of Dauntless Revived. These plans are selected against the project's measured RAM footprint; real capacity still depends on player count and concurrent hunts.",
-    ),
+    h("p", { class: "card-text partner-copy" }, t("partner_intro")),
     grid,
-    h(
-      "div",
-      { class: "card-row partner-actions" },
-      linkButton(fi ? "Katso EU Gamehost" : "Explore EU Gamehost", () => open("eugamehost"), { icon: "external", fk: "host-all" }),
-      linkButton("Dedicated: Ryzen 5800X", () => open("eugamehost_5800x"), { icon: "external", fk: "host-dedicated" }),
+    h("div", { class: "card-row partner-actions" },
+      linkButton(t("partner_explore"), () => open("eugamehost"), { icon: "external", fk: "host-all" }),
     ),
-    h(
-      "p",
-      { class: "small-print partner-disclosure" },
-      fi
-        ? "Kumppanuus / mainos: EU Gamehost on projektin kumppani. Hinnat ja saatavuus voivat muuttua; tarkista ajantasaiset ehdot palveluntarjoajalta."
-        : "Partner / advertising disclosure: EU Gamehost partners with this project. Prices and availability can change; confirm current terms with the provider.",
-    ),
+    h("p", { class: "small-print partner-disclosure" }, t("partner_disclosure")),
   );
 }
+
+function renderPartners(): void {
+  renderRegion($("#view-partners"), state.lang, () => [
+    h("div", { class: "page partners-page" },
+      h("h1", { class: "page-title", id: "partners-title" }, t("nav_partners")),
+      h("p", { class: "page-sub" }, t("partners_subtitle")),
+      partnerHostingCard(),
+      card("",
+        h("h2", { class: "card-title" }, icon("server"), t("partner_capacity_title")),
+        h("p", { class: "card-text" }, t("partner_capacity")),
+        h("p", { class: "small-print" }, t("partner_capacity_note")),
+      ),
+    ),
+  ]);
+}
+
+// ------------------------------------------------------------------ server page
 
 function renderServer(): void {
   const container = $("#view-server");
@@ -1055,7 +1070,7 @@ function renderServer(): void {
   const sig = JSON.stringify([state.lang, snap?.server ?? null, snap?.status ?? null, snap?.phase, snap?.connect.problem, snap?.busy, !!snap?.task, snap?.game.running, minute]);
   renderRegion(container, sig, () => {
     if (!snap?.server) {
-      return [h("div", { class: "page" }, h("h1", { class: "page-title", id: "server-title" }, t("nav_server")), card("", h("p", { class: "card-text" }, t("sp_nojoin"))))];
+      return [h("div", { class: "page" }, h("h1", { class: "page-title", id: "server-title" }, t("nav_server")), card("", h("p", { class: "card-text" }, t("sp_nojoin"))), partnerBanner())];
     }
     const sv = snap.server;
     const status = snap.status;
@@ -1074,7 +1089,7 @@ function renderServer(): void {
     const parts: HTMLElement[] = [
       h("h1", { class: "page-title", id: "server-title" }, serverName()),
       h("p", { class: "page-sub" }, t("server_auto")),
-      partnerHostingCard(),
+      partnerBanner(),
       card("", kv, h("div", { class: "card-row", style: undefined }, button(t("sp_refresh"), () => void api.refreshStatus(), { icon: "refresh", fk: "srv-refresh" }), status?.sourceUrl ? linkButton(t("sp_source"), () => open("server_source"), { icon: "external", fk: "srv-source" }) : null)),
     ];
     if (status?.limited) {
@@ -1353,6 +1368,7 @@ const NAV: { view: View; icon: IconName; key: StringKey }[] = [
   { view: "play", icon: "play", key: "nav_play" },
   { view: "news", icon: "news", key: "nav_news" },
   { view: "server", icon: "server", key: "nav_server" },
+  { view: "partners", icon: "people", key: "nav_partners" },
   { view: "settings", icon: "settings", key: "nav_settings" },
 ];
 
@@ -1403,8 +1419,8 @@ function setView(v: View): void {
   for (const view of VIEWS) $(`#view-${view}`).hidden = view !== v;
   $("#actionbar").hidden = false;
   // The Server page shows everything the side panel shows, in full: no need for both. The Credits
-  // page is long lists of names and gets the room too.
-  $(".world").classList.toggle("no-panel", v === "server" || v === "credits");
+  // and Partners pages have long content and get the room too.
+  $(".world").classList.toggle("no-panel", v === "server" || v === "credits" || v === "partners");
   renderAll();
   if (changed && !reducedMotion.matches) {
     const selected = $(`#view-${v}`);
@@ -1459,6 +1475,7 @@ function renderAll(): void {
   if (state.view === "server") renderServer();
   if (state.view === "settings") renderSettings();
   if (state.view === "credits") renderCredits();
+  if (state.view === "partners") renderPartners();
   renderActionBar();
   renderPanel();
 }
@@ -1749,7 +1766,7 @@ function initChrome(): void {
   const github = $("#github-btn");
   github.appendChild(githubMark());
   github.addEventListener("click", () => open("project_source"));
-  $("#eugamehost-btn").addEventListener("click", () => open("eugamehost"));
+  $("#eugamehost-btn").addEventListener("click", () => setView("partners"));
   $("#discord-btn").addEventListener("click", () => open("discord"));
   $("#patreon-btn").addEventListener("click", () => open("patreon"));
   document.addEventListener("visibilitychange", () => void api.setStatusPolling(!document.hidden));

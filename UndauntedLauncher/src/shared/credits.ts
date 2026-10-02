@@ -42,6 +42,8 @@ export const UPSTREAM_PEOPLE: readonly CreditPerson[] = [
 // Open-source software in the launcher and in the server DLL it ships. The full license texts are in
 // THIRD-PARTY-NOTICES.txt, which ships with the launcher.
 export const SOFTWARE: readonly CreditSoftware[] = [
+  { name: "Simple Icons", author: { en: "Simple Icons contributors", fi: "Simple Iconsin tekijät" }, license: "CC0-1.0", note: { en: "The Patreon symbol on the optional support button. Patreon retains its trademark rights.", fi: "Valinnaisen tukipainikkeen Patreon-symboli. Tavaramerkin oikeudet kuuluvat Patreonille." } },
+  { name: "Discord brand assets", author: "Discord Inc.", license: null, note: { en: "The official Discord symbol on the community button, used under Discord's brand guidelines.", fi: "Yhteisöpainikkeen virallinen Discord-symboli Discordin brändiohjeiden mukaisesti." } },
   { name: "MinHook", author: "Tsuda Kageyu", license: "BSD-2-Clause", note: { en: "The function-hooking library in the server DLL.", fi: "Palvelin-DLL:n funktioiden koukutuskirjasto." } },
   { name: "Hacker Disassembler Engine 64", author: "Vyacheslav Patkov", license: "BSD-2-Clause", note: { en: "Part of MinHook.", fi: "Osa MinHookia." } },
   { name: "Dumper-7", author: { en: "Encryqed and contributors", fi: "Encryqed ja muut tekijät" }, license: null, note: { en: "The Unreal Engine SDK generator the server DLL is built against.", fi: "Unreal Engine -SDK:n generaattori. Palvelin-DLL on käännetty sen tuottamaa SDK:ta vasten." } },

@@ -16,6 +16,7 @@ ref: setup/index
 {% assign winserver_page = site.pages | where: "path", "setup/windows-server.md" | first %}
 {% assign linuxserver_page = site.pages | where: "path", "setup/linux-server.md" | first %}
 {% assign openbsdserver_page = site.pages | where: "path", "setup/openbsd-server.md" | first %}
+{% assign partner_page = site.pages | where: "path", "setup/hosting-partner.md" | first %}
 {% assign upgrade_page = site.pages | where: "path", "setup/upgrading.md" | first %}
 {% assign verification_page = site.pages | where: "path", "findings/verification.md" | first %}
 {% assign legal_page = site.pages | where: "path", "legal.md" | first %}
@@ -53,6 +54,7 @@ is a live two-machine game session.
 | [Windows server kit]({{ winserver_page.url | relative_url }}) | The host, for the live-tested Windows path | One command installs everything on Windows Server 2019+ with the current backup/update tooling. The existing Windows port is unchanged. |
 | [Linux server]({{ linuxserver_page.url | relative_url }}) | A Linux host | Native Node/SQLite control plane, systemd, nftables and Dauntless 1.4.4 game processes through Proton/Wine. Includes a one-host install and a separate Linux game-worker mode. |
 | [OpenBSD server]({{ openbsdserver_page.url | relative_url }}) | An OpenBSD host plus Linux game worker | Native OpenBSD 7.9 control plane with rc.d + PF. Game-server processes are forwarded to a restricted Linux Proton/Wine worker over SSH. |
+| [Hosting partner: EU Gamehost]({{ partner_page.url | relative_url }}) | Hosts who want rented hardware | Clearly labelled partner/advertising content, current example plans, measured capacity rationale and direct plan links. |
 | [Troubleshooting]({{ trouble_page.url | relative_url }}) | Everyone | Problems we actually hit, with causes and fixes. A few entries come from reading the code and are marked as such. |
 | [Upgrade notes]({{ upgrade_page.url | relative_url }}) | The host, before updating a server that already has players | What each update changes for players and what to decide first. Now: real progression is on by default, so earlier players start at Slayer level 1 unless you keep their max ranks or stay on the stub. |
 

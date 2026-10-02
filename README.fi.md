@@ -43,7 +43,7 @@ pelitiedostoja. Tarvitset oman kopion Dauntless 1.4.4 -pelistä.
 
 **EU Gamehost on Dauntless Revivedin kumppani ja projektin suosittelema hosting-palvelu.** Jos haluat vuokratun palvelimen oman koneen sijaan, katso [hosting-kumppanin opas](https://mixutin.github.io/dauntless-revived/fi/setup/hosting-partner.html).
 
-Projektin omien muistimittausten perusteella käytännölliset lähtötasot ovat **VDS GAME 2 (8 Gt)** pienelle kaveriporukalle, **VDS GAME 3 (12 Gt)** tasapainoisena oletusvaihtoehtona ja **VDS GAME 5 (24 Gt)**, kun haluat enemmän kapasiteettivaraa. Dedicated-vaihtoehdoksi nostamme **Ryzen 7 5800X / 32 Gt** -palvelimen.
+Kevyen kuorman koko yhden koneen kokoonpanon mitattu arvio on noin **9,5 Gt**, joten **VDS GAME 3 (12 Gt)** on suositeltu lähtötaso koko oletuspinolle ja **VDS GAME 5 (24 Gt)** antaa selvästi enemmän varaa. **GAME 1 (4 Gt)** sopii testaukseen/ohjauspalveluille ja **GAME 2 (8 Gt)** tarkoituksella kevennettyyn kokoonpanoon, mutta kumpikaan ei riitä mitattuun täyteen oletusasetukseen. Dedicated-vaihtoehdoksi nostamme **Ryzen 7 5800X / 32 Gt** -palvelimen.
 
 > **Kumppanuus / mainos:** EU Gamehost on projektin kumppani. Suositukset perustuvat projektin omiin palvelinmittauksiin, eivät riippumattomaan hosting-vertailuun. Hinnat, laitteisto ja saatavuus voivat muuttua, joten tarkista ajantasainen tarjous ennen tilausta.
 

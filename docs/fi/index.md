@@ -48,6 +48,7 @@ molemmista versioista, on kirjoitettu tälle sivustolle.
 [Asennusohjeet]({{ setup_page.url | relative_url }}){: .btn .btn-primary .mr-2 }
 [Lue löydökset]({{ findings_page.url | relative_url }}){: .btn .mr-2 }
 [Tekninen viite]({{ reference_page.url | relative_url }}){: .btn .mr-2 }
+[Hosting-kumppani · EU Gamehost]({{ '/fi/setup/hosting-partner.html' | relative_url }}){: .btn .mr-2 }
 [Liity Discordiin](https://discord.gg/ZJRprHzsgu){: .btn .btn-primary .mr-2 }
 [Tiekartta]({{ roadmap_page.url | relative_url }}){: .btn }
 

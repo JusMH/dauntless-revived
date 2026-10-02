@@ -41,7 +41,7 @@ Dauntless Revived is free. If you would like to support ongoing development and 
 
 **EU Gamehost is a partnered and recommended hosting provider for Dauntless Revived.** If you want a rented server instead of keeping your own PC online, see the [hosting partner guide](https://mixutin.github.io/dauntless-revived/setup/hosting-partner.html).
 
-For this project's measured footprint, our practical starting points are **VDS GAME 2 (8 GB)** for a small friend group, **VDS GAME 3 (12 GB)** as the default balanced option, and **VDS GAME 5 (24 GB)** when you want substantially more headroom. Operators wanting dedicated hardware can look at the **Ryzen 7 5800X / 32 GB** dedicated option.
+The measured light-load all-in-one footprint is roughly **9.5 GB**, so **VDS GAME 3 (12 GB)** is our recommended starting point for the full default stack and **VDS GAME 5 (24 GB)** is the headroom option. **GAME 1 (4 GB)** is useful for testing/control-plane-only deployments and **GAME 2 (8 GB)** for deliberately trimmed setups, but neither has enough RAM for our measured full default layout. Operators wanting dedicated hardware can look at the **Ryzen 7 5800X / 32 GB** option.
 
 > **Partner / advertising disclosure:** EU Gamehost partners with this project. These recommendations use the project's own measured server footprint, not an independent hosting benchmark. Prices, hardware and availability can change; verify the current offer with EU Gamehost before ordering.
 

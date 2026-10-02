@@ -160,6 +160,7 @@ test("the page opens links by name only, and community/source controls are in th
     upstream_source: true,
     upstream_contributors: true,
     eugamehost: true,
+    eugamehost_game1: true,
     eugamehost_game2: true,
     eugamehost_game3: true,
     eugamehost_game5: true,
@@ -191,7 +192,8 @@ test("the page opens links by name only, and community/source controls are in th
   const rail = html.slice(html.indexOf('<nav class="rail"'), html.indexOf("</nav>"));
   assert.match(rail, /<button type="button" class="icon-btn" id="github-btn" data-i18n-aria="github_link"><\/button>/);
   assert.match(rail, /<button type="button" class="rail-link" id="credits-btn">/);
-  assert.match(rail, /<button type="button" class="discord-mini" id="discord-btn">/);
+  assert.match(rail, /<button type="button" class="social-button" id="discord-btn">/);
+  assert.match(rail, /<button type="button" class="social-button" id="patreon-btn">/);
   assert.match(html, /<section class="view" id="view-credits" aria-labelledby="credits-title" hidden><\/section>/);
 });
 

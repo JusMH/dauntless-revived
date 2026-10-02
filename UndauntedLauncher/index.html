@@ -43,13 +43,16 @@
           <ul class="nav" id="nav"></ul>
           <div class="rail-foot">
             <div class="account-chip" id="account-chip"></div>
-            <button type="button" class="partner-mini" id="eugamehost-btn" title="EU Gamehost — partnered hosting provider">
-              <span class="partner-mini-label">HOSTING PARTNER</span>
+            <button type="button" class="partner-mini" id="eugamehost-btn" data-i18n-aria="partner_banner_label">
+              <span class="partner-mini-label" data-i18n="partner_ad">HOSTING PARTNER · AD</span>
               <img src="./src/renderer/brand/eugamehost-partner.png" alt="EU Gamehost" draggable="false" />
             </button>
-            <button type="button" class="discord-mini" id="patreon-btn"><span class="discord-dot" aria-hidden="true"></span><span data-i18n="patreon_link">Support us on Patreon</span></button>
-            <button type="button" class="discord-mini" id="discord-btn">
-              <span class="discord-dot" aria-hidden="true"></span>
+            <button type="button" class="social-button" id="patreon-btn">
+              <span class="social-icon social-icon-patreon" aria-hidden="true"></span>
+              <span data-i18n="patreon_link">Optional support on Patreon</span>
+            </button>
+            <button type="button" class="social-button" id="discord-btn">
+              <span class="social-icon social-icon-discord" aria-hidden="true"></span>
               <span data-i18n="discord_link">Join our Discord</span>
             </button>
             <div class="lang-switch" id="lang-switch" role="group" data-i18n-aria="set_language">
@@ -139,6 +142,7 @@
             <section class="view" id="view-play" aria-labelledby="play-title"></section>
             <section class="view" id="view-news" aria-labelledby="news-title" hidden></section>
             <section class="view" id="view-server" aria-labelledby="server-title" hidden></section>
+            <section class="view" id="view-partners" aria-labelledby="partners-title" hidden></section>
             <section class="view" id="view-settings" aria-labelledby="settings-title" hidden></section>
             <section class="view" id="view-credits" aria-labelledby="credits-title" hidden></section>
             <footer class="actionbar" id="actionbar">

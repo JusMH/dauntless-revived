@@ -30,6 +30,7 @@ is written up here.
 [Set it up](https://mixutin.github.io/dauntless-revived/setup/)
 [Read the findings](https://mixutin.github.io/dauntless-revived/findings/)
 [Reference](https://mixutin.github.io/dauntless-revived/reference/)
+[Hosting partner · EU Gamehost](https://mixutin.github.io/dauntless-revived/setup/hosting-partner.html)
 [Join Discord](https://discord.gg/ZJRprHzsgu)
 [Optional Patreon support](https://patreon.com/DauntlessRevived)
 [Roadmap](https://mixutin.github.io/dauntless-revived/roadmap.html)
@@ -206,6 +207,7 @@ is a live two-machine game session.
 | [Windows server kit](https://mixutin.github.io/dauntless-revived/setup/windows-server.html) | The host, for the live-tested Windows path | One command installs everything on Windows Server 2019+ with the current backup/update tooling. The existing Windows port is unchanged. |
 | [Linux server](https://mixutin.github.io/dauntless-revived/setup/linux-server.html) | A Linux host | Native Node/SQLite control plane, systemd, nftables and Dauntless 1.4.4 game processes through Proton/Wine. Includes a one-host install and a separate Linux game-worker mode. |
 | [OpenBSD server](https://mixutin.github.io/dauntless-revived/setup/openbsd-server.html) | An OpenBSD host plus Linux game worker | Native OpenBSD 7.9 control plane with rc.d + PF. Game-server processes are forwarded to a restricted Linux Proton/Wine worker over SSH. |
+| [Hosting partner: EU Gamehost](https://mixutin.github.io/dauntless-revived/setup/hosting-partner.html) | Hosts who want rented hardware | Clearly labelled partner/advertising content, current example plans, measured capacity rationale and direct plan links. |
 | [Troubleshooting](https://mixutin.github.io/dauntless-revived/setup/troubleshooting.html) | Everyone | Problems we actually hit, with causes and fixes. A few entries come from reading the code and are marked as such. |
 | [Upgrade notes](https://mixutin.github.io/dauntless-revived/setup/upgrading.html) | The host, before updating a server that already has players | What each update changes for players and what to decide first. Now: real progression is on by default, so earlier players start at Slayer level 1 unless you keep their max ranks or stay on the stub. |
 
@@ -1130,22 +1132,31 @@ URL: https://mixutin.github.io/dauntless-revived/setup/hosting-partner.html
 
 ![EU Gamehost](https://mixutin.github.io/dauntless-revived/assets/eugamehost-partner.png)
 
-**EU Gamehost is a partnered and recommended hosting provider for Dauntless Revived.** This is partner/promotional content, not an independent hosting benchmark.
+**EU Gamehost is a partnered and recommended hosting provider for Dauntless Revived.** This page is partner/promotional content, not an independent hosting benchmark.
 
-Our own measurements are the basis for the recommendations: Ramsgate uses about **1.1 GB RAM**, a hunt server about **0.9 GB**, the Training Dojo about **0.9 GB**, and the Node control plane about **130 MB**. Our light-load estimate with every default hunt port active is roughly **9.5 GB** including a client on the host. Combat CPU load at scale is not fully measured yet.
+## Recommended Dauntless Revived plans
 
-| Use case | Plan | Example specification | Price shown |
+Our recommendations start with our own measurements: Ramsgate uses about **1.1 GB RAM**, a hunt server about **0.9 GB**, the Training Dojo about **0.9 GB**, and the Node control plane about **130 MB**. With every default hunt port active and a client on the same host, our light-load estimate is roughly **9.5 GB**. Combat CPU load at scale is not fully measured yet.
+
+That means the cheapest plans are useful, but **GAME 3 (12 GB) is our minimum recommended starting point for the full default all-in-one stack**.
+
+| Use case | Plan | Public specification | Base monthly price shown |
 |---|---|---|---:|
-| Small friend group | **VDS GAME 2** | 2 vCPU, 8 GB RAM, 120 GB NVMe, 5 Gbps unmetered | £34.99/mo |
-| **Recommended starting point** | **VDS GAME 3** | 3 vCPU, 12 GB RAM, 180 GB NVMe, 5 Gbps unmetered | £44.99/mo |
-| More capacity headroom | **VDS GAME 5** | 6 vCPU, 24 GB RAM, 360 GB NVMe, 5 Gbps unmetered | £66.99/mo |
-| Dedicated hardware | **Ryzen 7 5800X** | 8c/16t, 32 GB DDR4, 1 TB NVMe, 10 Gbps port | £85/mo |
+| Testing / control plane only | **VDS GAME 1** | 1 vCPU @ 5.8 GHz, 4 GB RAM, 60 GB NVMe, 5 Gbps unmetered | £24.99/mo |
+| Trimmed / split deployment | **VDS GAME 2** | 2 vCPU @ 5.8 GHz, 8 GB RAM, 120 GB NVMe, 5 Gbps unmetered | £34.99/mo |
+| **Recommended full-stack start** | **VDS GAME 3** | 3 vCPU @ 5.8 GHz, 12 GB RAM, 180 GB NVMe, 5 Gbps unmetered | £44.99/mo |
+| More capacity headroom | **VDS GAME 5** | 6 vCPU @ 5.8 GHz, 24 GB RAM, 360 GB NVMe, 5 Gbps unmetered | £66.99/mo |
+| Dedicated hardware | **Ryzen 7 5800X** | 8c/16t @ 4.7 GHz, 32 GB DDR4, 1 TB NVMe, 10 Gbps port | £85/mo |
 
-[Deploy VDS GAME 2](https://www.eugamehost.com/clients/cart.php?a=add&pid=239&promocode=SIGNUP6MONTH&skipconfig=1) · [Deploy VDS GAME 3](https://www.eugamehost.com/clients/cart.php?a=add&pid=240&promocode=SIGNUP6MONTH&skipconfig=1) · [Deploy VDS GAME 5](https://www.eugamehost.com/clients/cart.php?a=add&pid=242&promocode=SIGNUP6MONTH&skipconfig=1) · [Ryzen 5800X](https://www.eugamehost.com/clients/cart.php?a=add&pid=500)
+[Deploy VDS GAME 1](https://www.eugamehost.com/clients/cart.php?a=add&pid=238&promocode=SIGNUP6MONTH&skipconfig=1) · [Deploy VDS GAME 2](https://www.eugamehost.com/clients/cart.php?a=add&pid=239&promocode=SIGNUP6MONTH&skipconfig=1) · [Deploy VDS GAME 3](https://www.eugamehost.com/clients/cart.php?a=add&pid=240&promocode=SIGNUP6MONTH&skipconfig=1) · [Deploy VDS GAME 5](https://www.eugamehost.com/clients/cart.php?a=add&pid=242&promocode=SIGNUP6MONTH&skipconfig=1) · [Ryzen 5800X](https://www.eugamehost.com/clients/cart.php?a=add&pid=500)
 
-EU Gamehost publishes DDoS-protection, NVMe-storage and high-speed-network claims for these product families. Check the live product page, current terms, location, OS availability and price before buying.
+## Why this partner fits the project
 
-> **Partner / advertising disclosure:** EU Gamehost partners with Dauntless Revived. These plan choices are project recommendations based on our measured Dauntless Revived footprint and the plan specifications supplied/published for them. They are not a guarantee of player capacity.
+EU Gamehost's public gaming VDS pages currently advertise **30 Tbps DDoS protection**, full root/administrator access, NVMe storage and Windows/Linux game-server support. The VDS plans above use dedicated high-clock Ryzen vCPU allocations and advertise 5 Gbps unmetered networking; the Ryzen 5800X dedicated option advertises a 10 Gbps port.
+
+The public plan details and base monthly prices above were checked **2 October 2026**. Promotional discounts, stock, locations, operating-system options and exact hardware can change, so check the live EU Gamehost page before ordering.
+
+> **Partner / advertising disclosure:** EU Gamehost partners with Dauntless Revived. These plan choices are project recommendations based on our measured Dauntless Revived footprint and provider-published specifications. They are not a guarantee of player capacity or an independent hosting benchmark.
 
 ================================================================================
 URL: https://mixutin.github.io/dauntless-revived/setup/friends.html
