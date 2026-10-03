@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { DescribeGameservers } from "../controllers/gameservers";
+import { DescribeOverflow } from '../controllers/overflow';
 
 export const gameserversRouter = Router();
 
@@ -22,7 +23,7 @@ export function IsDirectLoopbackRequest(req: { socket?: { remoteAddress?: string
 // expectedPlayers, maxPlayers, startedAt}]}. The list holds account ids, so it is for
 // the metagame on this machine only: the deploy server binds loopback, and this route
 // also refuses any caller that is not on loopback.
-gameserversRouter.get("/gameservers", (req, res) => {
+gameserversRouter.get("/gameservers", async (req, res) => {
     if(!IsDirectLoopbackRequest(req)){
         res.status(403);
         res.send();
@@ -31,6 +32,6 @@ gameserversRouter.get("/gameservers", (req, res) => {
 
     res.status(200);
     res.json({
-        servers: DescribeGameservers()
+        servers: [...DescribeGameservers(), ...await DescribeOverflow()]
     });
 });

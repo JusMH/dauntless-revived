@@ -491,6 +491,8 @@ export async function Startup(){
         FreePorts.push(i);
     }
 
+    if (process.env.HUNT_WORKER === '1') return;
+
     await EnsurePersistentWorld("ramsgate");
 
     // Upstream always started the Dojo here. Opt back in with ENABLE_DOJO=1 on

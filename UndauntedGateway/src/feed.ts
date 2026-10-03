@@ -9,6 +9,7 @@ export type FeedOptions = {
     // entry for 10 minutes, and a playing client sends a heartbeat every 20 seconds.
     refreshMs: number;
     timeoutMs: number;
+    additionalUrls?: string[];
 };
 
 // Tells the allowlist helper which addresses belong to logged-in players. Fire and forget: a
@@ -19,14 +20,17 @@ export class AllowlistFeed {
     private readonly Agent = new http.Agent({ keepAlive: true, maxSockets: 4 });
     private readonly Warnings = new LogThrottle(60_000);
     private readonly Target: URL;
+    private readonly Others: AllowlistFeed[];
     // Requests sent to the helper, for tests and the status log.
     public Sent = 0;
 
     constructor(private readonly Options: FeedOptions, private readonly Now: () => number = Date.now){
         this.Target = new URL("/allow", Options.url);
+        this.Others = (Options.additionalUrls ?? []).map(url => new AllowlistFeed({ ...Options, url, additionalUrls: undefined }, Now));
     }
 
     Report(Ip: string){
+        for (const Feed of this.Others) Feed.Report(Ip);
         if(Ip === "unknown"){
             return;
         }
@@ -103,12 +107,14 @@ export class AllowlistFeed {
 
     // Resolves when nothing is on its way to the helper (tests and shutdown).
     async Idle(){
+        await Promise.all(this.Others.map(Feed => Feed.Idle()));
         while(this.Pending.size > 0){
             await Promise.all([...this.Pending.values()]);
         }
     }
 
     Close(){
+        for (const Feed of this.Others) Feed.Close();
         this.Agent.destroy();
     }
 }
