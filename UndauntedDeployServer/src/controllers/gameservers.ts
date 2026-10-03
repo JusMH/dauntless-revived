@@ -295,14 +295,15 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
             ...STANDARD_GAMESERVER_ARGS
         ], {
             windowsHide: IsHunt,
-            env: {
+            env: IsHunt ? {
                 ...process.env,
                 DR_GAMESERVER_READY_FILE: ReadyFile
-            }
+            } : process.env
         });
     }
     catch(error){
         ReleaseReservation();
+        rmSync(ReadyFile, {force: true});
         if(IsHunt){
             FreePorts.push(Port);
         }
@@ -313,9 +314,10 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
 
     // A process that cannot be started (a wrong GAMESERVER_BINARY_PATH, a missing file) reports it
     // as an "error" event. Without a listener that event took the whole deploy server down.
-    Child.on("error", (error) => { ReleaseReservation(); logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`); });
+    Child.on("error", (error) => { ReleaseReservation(); rmSync(ReadyFile, {force: true}); logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`); });
     Child.on("exit", (Code, Signal) => {
         ReleaseReservation();
+        rmSync(ReadyFile, {force: true});
         // Release hunt ports immediately instead of waiting up to 60s for the watchdog.
         if (IsHunt) {
             const Finished = Gameservers.find(Server => Server.id === Id);
@@ -338,6 +340,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     // metagame reports to the player as FAILED instead of an address nothing listens on.
     if(Child.pid === undefined){
         ReleaseReservation();
+        rmSync(ReadyFile, {force: true});
         if(IsHunt){
             FreePorts.push(Port);
         }
