@@ -207,17 +207,31 @@ let ServerLaunchQueue: Promise<unknown> = Promise.resolve();
 let NextServerLaunchAt = 0;
 
 function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
-    const Launch = ServerLaunchQueue.catch(() => {}).then(async () => {
+    const Spawned = ServerLaunchQueue.catch(() => {}).then(async () => {
         if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
         const Wait = NextServerLaunchAt - Date.now();
         if (Wait > 0) await setTimeout(Wait);
-        const Server = await StartServerNow(Map, Behemoth, MatchmakerHuntId, ExpectedPlayers, IsRamsgate, IsTrainingDojo);
-        // Failed attempts must not add another cooldown to the queue.
+        const Started = await StartServerNow(Map, Behemoth, MatchmakerHuntId, ExpectedPlayers, IsRamsgate, IsTrainingDojo);
         NextServerLaunchAt = Date.now() + SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP * 1000;
+        return Started;
+    });
+
+    ServerLaunchQueue = Spawned.then(() => undefined, () => undefined);
+
+    return Spawned.then(async ({Server, Child, IsHunt}) => {
+        try{
+            await WaitForServerStartup(Child, Server.port, IsHunt);
+        }
+        catch(error){
+            if(Gameservers.includes(Server)){
+                await CleanupServer(Server);
+            }
+
+            throw error;
+        }
+
         return Server;
     });
-    ServerLaunchQueue = Launch;
-    return Launch;
 }
 
 async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
@@ -307,17 +321,6 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         throw new Error(`Could not start a game server on port ${Port}`);
     }
 
-    try{
-        await WaitForServerStartup(Child, Port, IsHunt);
-    }
-    catch(error){
-        if(IsHunt && !FreePorts.includes(Port)){
-            FreePorts.push(Port);
-        }
-
-        throw error;
-    }
-
     const NewGameserver: Gameserver = {
         id: Id,
         port: Port,
@@ -333,7 +336,11 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
 
     Gameservers.push(NewGameserver);
 
-    return NewGameserver;
+    return {
+        Server: NewGameserver,
+        Child: Child,
+        IsHunt: IsHunt
+    };
 }
 
 export async function GetRamsgateConnectionDetails(){
