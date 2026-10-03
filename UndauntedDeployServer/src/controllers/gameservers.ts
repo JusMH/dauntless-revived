@@ -73,6 +73,7 @@ function TransformExpectedPlayerArgs(ExpectedPlayers: ExpectedPlayer[]){
 // again (through the same shared launch as a player's request, so the two never start two processes
 // on one port); a hunt's port goes back to the pool.
 export async function CleanupServer(ServerToShutdown: Gameserver){
+    if (!Gameservers.includes(ServerToShutdown)) return; // exit event and watchdog may race
     Gameservers = Gameservers.filter(Server => Server !== ServerToShutdown);
 
     if(ServerToShutdown.isRamsgate){
@@ -121,7 +122,11 @@ function EnsurePersistentWorld(World: PersistentWorld, Why?: string, Level: "inf
     }
 
     const IsRamsgate = World === "ramsgate";
-    const Launch = StartServer(IsRamsgate ? RAMSGATE_MAP_PATH : TRAINING_DOJO_MAP_PATH, undefined, undefined, undefined, IsRamsgate, !IsRamsgate)
+    const DojoHuntId = IsRamsgate ? undefined : TRAINING_DOJO_MATCHMAKER_HUNT_ID;
+    const WorldMap = IsRamsgate ? RAMSGATE_MAP_PATH
+        : `${TRAINING_DOJO_MAP_PATH}?game=${GetGameModeOverrideFromMatchmakerHuntId(DojoHuntId!)}?MaxPlayers=${MaxPlayersFromTables(DojoHuntId!)}`;
+    // Shared worlds have no fixed roster, but Training Grounds still needs its hunt rules and mode.
+    const Launch = StartServer(WorldMap, undefined, DojoHuntId, undefined, IsRamsgate, !IsRamsgate)
         .then((Started) => {
             if(IsRamsgate){
                 RamsgateServer = Started;
@@ -150,14 +155,24 @@ export function IsPersistentWorldLivenessOn(){
     return process.env.PERSISTENT_WORLD_LIVENESS !== "0";
 }
 
-let ServerLaunchQueue: Promise<void> = Promise.resolve();
+let ServerLaunchQueue: Promise<unknown> = Promise.resolve();
+let NextServerLaunchAt = 0;
 
-async function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
-    const LaunchProc = ServerLaunchQueue;
+function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
+    const Launch = ServerLaunchQueue.catch(() => {}).then(async () => {
+        if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
+        const Wait = NextServerLaunchAt - Date.now();
+        if (Wait > 0) await setTimeout(Wait);
+        const Server = await StartServerNow(Map, Behemoth, MatchmakerHuntId, ExpectedPlayers, IsRamsgate, IsTrainingDojo);
+        // Failed attempts must not add another cooldown to the queue.
+        NextServerLaunchAt = Date.now() + SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP * 1000;
+        return Server;
+    });
+    ServerLaunchQueue = Launch;
+    return Launch;
+}
 
-    ServerLaunchQueue = ServerLaunchQueue.catch(() => {}).then(async () => await setTimeout(SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP * 1000));
-
-    await LaunchProc;
+async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
 
     if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
     const ReleaseReservation = memoryAdmission.reserve(!IsRamsgate && !IsTrainingDojo);
@@ -215,6 +230,11 @@ async function StartServer(Map: string, Behemoth: string | undefined, Matchmaker
     Child.on("error", (error) => { ReleaseReservation(); logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`); });
     Child.on("exit", (Code, Signal) => {
         ReleaseReservation();
+        // Release hunt ports immediately instead of waiting up to 60s for the watchdog.
+        if (IsHunt) {
+            const Finished = Gameservers.find(Server => Server.id === Id);
+            if (Finished) void CleanupServer(Finished);
+        }
         const Line = `Game server on port ${Port} (pid ${Child.pid}) exited ${Signal != null ? `on ${Signal}` : `with code ${Code}`}`;
 
         if(Code === 0){
@@ -504,6 +524,8 @@ export function UseProcessFunctionsForTests(Functions: { Spawn?: SpawnFunction, 
 }
 
 export function ResetGameserversForTests(){
+    ServerLaunchQueue = Promise.resolve();
+    NextServerLaunchAt = 0;
     Gameservers = [];
     FreePorts = [];
     RamsgateServer = undefined;
