@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import { linkInput } from './link-input.mjs';
 
 export async function loadState(file) {
   try {
@@ -76,9 +77,10 @@ export class Keys {
   link(user, launcherKey) {
     const task = this.queue.catch(() => {}).then(async () => {
       if (!/^\d{17,20}$/.test(user)) throw new Error('Invalid Discord user');
-      if (typeof launcherKey !== 'string' || launcherKey.length < 16 || launcherKey.length > 512 || /\s/.test(launcherKey)) return {status:'invalid_key'};
-      const account = await this.api.identity(launcherKey);
-      if (!account) return {status:'invalid_key'};
+      const input = linkInput(launcherKey);
+      if (!input.key) return input;
+      const account = await this.api.identity(input.key);
+      if (!account) return {status:input.key.startsWith('DR-') ? 'invite_not_key' : 'invalid_key'};
       return this.api.linkAccount(user, account.userId);
     });
     this.queue = task;

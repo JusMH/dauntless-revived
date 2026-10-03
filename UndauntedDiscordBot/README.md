@@ -21,3 +21,16 @@ Verified links from the earlier bot state migrate automatically at startup.
 `/key status` reads the central database to confirm the account link.
 An account and Discord ID can each have only one link; conflicting changes require
 the server team. Registration invite codes cannot be used as launcher account keys.
+
+Older `dauntless-revived://join?...` links are registration invites, not account credentials.
+For an already registered account, use **Launcher → Settings → Save a backup of your key…**, open
+the saved file, and copy the value after `Key:` into `/key link key:`. The bot also
+accepts a labelled backup or a key wrapped in Discord backticks. It never links an
+account by display name or by a shared/redeemed invite, and never replaces its key.
+
+Registration synchronizes `/key` globally (for DMs) and in the configured guild, or
+the bot's joined guilds when `DISCORD_GUILD_ID` is unset. Unchanged definitions are
+not rewritten; changed definitions preserve the existing command ID. Guild commands
+make updates available immediately. If Discord still shows **command is outdated**,
+close the command picker, reload Discord, and select Revived Warden's `/key link`
+again. This is a cached command-definition error, not an account-key rejection.

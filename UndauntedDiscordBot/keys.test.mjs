@@ -20,6 +20,26 @@ test('claims produce complete launcher invites and valid registration code chara
   assert.throws(()=>launcherInvite({...config,CertFingerprint:'wrong'},'GOOD-CODE'));
 });
 const user = '123456789012345678';
+test('old Join invites explain account-key recovery without verifying an invite as a credential',async()=>{
+  const f=setup(); f.api.identity=async()=>assert.fail('Join invite must never be sent as an account key');
+  assert.deepEqual(await f.service.link(user,'dauntless-revived://join?v=2&code=OLD-CODE'),{status:'invite_not_key'});
+  assert.equal(f.count(),0); assert.equal(f.links.size,0);
+});
+test('legacy short keys, backup files and Discord-formatted keys retain the original credential',async()=>{
+  const f=setup(); const key='oldkey12'; const seen=[];
+  f.api.identity=async input=>{seen.push(input);return {userId:'UID-account',username:'Slayer'};};
+  for(const input of [key,` \`${key}\` `,`\`\`\`\n${key}\n\`\`\``,`Dauntless Revived account key\nUsername: Slayer\nKey: ${key}\n\nKeep this file private.`])
+    assert.deepEqual(await f.service.link(user,input),{status:'linked'});
+  assert.deepEqual(seen,[key,key,key,key]); assert.equal(f.count(),0);
+});
+test('ambiguous backups and malformed input never link; registration codes receive specific guidance',async()=>{
+  const f=setup(); let verifies=0; f.api.identity=async()=>{verifies++;return null;};
+  for(const input of ['Key: firstkey\nKey: secondkey','bad key value','x'.repeat(8193)])
+    assert.deepEqual(await f.service.link(user,input),{status:'invalid_key_format'});
+  assert.equal(verifies,0);
+  assert.deepEqual(await f.service.link(user,'DR-old-registration'),{status:'invite_not_key'});
+  assert.equal(f.links.size,0); assert.equal(f.count(),0);
+});
 function setup() {
   const state = {version: 1, users: {}};
   const rows = new Map();

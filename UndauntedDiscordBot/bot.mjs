@@ -1,7 +1,9 @@
-import { Client, Events, GatewayIntentBits, MessageFlags, REST, Routes, SlashCommandBuilder } from 'discord.js';
+import { Client, Events, GatewayIntentBits, MessageFlags, REST } from 'discord.js';
 import { resolve } from 'node:path';
 import { backend, Keys, loadState, saveState } from './keys.mjs';
 import { loadInviteConfig, inviteMessage } from './invite.mjs';
+import { syncKeyCommands } from './commands.mjs';
+import { keyInstructions } from './link-input.mjs';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const adminKey = process.env.METAGAME_ADMIN_KEY;
@@ -13,17 +15,12 @@ await keys.migrateLinks();
 
 const client = new Client({intents: [GatewayIntentBits.Guilds]});
 const rest = new REST({version: '10'}).setToken(token);
-const command = new SlashCommandBuilder().setName('key').setDescription('Your Dauntless Revived access code')
-  .setContexts(0, 1)
-  .addSubcommand(option => option.setName('claim').setDescription('Receive a complete launcher invite by direct message'))
-  .addSubcommand(option => option.setName('status').setDescription('Check your account link or code redemption'))
-  .addSubcommand(option => option.setName('link').setDescription('Privately link your existing launcher account')
-    .addStringOption(value => value.setName('key').setDescription('Your existing launcher account key').setRequired(true).setMinLength(16).setMaxLength(512)));
 
 client.once(Events.ClientReady, async () => {
   try {
-    // Upsert only /key; preserve other commands owned by this bot.
-    await rest.post(Routes.applicationCommands(client.application.id), {body: command.toJSON()});
+    const guilds = process.env.DISCORD_GUILD_ID ? [process.env.DISCORD_GUILD_ID] : [...client.guilds.cache.keys()];
+    const changed = await syncKeyCommands(rest, client.application.id, guilds);
+    console.log(`Key command registration: ${changed} scopes updated`);
     console.log('Revived key bot ready');
   } catch { console.error('Could not register /key'); await client.destroy(); process.exitCode = 1; }
 });
@@ -56,7 +53,9 @@ client.on(Events.InteractionCreate, async interaction => {
       } else {
         const messages = {
           linked: '🔑 **Key Accepted**\nYour Discord has been linked to your existing Revived account. Keep using the same launcher key—nothing to replace.\n**Clear skies, Slayer.**',
-          invalid_key: '🔑 **Key Not Accepted**\nCheck your launcher account key and try again. Registration codes cannot link an existing account.',
+          invite_not_key: `🔑 **Use Your Saved Account Key**\nThat is a Join invite or registration code. It cannot identify your existing account.\n\n${keyInstructions}\n\nIf you have not registered yet, paste the complete invite into the launcher’s Join screen first.`,
+          invalid_key_format: `🔑 **Copy Your Saved Account Key**\n${keyInstructions}`,
+          invalid_key: `🔑 **Account Key Not Recognized**\nThis server did not recognize that account key.\n\n${keyInstructions}\n\nIf the saved key still fails, contact the server team with your launcher username and this message, not your key.`,
           discord_already_linked: 'Your Discord is already linked to another account. Contact the server team to change it.',
           account_already_linked: 'This account is already linked to another Discord. Contact the server team to change it.',
           ready: '🔑 **Key Ready**\nYour code has not been redeemed. Run `/key claim` to receive it by DM.',
