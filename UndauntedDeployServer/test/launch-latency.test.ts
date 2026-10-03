@@ -43,3 +43,23 @@ test("hunt exit frees its port immediately and watchdog cleanup cannot duplicate
     await game.CleanupServer(hunt);
     assert.equal(game.GameserverStateForTests().FreePorts.filter(port => port === hunt.port).length, 1);
 });
+
+
+test("hunt startup failure during readiness grace is rejected and returns its port", async () => {
+    game.ResetGameserversForTests();
+    game.UseProcessFunctionsForTests({ Spawn: spawn, IsAlive: () => true });
+    await game.Startup();
+    const before = game.GameserverStateForTests().FreePorts.length;
+    process.env.GAMESERVER_STARTUP_GRACE_MS = "50";
+    game.UseProcessFunctionsForTests({ Spawn: () => {
+        const child = Object.assign(new EventEmitter(), { pid: pid++, unref() {} });
+        setTimeout(() => child.emit("exit", 1, null), 10);
+        return child as unknown as ChildProcess;
+    }, IsAlive: () => true });
+    try {
+        await assert.rejects(game.StartupGameserverWithArgs(args), /exited during startup/);
+        assert.equal(game.GameserverStateForTests().FreePorts.length, before);
+    } finally {
+        process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
+    }
+});
