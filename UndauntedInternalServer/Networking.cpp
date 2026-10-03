@@ -2,6 +2,8 @@
 
 #include <iostream>
 #include "ChannelLookup.h"
+#include <fstream>
+#include <filesystem>
 
 using namespace SDK;
 
@@ -120,14 +122,22 @@ namespace Networking {
 
         FString empy = FString();
 
-        const bool ListenStatus = (*(reinterpret_cast<bool(**)(UNetDriver*, void*, FURL*, bool, FString*)>(*(__int64*)NetDriver + 0x280)))(NetDriver, (void*)UWorld::GetWorld()->NetworkNotify, &url, false, &empy);
-        std::cout << "Listen Status: " << ListenStatus << std::endl;
+        const bool Listening = (*(reinterpret_cast<bool(**)(UNetDriver*, void*, FURL*, bool, FString*)>(*(__int64*)NetDriver + 0x280)))(NetDriver, (void*)UWorld::GetWorld()->NetworkNotify, &url, false, &empy);
+        std::cout << "Listen Status: " << Listening << std::endl;
 
         reinterpret_cast<void(*)(UNetDriver*, UWorld*)>(BaseAddress + 0x3491890)(NetDriver, UWorld::GetWorld());
 
         UWorld::GetWorld()->NetDriver = NetDriver;
+        // A unique per-launch marker lets deployment wait for the actual listening world.
+        // Never include credentials or player identities in this file.
+        wchar_t ReadyPath[32768] = {};
+        const DWORD Length = GetEnvironmentVariableW(L"DR_SERVER_READY_FILE", ReadyPath, 32768);
+        if (Listening && Length > 0 && Length < 32768) {
+            std::ofstream Ready{std::filesystem::path(ReadyPath)};
+            Ready << GetCurrentProcessId() << ":" << Port;
+        }
 
-        return ListenStatus;
+        return Listening;
     }
 
     void TickNetworking() {

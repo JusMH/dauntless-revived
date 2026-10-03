@@ -22,7 +22,6 @@ const SOLO_JOIN_DEDUPE_MS = 30 * 1000;
 // player polls), or at once when it reaches QUEUE_FULL_PLAYERS
 const QUEUE_WAIT_MS = 20 * 1000;
 const QUEUE_FULL_PLAYERS = 4;
-const QUEUE_STATUS_LAUNCH_WAIT_MS = 100;
 // Capacity is not an endless queue. End the attempt promptly when the host stays full.
 export const CAPACITY_WAIT_MS = 60 * 1000;
 
@@ -178,6 +177,13 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
     }
 }
 
+async function WaitBriefly(Work: Promise<unknown>) {
+    let Timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        await Promise.race([Work, new Promise<void>(Resolve => { Timer = setTimeout(Resolve, 1500); })]);
+    } finally { if (Timer) clearTimeout(Timer); }
+}
+
 async function PopQueue(HuntId: string, MatchmakingQueue: MatchmakingQueueData | undefined = MatchmakingQueueMap.get(HuntId)){
     if(MatchmakingQueue == undefined || MatchmakingQueue.Resolved || (MatchmakingQueue.RetryAfter ?? 0) > PartyNow()){
         return;
@@ -244,8 +250,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
         } else if (!waiting.busy && PartyNow() >= waiting.next) {
             waiting.busy = true;
             waiting.next = PartyNow() + 10000;
-            try { if (await waiting.retry()) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }
-            finally { waiting.busy = false; }
+            await WaitBriefly(waiting.retry().then(Done => { if (Done) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }).finally(() => { waiting.busy = false; }));
         }
         return PlayerMatchmakingResult;
     }
@@ -262,10 +267,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
         }
 
         if(PartyNow() - MatchmakingQueue.LastPlayerAddedTime > QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
-            await Promise.race([
-                PopQueue(PlayerMatchmakingResult.HuntId, MatchmakingQueue),
-                new Promise<void>((Resolve) => setTimeout(Resolve, QUEUE_STATUS_LAUNCH_WAIT_MS))
-            ]);
+            await WaitBriefly(PopQueue(PlayerMatchmakingResult.HuntId, MatchmakingQueue));
         }
     }
 

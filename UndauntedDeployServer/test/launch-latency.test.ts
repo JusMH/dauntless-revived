@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import { after, test } from "node:test";
-import { writeFileSync } from "node:fs";
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = "0.3";
 const game = require("../src/controllers/gameservers") as typeof import("../src/controllers/gameservers");
@@ -17,6 +19,31 @@ const spawn = () => {
     return child as unknown as ChildProcess;
 };
 after(RemoveDeployTestDir);
+
+test('cold starts overlap while spawn pacing and listener readiness are preserved', async () => {
+    game.ResetGameserversForTests();
+    const dir = await mkdtemp(path.join(tmpdir(), 'launch-ready-'));
+    const markers: { file: string; pid: number; port: string }[] = [];
+    game.UseProcessFunctionsForTests({ Spawn: spawn, IsAlive: () => true });
+    await game.Startup();
+    process.env.GAMESERVER_READY_DIR = dir;
+    game.UseProcessFunctionsForTests({ Spawn: (_command, args, options) => {
+        const child = spawn();
+        markers.push({file: options.env!.DR_SERVER_READY_FILE!, pid: child.pid!, port: args[1]});
+        return child;
+    }, IsAlive: () => true });
+    try {
+        const first = game.StartupGameserverWithArgs(args);
+        const second = game.StartupGameserverWithArgs(args);
+        await new Promise(resolve => setTimeout(resolve, 850));
+        assert.equal(markers.length, 2, 'one cold start blocked the entire launch queue');
+        for (const marker of markers) await writeFile(marker.file, `${marker.pid}:${marker.port}`);
+        await Promise.all([first, second]);
+    } finally {
+        delete process.env.GAMESERVER_READY_DIR;
+        await rm(dir, {recursive: true, force: true});
+    }
+});
 
 test("failed spawns do not add cooldowns, successful launches remain spaced", async () => {
     game.ResetGameserversForTests();
@@ -61,37 +88,6 @@ test("hunt startup failure during readiness grace is rejected and returns its po
         await assert.rejects(game.StartupGameserverWithArgs(args), /exited during startup/);
         assert.equal(game.GameserverStateForTests().FreePorts.length, before);
     } finally {
-        process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
-    }
-});
-
-
-test("readiness waits do not serialize concurrent hunt spawns", async () => {
-    game.ResetGameserversForTests();
-    const spawnTimes: number[] = [];
-    game.UseProcessFunctionsForTests({
-        Spawn: (_command, _args, options) => {
-            spawnTimes.push(Date.now());
-            const readyFile = String(options.env?.DR_GAMESERVER_READY_FILE ?? "");
-            if(readyFile.length > 0){
-                setTimeout(() => writeFileSync(readyFile, "1"), 400);
-            }
-            return Object.assign(new EventEmitter(), { pid: pid++, unref() {}, kill() { return true; } }) as unknown as ChildProcess;
-        },
-        IsAlive: () => true
-    });
-    await game.Startup();
-    process.env.GAMESERVER_STARTUP_GRACE_MS = "1000";
-
-    try{
-        await Promise.all([
-            game.StartupGameserverWithArgs(args),
-            game.StartupGameserverWithArgs(args)
-        ]);
-        assert.ok(spawnTimes.length >= 3);
-        assert.ok(spawnTimes[2] - spawnTimes[1] < 550, `hunt launches were serialized by readiness: ${spawnTimes[2] - spawnTimes[1]}ms`);
-    }
-    finally{
         process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
     }
 });

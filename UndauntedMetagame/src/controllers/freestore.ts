@@ -67,6 +67,20 @@ const Catalog = catalog as unknown as Record<string, unknown>;
 const CatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key]));
 const AllOffers = CatalogTags.flatMap((Tag) => Catalog[Tag] as StoreOffer[]);
 
+let ExtraOffersForTests: StoreOffer[] = [];
+
+export function SetExtraOffersForTests(Offers?: StoreOffer[]){
+    ExtraOffersForTests = Offers ?? [];
+}
+
+const CURRENCY_FIELDS: Record<string, {PriceField: string, CatalogId: string}> = {
+    platinum: {PriceField: "platinumPrice", CatalogId: "CURRENCY_PLATINUM_UNIV"},
+    celldust: {PriceField: "cellDustPrice", CatalogId: "CURRENCY_CELLDUST"},
+    markssteel: {PriceField: "steelMarksPrice", CatalogId: "CURRENCY_MARKS_STEEL"},
+    marksgilded: {PriceField: "gildedMarksPrice", CatalogId: "CURRENCY_MARKS_GILDED"},
+    prestige: {PriceField: "prestigePrice", CatalogId: "CURRENCY_PRESTIGE"}
+};
+
 // Which items the store may hand out at all: cosmetics, and the repeatable consumable. Anything else
 // (currencies, boosts, weapons proper) is refused even if an offer lists it.
 const COSMETIC_PREFIXES = ["AR_", "WP_", "EM_", "DYE_", "QI_FLARE_", "BNC_FABRIC_", "BNC_STANDARD_", "BNC_SIGIL_", "LT_"];
@@ -105,17 +119,41 @@ function IsListed(Offer: StoreOffer){
 }
 
 function FindOffer(SkuId: string){
-    return AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer));
+    return AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer)) ?? ExtraOffersForTests.find((Offer) => Offer.id === SkuId);
 }
 
-// Free offers only, of permanent cosmetics, repeatable consumables and entitlements
+function ResolveOfferPricing(Offer: StoreOffer){
+    const Matches = Object.entries(CURRENCY_FIELDS).filter(([, Field]) => typeof Offer[Field.PriceField] === "number");
+
+    if(Matches.length !== 1){
+        throw new StoreError(500, `Offer ${Offer.id} has ${Matches.length} price field(s) set; exactly one is required`);
+    }
+
+    const [Currency, Field] = Matches[0];
+    const Price = Offer[Field.PriceField] as number;
+
+    if(!Number.isSafeInteger(Price) || Price < 0){
+        throw new StoreError(500, `Offer ${Offer.id} has an invalid price`);
+    }
+
+    return {Currency, CatalogId: Field.CatalogId, Price};
+}
+
+function CurrencyBalance(tx: Tx, CharacterId: string, CatalogId: string){
+    const Row = tx.select({stackedItems: inventory.stackedItems}).from(inventory).where(eq(inventory.characterId, CharacterId)).get();
+
+    for(const Stack of JSON.parse(Row?.stackedItems ?? "[]") as any[]){
+        if(Stack?.catalogId === CatalogId && Number.isSafeInteger(Number(Stack.quantity))){
+            return Number(Stack.quantity);
+        }
+    }
+
+    return 0;
+}
+
 function CheckOffer(Offer: StoreOffer){
     const Items = Offer.items ?? [];
     const Grants = Offer.entitlements ?? [];
-
-    if(Offer.platinumPrice !== 0){
-        throw new StoreError(409, "Offer is not free");
-    }
 
     if(Items.length === 0 && Grants.length === 0){
         throw new StoreError(409, "Offer grants nothing");
@@ -141,7 +179,7 @@ function CheckOffer(Offer: StoreOffer){
 }
 
 function CheckCurrency(Currency: string){
-    if(Currency !== "platinum"){
+    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Currency)){
         throw new StoreError(400, "Unsupported store currency");
     }
 }
@@ -250,6 +288,12 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
 
     CheckOffer(Offer);
 
+    const Pricing = ResolveOfferPricing(Offer);
+
+    if(Pricing.Currency !== Currency){
+        throw new StoreError(400, "Offer is not sold in that currency");
+    }
+
     if(Date.now() - LastSweep >= SWEEP_EVERY_MS){
         PruneExpiredStorePurchases();
     }
@@ -271,6 +315,10 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
 
         if(WithRemaining(tx, AccountId, HeldCatalogIds(tx, Character.characterId), Offer).remaining === 0){
             throw new StoreError(409, "You already own everything this offer grants");
+        }
+
+        if(Pricing.Price > 0 && CurrencyBalance(tx, Character.characterId, Pricing.CatalogId) < Pricing.Price){
+            throw new StoreError(409, "Insufficient balance");
         }
 
         const Recent = tx.select({ Issued: count() }).from(storepurchases)
@@ -302,7 +350,7 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
 // POST /notification/<currency>?token=<token>: the grant and the receipt in one transaction. A token
 // that was already redeemed answers again and grants nothing (a retry after a lost answer).
 export function RedeemStorePurchase(AccountId: string, Currency: string, Token: unknown){
-    if(Currency !== "platinum" || typeof Token !== "string" || !/^[a-f0-9]{64}$/.test(Token)){
+    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Currency) || typeof Token !== "string" || !/^[a-f0-9]{64}$/.test(Token)){
         throw new StoreError(400, "Invalid purchase token or currency");
     }
 
@@ -341,6 +389,16 @@ export function RedeemStorePurchase(AccountId: string, Currency: string, Token: 
             throw new StoreError(409, "Offer changed; request a new token");
         }
 
+        const Pricing = ResolveOfferPricing(Offer);
+
+        if(Pricing.Currency !== Currency){
+            throw new StoreError(400, "Offer is not sold in that currency");
+        }
+
+        if(Pricing.Price > 0 && CurrencyBalance(tx, Purchase.characterId, Pricing.CatalogId) < Pricing.Price){
+            throw new StoreError(409, "Insufficient balance");
+        }
+
         // Cosmetics are unlocks: something the character already holds is not granted again (overlapping
         // bundles, a second token). The repeatable consumable grants its full quantity every time.
         const Held = HeldCatalogIds(tx, Purchase.characterId);
@@ -353,14 +411,15 @@ export function RedeemStorePurchase(AccountId: string, Currency: string, Token: 
         const Instanced = ToGrant.filter((Item) => GrantKind(Item.catalogId) === "instanced")
             .map((Item) => ({catalogId: Item.catalogId, instanceId: Hash(`${TokenHash}:${Item.catalogId}`).slice(0, 32), updateVersion: 0}));
 
-        if(Stacked.length > 0 || Instanced.length > 0){
+        if(Stacked.length > 0 || Instanced.length > 0 || Pricing.Price > 0){
             try{
                 ApplyInventoryTransactionInTx(tx, {
                     UserId: AccountId,
                     CharacterId: Purchase.characterId,
                     TransactionId: `store:${TokenHash}`,
                     InstancedItemsToAdd: Instanced,
-                    StackedItemsToAdd: Stacked
+                    StackedItemsToAdd: Stacked,
+                    StackedItemsToRemove: Pricing.Price > 0 ? [{catalogId: Pricing.CatalogId, quantity: Pricing.Price}] : undefined
                 }, {Caller: "store", Source: `store:${Purchase.skuId}`});
             }
             catch(error){

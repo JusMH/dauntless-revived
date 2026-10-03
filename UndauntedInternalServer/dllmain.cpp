@@ -1,3 +1,5 @@
+#include "HuntIdlePolicy.h"
+
 #include "ServerFrameLimit.h"
 #include <chrono>
 #include <thread>
@@ -45,32 +47,6 @@ namespace Globals {
     std::wstring MetagameAddress;
 
     bool EnableLogging = true;
-}
-
-void SignalServerReady() {
-    const DWORD Required = GetEnvironmentVariableW(L"DR_GAMESERVER_READY_FILE", nullptr, 0);
-
-    if (Required == 0) {
-        return;
-    }
-
-    std::wstring Path(Required, L'\0');
-
-    if (GetEnvironmentVariableW(L"DR_GAMESERVER_READY_FILE", Path.data(), Required) == 0) {
-        return;
-    }
-
-    Path.resize(Required - 1);
-    HANDLE File = CreateFileW(Path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
-
-    if (File == INVALID_HANDLE_VALUE) {
-        return;
-    }
-
-    const char Ready = '1';
-    DWORD Written = 0;
-    WriteFile(File, &Ready, 1, &Written, nullptr);
-    CloseHandle(File);
 }
 
 std::map<std::wstring, std::wstring> EndpointMap = {};
@@ -349,7 +325,7 @@ void EncounterableSetupHook() {
     return;
 }
 
-float TotalNoPlayersTime = 0.0f;
+HuntIdlePolicy HuntIdle;
 
 bool EnableWatchdog = true;
 
@@ -386,10 +362,6 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
     if (Globals::DoListen) {
         Globals::DoListen = false;
         Globals::Listening = Networking::Listen(UEngine::GetEngine(), Globals::Port);
-
-        if (Globals::Listening) {
-            SignalServerReady();
-        }
     }
 
     if (Globals::Listening && Networking::NetDriver) {
@@ -402,14 +374,8 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
             HasConnection = true;
         }
 
-        if (EnableWatchdog) {
-            if (!HasConnection) {
-                TotalNoPlayersTime += DeltaTime;
-
-                if (TotalNoPlayersTime >= 50.0f) {
-                    exit(0);
-                }
-            }
+        if (EnableWatchdog && HuntIdle.Advance(DeltaTime, HasConnection)) {
+            exit(0);
         }
 
         for (UNetConnection* Conn : Networking::NetDriver->ClientConnections) {

@@ -7,7 +7,7 @@ import { and, eq } from "drizzle-orm";
 import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
 import { characters, inventory, storepurchases, users } from "../src/db/schema";
-import { CreateStorePurchase, GetStoreOffer, GrantKind, ListStoreOffers, MAX_TOKENS_PER_WINDOW, PruneExpiredStorePurchases, RECEIPT_DAYS, RedeemStorePurchase, SetStoreTokenLimitForTests } from "../src/controllers/freestore";
+import { CreateStorePurchase, GetStoreOffer, GrantKind, ListStoreOffers, MAX_TOKENS_PER_WINDOW, PruneExpiredStorePurchases, RECEIPT_DAYS, RedeemStorePurchase, SetExtraOffersForTests, SetStoreTokenLimitForTests, StoreOffer } from "../src/controllers/freestore";
 import { HasActiveEntitlement, ListEntitlements, RevokeEntitlementInTx } from "../src/controllers/entitlements";
 import { CreateCharacterForUid, UpdateCharacterForUid } from "../src/controllers/character";
 import StoreCatalog from "../src/vendor/store_catalog.json";
@@ -621,5 +621,103 @@ describe("over HTTP", () => {
             }
             assert.equal(Count("storepurchases", "accountId = ?", A.UserId), 0);
         });
+    });
+});
+
+describe("non-platinum currency pricing (mechanism only; the shipped catalogue stays free)", () => {
+    const CellDustOffer: StoreOffer = {
+        id: "test_celldust_offer",
+        tags: ["webstore"],
+        platinumPrice: null as unknown as number,
+        cellDustPrice: 500,
+        items: [{ catalogId: ITEM, quantity: 1 }],
+        entitlements: null,
+        remaining: 1
+    };
+
+    const AmbiguousOffer: StoreOffer = {
+        ...CellDustOffer,
+        id: "test_ambiguous_offer",
+        platinumPrice: 0
+    };
+
+    beforeEach(() => {
+        SetExtraOffersForTests([CellDustOffer, AmbiguousOffer]);
+    });
+
+    after(() => {
+        SetExtraOffersForTests();
+    });
+
+    function Credit(CharacterId: string, CatalogId: string, Quantity: number){
+        GetDb().insert(inventory).values({ characterId: CharacterId, instancedItems: "[]", stackedItems: JSON.stringify([{ catalogId: CatalogId, quantity: Quantity }]) }).run();
+    }
+
+    it("charges the exact amount from the matching currency stack and grants the item", async () => {
+        const A = await MakePlayer();
+        Credit(A.CharacterId, "CURRENCY_CELLDUST", 750);
+
+        const Token = (await Call("GET", `/token/celldust/${CellDustOffer.id}`, { as: A.UserId })).json.purchaseToken;
+        const Confirm = await Call("POST", `/notification/celldust?token=${Token}`, { as: A.UserId });
+
+        assert.equal(Confirm.status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 250);
+        assert.equal(StackQuantity(A.CharacterId, ITEM), 1);
+    });
+
+    it("refuses the token when the balance is short, and grants or charges nothing", async () => {
+        const A = await MakePlayer();
+        Credit(A.CharacterId, "CURRENCY_CELLDUST", 100);
+
+        assert.equal((await Call("GET", `/token/celldust/${CellDustOffer.id}`, { as: A.UserId })).status, 409);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 100);
+        assert.equal(StackQuantity(A.CharacterId, ITEM), 0);
+        assert.equal(Count("storepurchases", "accountId = ?", A.UserId), 0);
+    });
+
+    it("refuses redeem if the balance drops below the price after the token is issued", async () => {
+        const A = await MakePlayer();
+        Credit(A.CharacterId, "CURRENCY_CELLDUST", 500);
+
+        const Token = (await Call("GET", `/token/celldust/${CellDustOffer.id}`, { as: A.UserId })).json.purchaseToken;
+
+        GetDb().update(inventory).set({ stackedItems: JSON.stringify([{ catalogId: "CURRENCY_CELLDUST", quantity: 10 }]) }).where(eq(inventory.characterId, A.CharacterId)).run();
+
+        const Confirm = await Call("POST", `/notification/celldust?token=${Token}`, { as: A.UserId });
+        assert.equal(Confirm.status, 409);
+        assert.equal(StackQuantity(A.CharacterId, ITEM), 0);
+    });
+
+    it("refuses a currency that does not match the offer's own price field", async () => {
+        const A = await MakePlayer();
+        Credit(A.CharacterId, "CURRENCY_PLATINUM_UNIV", 1000);
+
+        assert.equal((await Call("GET", `/token/platinum/${CellDustOffer.id}`, { as: A.UserId })).status, 400);
+    });
+
+    it("refuses an offer with more than one price field set", async () => {
+        const A = await MakePlayer();
+        Credit(A.CharacterId, "CURRENCY_CELLDUST", 1000);
+
+        assert.equal((await Call("GET", `/token/celldust/${AmbiguousOffer.id}`, { as: A.UserId })).status, 500);
+    });
+
+    it("refuses an unrecognised currency string", async () => {
+        const A = await MakePlayer();
+
+        assert.equal((await Call("GET", `/token/event01/${CellDustOffer.id}`, { as: A.UserId })).status, 400);
+    });
+
+    it("a retried confirm does not charge twice", async () => {
+        const A = await MakePlayer();
+        Credit(A.CharacterId, "CURRENCY_CELLDUST", 500);
+
+        const Token = (await Call("GET", `/token/celldust/${CellDustOffer.id}`, { as: A.UserId })).json.purchaseToken;
+
+        const First = await Call("POST", `/notification/celldust?token=${Token}`, { as: A.UserId });
+        const Second = await Call("POST", `/notification/celldust?token=${Token}`, { as: A.UserId });
+
+        assert.deepEqual([First.status, Second.status], [204, 204]);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 0);
     });
 });

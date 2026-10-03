@@ -182,6 +182,24 @@ async function JoinAll(ThePath: Path){
 }
 
 describe("matchmaking when the deploy server starts no game server", () => {
+    it('a cold hunt does not block join/status requests or allocate twice', async () => {
+        let Finish!: () => void;
+        CurrentMode = {Name: 'cold startup', Reply: res => { Finish = () => WORKING.Reply(res); }};
+        const started = Date.now();
+        const players = await JoinAll(PATHS[2]);
+        assert.ok(Date.now() - started < 2300, 'join waited for the cold game process');
+        await WaitForCalls(1);
+        for (const player of players)
+            assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'MATCHING');
+        Finish();
+        for (let retry = 0; retry < 30; retry++) {
+            const status = (await Call('GET', '/candidate/status', players[0].Token)).json.status;
+            if (status === 'IN_PROGRESS') return;
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        assert.fail('ready hunt was never returned');
+    });
+
     it('capacity waits retry once after ten seconds and reach the same server on every path', async () => {
         const { SetPartyClockForTests } = await import('../src/controllers/party');
         let now = Date.now();
