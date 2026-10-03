@@ -9,6 +9,8 @@
 //    launcher's local relay, which carries the WebSocket to the server over pinned TLS.
 //  - GameUserSettings.ini: when a graphics level is forced, its sg.*Quality lines are set to match.
 
+import { repairDisplaySettings } from './display-repair';
+
 import { promises as fsp } from "node:fs";
 import path from "node:path";
 import { isValidHost } from "../shared/invite";
@@ -126,16 +128,21 @@ export interface ApplyConfigOptions {
   configDir?: string;
 }
 
-export async function applyGameConfig(opts: ApplyConfigOptions): Promise<{ engineIni: string }> {
+export async function applyGameConfig(opts: ApplyConfigOptions): Promise<{ engineIni: string; displayRepaired: boolean }> {
   const dir = opts.configDir ?? defaultConfigDir();
   await fsp.mkdir(dir, { recursive: true });
   const engine = path.join(dir, "Engine.ini");
   const existing = (await readLines(engine)) ?? [];
   await writeAtomically(engine, encodeIni(rewriteEngineIniText(existing, opts.host, opts.graphics, opts.xmppPort ?? XMPP_PORT, opts.exposure ?? "game")));
-  if (opts.graphics >= 0) {
-    const gus = path.join(dir, "GameUserSettings.ini");
-    const lines = await readLines(gus);
-    if (lines !== null) await writeAtomically(gus, encodeIni(rewriteGameUserSettingsText(lines, opts.graphics)));
+  const gus = path.join(dir, "GameUserSettings.ini");
+  const lines = await readLines(gus);
+  let displayRepaired = false;
+  if (lines !== null) {
+    const display = repairDisplaySettings(lines);
+    displayRepaired = display.repaired;
+    if (displayRepaired) await fsp.copyFile(gus, `${gus}.before-display-repair-${Date.now()}`);
+    const next = opts.graphics >= 0 ? rewriteGameUserSettingsText(display.lines, opts.graphics) : display.lines;
+    if (displayRepaired || opts.graphics >= 0) await writeAtomically(gus, encodeIni(next));
   }
-  return { engineIni: engine };
+  return { engineIni: engine, displayRepaired };
 }

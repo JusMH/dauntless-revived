@@ -1106,20 +1106,24 @@ export class Controller {
           }
           if (this.hostPlatform === "linux" && prepared === null) return this.fail("compat_runtime_missing");
         }
+        let displayRepaired = false;
+
         try {
-          await applyGameConfig({
+          const config = await applyGameConfig({
             host: gameHost,
             xmppPort,
             graphics: this.s.graphics,
             exposure: this.s.exposure,
             configDir: prepared?.configDir ?? this.p.gameConfigDir,
           });
+          displayRepaired = config.displayRepaired;
+
           if (this.s.exposure !== "game") log.info(`game config: auto exposure ${this.s.exposure}`);
         } catch (e) {
           log.error(`could not write the game config: ${describeError(e)}`);
           return this.fail("config_failed");
         }
-        const args = buildLaunchArgs({ host: gameHost, port: gamePort, key, windowed: this.s.windowed });
+        const args = buildLaunchArgs({ host: gameHost, port: gamePort, key, windowed: this.s.windowed || displayRepaired });
         const via = prepared ? ` via ${prepared.runtimeName}` : "";
         log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : ""}`);
         try {
