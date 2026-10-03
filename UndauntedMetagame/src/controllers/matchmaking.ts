@@ -24,10 +24,12 @@ const QUEUE_FULL_PLAYERS = 4;
 export const CAPACITY_WAIT_MS = 60 * 1000;
 
 type MatchmakingQueueData = {
+    HuntId: string,
     RetryAfter?: number,
     CapacityDeadline?: number,
-    Players: string[],         // distinct account ids, in join order: a player is in at most one queue
-    LastPlayerAddedTime: number, // PartyNow(), the clock the rest of matchmaking uses
+    Players: string[],
+    CandidateIds: Map<string, string>,
+    LastPlayerAddedTime: number,
     Resolved: boolean
 };
 
@@ -51,8 +53,9 @@ type LaunchResult = {
     port: number
 };
 
-let MatchmakingQueueMap: Map<string, MatchmakingQueueData> = new Map<string, MatchmakingQueueData>(); // Key is HuntID
-let MatchmakingResultMap: Map<string, MatchmakingResult> = new Map<string, MatchmakingResult>(); // Key is PlayerID
+let MatchmakingQueueMap: Map<string, MatchmakingQueueData> = new Map<string, MatchmakingQueueData>();
+let MatchmakingResultMap: Map<string, MatchmakingResult> = new Map<string, MatchmakingResult>();
+const PlayerQueueMap = new Map<string, MatchmakingQueueData>();
 // The server each player was last told to travel to (the status poll's IN_PROGRESS)
 const LastSentMap = new Map<string, { Host: string, Port: number, HuntId: string, At: number }>();
 
@@ -171,14 +174,16 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
     }
 }
 
-async function PopQueue(HuntId: string){
-    const MatchmakingQueue = MatchmakingQueueMap.get(HuntId);
-
+async function PopQueue(HuntId: string, MatchmakingQueue: MatchmakingQueueData | undefined = MatchmakingQueueMap.get(HuntId)){
     if(MatchmakingQueue == undefined || MatchmakingQueue.Resolved || (MatchmakingQueue.RetryAfter ?? 0) > PartyNow()){
         return;
     }
 
     MatchmakingQueue.Resolved = true;
+
+    if(MatchmakingQueueMap.get(HuntId) === MatchmakingQueue){
+        MatchmakingQueueMap.delete(HuntId);
+    }
 
     const GameOnDeployServer: LaunchResult = MatchmakingQueue.CapacityDeadline !== undefined && PartyNow() >= MatchmakingQueue.CapacityDeadline
         ? {succeeded: false, readyNow: false, host: '', port: 0}
@@ -186,7 +191,7 @@ async function PopQueue(HuntId: string){
 
     if (GameOnDeployServer.capacity) {
         MatchmakingQueue.CapacityDeadline ??= PartyNow() + CAPACITY_WAIT_MS;
-        if (PartyNow() < MatchmakingQueue.CapacityDeadline) {
+        if (PartyNow() < MatchmakingQueue.CapacityDeadline && MatchmakingQueue.Players.length > 0) {
             MatchmakingQueue.Resolved = false;
             MatchmakingQueue.RetryAfter = PartyNow() + 10000;
             return;
@@ -195,9 +200,9 @@ async function PopQueue(HuntId: string){
 
     for(const Player of MatchmakingQueue.Players){
         const PlayerMatchmakingResultToUpdate = MatchmakingResultMap.get(Player);
+        const CandidateId = MatchmakingQueue.CandidateIds.get(Player);
 
-        // Only the entry this queue made: not a newer join, and not a party candidate that took the player since
-        if(PlayerMatchmakingResultToUpdate != undefined && !PlayerMatchmakingResultToUpdate.Ready && !PlayerMatchmakingResultToUpdate.PartyCandidate && PlayerMatchmakingResultToUpdate.HuntId === HuntId){
+        if(PlayerMatchmakingResultToUpdate != undefined && CandidateId !== undefined && PlayerMatchmakingResultToUpdate.CandidateId === CandidateId && !PlayerMatchmakingResultToUpdate.Ready && !PlayerMatchmakingResultToUpdate.PartyCandidate && PlayerMatchmakingResultToUpdate.HuntId === HuntId){
             if(GameOnDeployServer.succeeded){
                 PlayerMatchmakingResultToUpdate.Host = GameOnDeployServer.host;
                 PlayerMatchmakingResultToUpdate.Port = GameOnDeployServer.port;
@@ -207,14 +212,14 @@ async function PopQueue(HuntId: string){
                 PlayerMatchmakingResultToUpdate.Failed = true;
             }
         }
+
+        if(PlayerQueueMap.get(Player) === MatchmakingQueue){
+            PlayerQueueMap.delete(Player);
+        }
     }
 
     if(!GameOnDeployServer.succeeded){
         logger.warn(`mm: the ${HuntId} queue (${MatchmakingQueue.Players.join(",")}) got no game server; their status polls answer FAILED`);
-    }
-
-    if(MatchmakingQueueMap.get(HuntId) === MatchmakingQueue){
-        MatchmakingQueueMap.delete(HuntId);
     }
 }
 
@@ -243,7 +248,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
 
     // Party candidates have no queue: the leader's join started their server already
     if(!PlayerMatchmakingResult.Ready && !PlayerMatchmakingResult.Failed && !PlayerMatchmakingResult.PartyCandidate){
-        const MatchmakingQueue = MatchmakingQueueMap.get(PlayerMatchmakingResult.HuntId);
+        const MatchmakingQueue = PlayerQueueMap.get(PlayerId);
 
         if(MatchmakingQueue == undefined){
             logger.warn(`mm: ${PlayerId} waits for ${PlayerMatchmakingResult.HuntId} but no queue holds them; answering FAILED`);
@@ -253,54 +258,76 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
         }
 
         if(PartyNow() - MatchmakingQueue.LastPlayerAddedTime > QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
-            await PopQueue(PlayerMatchmakingResult.HuntId);
+            await PopQueue(PlayerMatchmakingResult.HuntId, MatchmakingQueue);
         }
     }
 
     return PlayerMatchmakingResult;
 }
 
-// TODO: This can fail if the previous party is waiting for the deployserver, and a new party is joining in.
-// Right now we handle this by failing all new players until the old party is cleared out
-// This can be MUCH better in the future
 async function QueuePlayer(HuntId: string, PlayerId: string){
-    const ExistingQueue = MatchmakingQueueMap.get(HuntId);
-    if(ExistingQueue?.Resolved || (ExistingQueue && ExistingQueue.Players.length >= QUEUE_FULL_PLAYERS && !ExistingQueue.Players.includes(PlayerId))){
-        return false;
+    const CurrentEntry = MatchmakingResultMap.get(PlayerId);
+    const CurrentQueue = PlayerQueueMap.get(PlayerId);
+
+    if(CurrentEntry !== undefined && !CurrentEntry.PartyCandidate && !CurrentEntry.Failed && CurrentEntry.HuntId === HuntId){
+        if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId)){
+            return true;
+        }
+
+        if(CurrentEntry.Ready){
+            const LastSent = LastSentMap.get(PlayerId);
+
+            if(LastSent !== undefined && LastSent.HuntId === HuntId && LastSent.Host === CurrentEntry.Host && LastSent.Port === CurrentEntry.Port){
+                CurrentEntry.ParkedAt = PartyNow();
+            }
+
+            return true;
+        }
     }
 
-    // A player has at most one queued join: this one replaces any older one still waiting, in this
-    // hunt's queue or another's. Before, a join the player had made earlier (never matched, and its
-    // cancel is ignored on purpose, see routes/matchmaking.ts) stayed in the queue, the new join was
-    // added next to it, and the hunt server was told to expect the player twice.
+    const ExistingQueue = MatchmakingQueueMap.get(HuntId);
+
+    if(ExistingQueue !== undefined && ExistingQueue.Players.length >= QUEUE_FULL_PLAYERS){
+        void PopQueue(HuntId, ExistingQueue);
+    }
+
     LeaveWaitingQueues(PlayerId, "their new join replaces it");
 
-    // Looked up again: the player's older join may have been the only one in this hunt's queue
-    const Queue = MatchmakingQueueMap.get(HuntId);
+    let Queue = MatchmakingQueueMap.get(HuntId);
+
+    if(Queue !== undefined && Queue.Players.length >= QUEUE_FULL_PLAYERS){
+        void PopQueue(HuntId, Queue);
+        Queue = undefined;
+    }
+
+    const CandidateId = crypto.randomUUID();
 
     MatchmakingResultMap.set(PlayerId, {
         Ready: false,
-        CandidateId: crypto.randomUUID(),
+        CandidateId: CandidateId,
         HuntId: HuntId,
         Host: "",
         Port: 0
     });
 
     if(Queue === undefined){
-        MatchmakingQueueMap.set(HuntId, {
-            Players: [PlayerId],
+        Queue = {
+            HuntId: HuntId,
+            Players: [],
+            CandidateIds: new Map<string, string>(),
             LastPlayerAddedTime: PartyNow(),
             Resolved: false
-        });
-
-        return true;
+        };
+        MatchmakingQueueMap.set(HuntId, Queue);
     }
 
     Queue.Players.push(PlayerId);
+    Queue.CandidateIds.set(PlayerId, CandidateId);
     Queue.LastPlayerAddedTime = PartyNow();
+    PlayerQueueMap.set(PlayerId, Queue);
 
     if(Queue.Players.length >= QUEUE_FULL_PLAYERS){
-        await PopQueue(HuntId);
+        void PopQueue(HuntId, Queue);
     }
 
     return true;
@@ -310,17 +337,21 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
 // it takes them out of every queue still waiting, so no hunt server is told to expect a player who
 // went elsewhere, or the same player twice. A queue already asking the deploy server is left alone.
 function LeaveWaitingQueues(PlayerId: string, Why: string){
-    for(const [HuntId, Queue] of [...MatchmakingQueueMap.entries()]){
-        if(!Queue.Resolved && Queue.Players.includes(PlayerId)){
-            Queue.Players = Queue.Players.filter((Player) => Player !== PlayerId);
+    const Queue = PlayerQueueMap.get(PlayerId);
 
-            if(Queue.Players.length === 0){
-                MatchmakingQueueMap.delete(HuntId);
-            }
-
-            logger.info(`mm: ${PlayerId} taken out of the ${HuntId} queue: ${Why}`);
-        }
+    if(Queue === undefined || Queue.Resolved || !Queue.Players.includes(PlayerId)){
+        return;
     }
+
+    Queue.Players = Queue.Players.filter((Player) => Player !== PlayerId);
+    Queue.CandidateIds.delete(PlayerId);
+    PlayerQueueMap.delete(PlayerId);
+
+    if(Queue.Players.length === 0 && MatchmakingQueueMap.get(Queue.HuntId) === Queue){
+        MatchmakingQueueMap.delete(Queue.HuntId);
+    }
+
+    logger.info(`mm: ${PlayerId} taken out of the ${Queue.HuntId} queue: ${Why}`);
 }
 
 // A player going somewhere on their own no longer counts in their party's candidate
@@ -374,16 +405,18 @@ export function CancelMatchmaking(PlayerId: string){
         return PlayerMatchmakingResult;
     }
 
-    const MatchmakingQueue = MatchmakingQueueMap.get(PlayerMatchmakingResult.HuntId);
+    const MatchmakingQueue = PlayerQueueMap.get(PlayerId);
 
     if(MatchmakingQueue != undefined && !MatchmakingQueue.Resolved){
         MatchmakingQueue.Players = MatchmakingQueue.Players.filter((Player) => Player !== PlayerId);
+        MatchmakingQueue.CandidateIds.delete(PlayerId);
 
-        if(MatchmakingQueue.Players.length === 0){
-            MatchmakingQueueMap.delete(PlayerMatchmakingResult.HuntId);
+        if(MatchmakingQueue.Players.length === 0 && MatchmakingQueueMap.get(MatchmakingQueue.HuntId) === MatchmakingQueue){
+            MatchmakingQueueMap.delete(MatchmakingQueue.HuntId);
         }
     }
 
+    PlayerQueueMap.delete(PlayerId);
     MatchmakingResultMap.delete(PlayerId);
 
     return PlayerMatchmakingResult;
@@ -807,5 +840,6 @@ export function ResetMatchmakingForTests(){
     CapacityWaits.clear();
     MatchmakingQueueMap.clear();
     MatchmakingResultMap.clear();
+    PlayerQueueMap.clear();
     LastSentMap.clear();
 }
