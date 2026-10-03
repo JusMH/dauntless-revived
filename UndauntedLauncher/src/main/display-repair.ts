@@ -1,7 +1,7 @@
 // The shipped D3D11 client cannot allocate a texture wider/taller than 16384.
 // Repair only impossible saved dimensions, preserving ordinary display choices.
 const dimensions = /^(?:ResolutionSize[XY]|LastUserConfirmedResolutionSize[XY]|DesiredScreen(?:Width|Height)|LastUserConfirmedDesiredScreen(?:Width|Height))$/i;
-export function repairDisplaySettings(lines: string[]): {lines:string[], repaired:boolean} {
+export function repairDisplaySettings(lines: string[], forceSafeWindow = false): {lines:string[], repaired:boolean} {
   let section = false;
   const bad = lines.some(line => {
     const heading = /^\s*\[([^\]]+)\]/.exec(line);
@@ -11,7 +11,12 @@ export function repairDisplaySettings(lines: string[]): {lines:string[], repaire
     const value = Number(match[2]);
     return !Number.isFinite(value) || value < 1 || value > 16384;
   });
-  if (!bad) return {lines, repaired:false};
+  if (!bad && !forceSafeWindow) return {lines, repaired:false};
+  // A clean/missing INI can still inherit a bad desktop/fullscreen size. The opt-in
+  // Poet fix writes safe settings even when the old saved-dimension heuristic finds nothing.
+  if (!lines.some(line=>/^\s*\[[^\]]*(?:^|\.)[A-Za-z]*GameUserSettings\]/i.test(line))) {
+    lines=[...lines,'[/Script/Engine.GameUserSettings]','[/Script/Archon.ArchonGameUserSettings]'];
+  }
   section = false;
   const out: string[] = [];
   for (const line of lines) {
@@ -26,5 +31,5 @@ export function repairDisplaySettings(lines: string[]): {lines:string[], repaire
     if (section && key && (dimensions.test(key) || /^(FullscreenMode|LastConfirmedFullscreenMode|PreferredFullscreenMode|WindowPos[XY])$/i.test(key))) continue;
     out.push(line);
   }
-  return {lines:out,repaired:true};
+  return {lines:out,repaired:out.join('\n') !== lines.join('\n')};
 }

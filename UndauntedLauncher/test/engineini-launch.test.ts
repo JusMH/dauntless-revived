@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { EventEmitter } from "node:events";
@@ -16,6 +16,24 @@ const KEY = "UUK_" + "0123456789abcdef".repeat(3);
 function tempDir(): string {
   return mkdtempSync(path.join(tmpdir(), "dr-launcher-test-"));
 }
+
+test('Poet fix writes missing config, backs up changed display settings once and reapplies after a game change',async()=>{
+  const dir=tempDir(); const file=path.join(dir,'GameUserSettings.ini');
+  const opts={host:'127.0.0.1',graphics:-1 as const,configDir:dir,safeWindow:true};
+  try {
+    assert.equal((await applyGameConfig(opts)).displayRepaired,true);
+    assert.match(readFileSync(file,'utf8'),/ResolutionSizeX=1280/);
+    assert.equal((await applyGameConfig(opts)).displayRepaired,false);
+    const previous='[/Script/Archon.ArchonGameUserSettings]\nResolutionSizeX=1920\nResolutionSizeY=1080\nFullscreenMode=1\nVolume=0.7\n';
+    writeFileSync(file,previous);
+    assert.equal((await applyGameConfig(opts)).displayRepaired,true);
+    const backups=readdirSync(dir).filter(name=>name.includes('.before-display-repair-'));
+    assert.equal(backups.length,1); assert.equal(readFileSync(path.join(dir,backups[0]),'utf8'),previous);
+    assert.match(readFileSync(file,'utf8'),/Volume=0.7/);
+    assert.equal((await applyGameConfig(opts)).displayRepaired,false);
+    assert.equal(readdirSync(dir).filter(name=>name.includes('.before-display-repair-')).length,1);
+  } finally {rmSync(dir,{recursive:true,force:true});}
+});
 
 // What friend-kit/play.ps1 writes for a new file with -Graphics 4 and host 100.64.0.7.
 const EXPECTED_FRESH = [

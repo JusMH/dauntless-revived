@@ -1134,6 +1134,8 @@ export class Controller {
             xmppPort,
             graphics: this.s.graphics,
             exposure: this.s.exposure,
+            safeWindow: this.s.windowed,
+
             configDir: prepared?.configDir ?? this.p.gameConfigDir,
           });
           displayRepaired = config.displayRepaired;

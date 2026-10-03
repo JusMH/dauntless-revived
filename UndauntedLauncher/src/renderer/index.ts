@@ -1174,7 +1174,7 @@ function renderSettings(): void {
       h("h2", { class: "card-title" }, t("set_graphics")),
       h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("label", { class: "settings-row-title", for: "gfx-select" }, t("set_graphics_level")), h("span", { class: "settings-row-sub" }, t("set_graphics_text"))), select),
       h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("label", { class: "settings-row-title", for: "exposure-select" }, t("set_exposure")), h("span", { class: "settings-row-sub" }, t("set_exposure_text"))), exposure),
-      h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("span", { class: "settings-row-title", id: "windowed-label" }, t("set_windowed"))), windowed),
+      h("div", { class: "settings-row" }, h("div", { class: "settings-row-text" }, h("span", { class: "settings-row-title", id: "windowed-label" }, t("set_windowed")), h("span", { class: "settings-row-sub" }, t("set_windowed_help"))), windowed),
     );
 
     const langRow = h("div", { class: "lang-switch", role: "group", "aria-label": t("set_language"), style: undefined });

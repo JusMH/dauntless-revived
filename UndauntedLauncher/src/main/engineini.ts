@@ -126,6 +126,7 @@ export interface ApplyConfigOptions {
   graphics: GraphicsPreset;
   exposure?: ExposureMode; // default "game": no exposure line
   configDir?: string;
+  safeWindow?: boolean;
 }
 
 export async function applyGameConfig(opts: ApplyConfigOptions): Promise<{ engineIni: string; displayRepaired: boolean }> {
@@ -137,10 +138,10 @@ export async function applyGameConfig(opts: ApplyConfigOptions): Promise<{ engin
   const gus = path.join(dir, "GameUserSettings.ini");
   const lines = await readLines(gus);
   let displayRepaired = false;
-  if (lines !== null) {
-    const display = repairDisplaySettings(lines);
+  if (lines !== null || opts.safeWindow) {
+    const display = repairDisplaySettings(lines ?? [], opts.safeWindow);
     displayRepaired = display.repaired;
-    if (displayRepaired) await fsp.copyFile(gus, `${gus}.before-display-repair-${Date.now()}`);
+    if (displayRepaired && lines !== null) await fsp.copyFile(gus, `${gus}.before-display-repair-${Date.now()}`);
     const next = opts.graphics >= 0 ? rewriteGameUserSettingsText(display.lines, opts.graphics) : display.lines;
     if (displayRepaired || opts.graphics >= 0) await writeAtomically(gus, encodeIni(next));
   }
