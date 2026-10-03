@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import { after, test } from "node:test";
+import { writeFileSync } from "node:fs";
 
 process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = "0.3";
 const game = require("../src/controllers/gameservers") as typeof import("../src/controllers/gameservers");
@@ -65,18 +66,22 @@ test("hunt startup failure during readiness grace is rejected and returns its po
 });
 
 
-test("startup grace does not serialize concurrent hunt spawns", async () => {
+test("readiness waits do not serialize concurrent hunt spawns", async () => {
     game.ResetGameserversForTests();
     const spawnTimes: number[] = [];
     game.UseProcessFunctionsForTests({
-        Spawn: () => {
+        Spawn: (_command, _args, options) => {
             spawnTimes.push(Date.now());
-            return Object.assign(new EventEmitter(), { pid: pid++, unref() {} }) as unknown as ChildProcess;
+            const readyFile = String(options.env?.DR_GAMESERVER_READY_FILE ?? "");
+            if(readyFile.length > 0){
+                setTimeout(() => writeFileSync(readyFile, "1"), 400);
+            }
+            return Object.assign(new EventEmitter(), { pid: pid++, unref() {}, kill() { return true; } }) as unknown as ChildProcess;
         },
         IsAlive: () => true
     });
     await game.Startup();
-    process.env.GAMESERVER_STARTUP_GRACE_MS = "400";
+    process.env.GAMESERVER_STARTUP_GRACE_MS = "1000";
 
     try{
         await Promise.all([
