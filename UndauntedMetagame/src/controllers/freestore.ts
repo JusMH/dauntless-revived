@@ -7,6 +7,7 @@ import { characters, inventory, storepurchases } from "../db/schema";
 import { logger } from "../logger";
 import { StoreRepeatableTokens } from "../features";
 import catalog from "../vendor/store_catalog.json";
+import curated30 from "../vendor/store_curated_30.json";
 import itemKinds from "../vendor/store_item_kinds.json";
 import { GetActiveCharacter } from "./activecharacter";
 import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
@@ -115,6 +116,7 @@ function IsRepeatable(Offer: StoreOffer){
 }
 
 function IsListed(Offer: StoreOffer){
+    if (process.env.STORE_CATALOG_PROFILE === "curated30" && Offer.tags.includes("webstore") && !curated30.includes(Offer.id)) return false;
     return !IsRepeatable(Offer) || StoreRepeatableTokens();
 }
 

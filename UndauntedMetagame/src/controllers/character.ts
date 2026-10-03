@@ -1,4 +1,5 @@
 import { and, eq, lt } from "drizzle-orm";
+import { isDeepStrictEqual } from 'node:util';
 import { GetDb } from "../db";
 import { characters } from "../db/schema";
 import { GetUsernameForUserId } from "./login";
@@ -125,6 +126,12 @@ export function UpdateCharacterForUid(CharacterId: string, UserId: string, Chara
                 throw new CharacterUpdateFailure("not_found", `characterId ${CharacterId} does not exist or does not belong to userId ${UserId}`);
             }
 
+            // A lost HTTP reply can make the world retry an already committed save.
+            // Acknowledge only an identical snapshot at the exact stored version.
+            if (Current.updateVersion === UpdateVersion && typeof CharacterDataToUpdateWith === 'string') {
+                const Processed = ProcessTriggers(CharacterDataToUpdateWith);
+                if (isDeepStrictEqual(JSON.parse(Current.data), JSON.parse(Processed))) return {success:true} as CharacterUpdateResult;
+            }
             if(Current.updateVersion >= UpdateVersion){
                 throw new CharacterUpdateFailure("conflict", `stored updateVersion ${Current.updateVersion}, incoming ${UpdateVersion}`, Current.updateVersion);
             }

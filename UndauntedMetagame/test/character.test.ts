@@ -46,6 +46,15 @@ describe("ProcessTriggers", () => {
 });
 
 describe("UpdateCharacterForUid", () => {
+    it('acknowledges identical committed retries without writing another history entry', async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+        assert.deepEqual(UpdateCharacterForUid(CharacterId,UserId,'{"hunt":"complete","reward":1}',1),{success:true});
+        const before = Count('characterhistory','characterId = ?',CharacterId);
+        assert.deepEqual(UpdateCharacterForUid(CharacterId,UserId,'{"reward":1,"hunt":"complete"}',1),{success:true});
+        assert.equal(Count('characterhistory','characterId = ?',CharacterId),before);
+        assert.equal(UpdateCharacterForUid(CharacterId,UserId,'{"hunt":"incomplete","reward":0}',1).success,false);
+        assert.equal(UpdateCharacterForUid(CharacterId,UserId,'{"hunt":"complete","reward":1}',0).success,false);
+    });
     it("answers not_found for a character that is not the caller's", async () => {
         const A = await MakePlayer();
         const B = await MakePlayer();
