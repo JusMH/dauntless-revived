@@ -55,6 +55,54 @@ const METAGAME_API_KEY = process.env.METAGAME_API_KEY!;
 const MY_IP = process.env.MY_IP!;
 const SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = Number(process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP!);
 
+function GameserverStartupGraceMs(){
+    const Raw = process.env.GAMESERVER_STARTUP_GRACE_MS;
+    if(Raw === undefined){
+        return 5000;
+    }
+
+    const Value = Number(Raw);
+
+    if(!/^\d+$/.test(Raw) || !Number.isSafeInteger(Value) || Value < 0 || Value > 60000){
+        throw new Error("Invalid GAMESERVER_STARTUP_GRACE_MS");
+    }
+
+    return Value;
+}
+
+async function WaitForServerStartup(Child: ChildProcess, Port: number, IsHunt: boolean){
+    if(!IsHunt){
+        return;
+    }
+
+    const GraceMs = GameserverStartupGraceMs();
+
+    if(GraceMs === 0){
+        return;
+    }
+
+    let OnExit!: (Code: number | null, Signal: NodeJS.Signals | null) => void;
+    let OnError!: (Error: Error) => void;
+    const Failed = new Promise<never>((_Resolve, Reject) => {
+        OnExit = (Code, Signal) => Reject(new Error(`Game server on port ${Port} exited during startup (${Signal ?? Code ?? "unknown"})`));
+        OnError = (Error) => Reject(new Error(`Game server on port ${Port} failed during startup: ${Error.message}`));
+        Child.once("exit", OnExit);
+        Child.once("error", OnError);
+    });
+
+    try{
+        await Promise.race([setTimeout(GraceMs), Failed]);
+    }
+    finally{
+        Child.off("exit", OnExit);
+        Child.off("error", OnError);
+    }
+
+    if(Child.pid === undefined || !ProcessIsAlive(Child.pid)){
+        throw new Error(`Game server on port ${Port} did not survive startup`);
+    }
+}
+
 function TransformExpectedPlayerArgs(ExpectedPlayers: ExpectedPlayer[]){
     let ToReturn = "";
 
@@ -257,6 +305,17 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         }
 
         throw new Error(`Could not start a game server on port ${Port}`);
+    }
+
+    try{
+        await WaitForServerStartup(Child, Port, IsHunt);
+    }
+    catch(error){
+        if(IsHunt && !FreePorts.includes(Port)){
+            FreePorts.push(Port);
+        }
+
+        throw error;
     }
 
     const NewGameserver: Gameserver = {
