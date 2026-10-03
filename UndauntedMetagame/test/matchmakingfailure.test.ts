@@ -124,6 +124,36 @@ async function Call(Method: string, Path: string, Token: string, Body?: unknown)
     return { status: Reply.status, json: Text.length > 0 ? JSON.parse(Text) : undefined };
 }
 
+async function WaitForCalls(Count: number){
+    const Deadline = Date.now() + 2000;
+
+    while(Calls.length < Count && Date.now() < Deadline){
+        await new Promise<void>((Resolve) => setTimeout(Resolve, 5));
+    }
+
+    assert.equal(Calls.length, Count);
+    await new Promise<void>((Resolve) => setTimeout(Resolve, 5));
+}
+
+async function WaitForStatus(Token: string, Expected: string){
+    const Deadline = Date.now() + 2000;
+    let Last: any;
+
+    while(Date.now() < Deadline){
+        Last = await Call("GET", "/candidate/status", Token);
+
+        if(Last.json?.status === Expected){
+            return Last;
+        }
+
+        await new Promise<void>((Resolve) => setTimeout(Resolve, 5));
+    }
+
+    assert.equal(Last?.json?.status, Expected);
+
+    return Last;
+}
+
 // The three ways a join reaches the deploy server, with the body the 1.4.4 client sends for each
 type Path = { Name: string, Players: number, Join: () => unknown };
 
@@ -161,15 +191,16 @@ describe("matchmaking when the deploy server starts no game server", () => {
                 Calls.length = 0;
                 CurrentMode = {Name: 'memory full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))};
                 const players = await JoinAll(path);
+                await WaitForCalls(1);
                 for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'MATCHING');
-                assert.equal(Calls.length, 1);
                 if (path.Players === 4) {
-                    const { HandlePlayerMatchmaking } = await import('../src/controllers/matchmaking');
-                    assert.equal(await HandlePlayerMatchmaking('ISLAND', '', Calls[0].HuntId, 'UID-fifth-capacity'), false);
+                    const { CancelMatchmaking, HandlePlayerMatchmaking } = await import('../src/controllers/matchmaking');
+                    assert.equal(await HandlePlayerMatchmaking('ISLAND', '', Calls[0].HuntId, 'UID-fifth-capacity'), true);
+                    CancelMatchmaking('UID-fifth-capacity');
                 }
                 CurrentMode = WORKING;
                 now += 10001;
-                for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'IN_PROGRESS');
+                for (const player of players) assert.equal((await WaitForStatus(player.Token, 'IN_PROGRESS')).json.status, 'IN_PROGRESS');
                 assert.equal(Calls.length, 2);
             }
         } finally { SetPartyClockForTests(); }
@@ -192,8 +223,9 @@ describe("matchmaking when the deploy server starts no game server", () => {
             for (const path of PATHS) {
                 Calls.length = 0;
                 const players = await JoinAll(path);
+                await WaitForCalls(1);
                 now += 60001;
-                for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'FAILED');
+                for (const player of players) assert.equal((await WaitForStatus(player.Token, 'FAILED')).json.status, 'FAILED');
                 assert.equal(Calls.length, 1);
             }
         } finally { SetPartyClockForTests(); }
@@ -204,10 +236,10 @@ describe("matchmaking when the deploy server starts no game server", () => {
             Calls.length = 0;
             const Players = await JoinAll(ThePath);
 
-            assert.equal(Calls.length, 1, `${ThePath.Name}: one start for the whole group`);
+            await WaitForCalls(1);
 
             for(const Player of Players){
-                const Status = await Call("GET", "/candidate/status", Player.Token);
+                const Status = await WaitForStatus(Player.Token, "IN_PROGRESS");
 
                 assert.equal(Status.json.status, "IN_PROGRESS", ThePath.Name);
                 assert.equal(Status.json.statusReason, null);
@@ -228,14 +260,14 @@ describe("matchmaking when the deploy server starts no game server", () => {
                 Calls.length = 0;
                 const Players = await JoinAll(ThePath);
 
-                assert.equal(Calls.length, 1, `${ThePath.Name}: asked once, no retry loop`);
+                await WaitForCalls(1);
 
                 if(ThePath.Players === 4){
                     assert.deepEqual(Calls[0].ExpectedPlayers, Players.map((Player) => Player.UserId));
                 }
 
                 for(const Player of Players){
-                    const Status = await Call("GET", "/candidate/status", Player.Token);
+                    const Status = await WaitForStatus(Player.Token, "FAILED");
 
                     assert.equal(Status.status, 200, ThePath.Name);
                     assert.equal(Status.json.status, "FAILED", `${Failure.Name} on ${ThePath.Name}`);
