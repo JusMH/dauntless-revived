@@ -47,6 +47,32 @@ namespace Globals {
     bool EnableLogging = true;
 }
 
+void SignalServerReady() {
+    const DWORD Required = GetEnvironmentVariableW(L"DR_GAMESERVER_READY_FILE", nullptr, 0);
+
+    if (Required == 0) {
+        return;
+    }
+
+    std::wstring Path(Required, L'\0');
+
+    if (GetEnvironmentVariableW(L"DR_GAMESERVER_READY_FILE", Path.data(), Required) == 0) {
+        return;
+    }
+
+    Path.resize(Required - 1);
+    HANDLE File = CreateFileW(Path.c_str(), GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_TEMPORARY, nullptr);
+
+    if (File == INVALID_HANDLE_VALUE) {
+        return;
+    }
+
+    const char Ready = '1';
+    DWORD Written = 0;
+    WriteFile(File, &Ready, 1, &Written, nullptr);
+    CloseHandle(File);
+}
+
 std::map<std::wstring, std::wstring> EndpointMap = {};
 void EvalEndpointMap() {
     static bool DidEvalEndpointMap = false;
@@ -359,9 +385,11 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
 
     if (Globals::DoListen) {
         Globals::DoListen = false;
-        Networking::Listen(UEngine::GetEngine(), Globals::Port);
+        Globals::Listening = Networking::Listen(UEngine::GetEngine(), Globals::Port);
 
-        Globals::Listening = true;
+        if (Globals::Listening) {
+            SignalServerReady();
+        }
     }
 
     if (Globals::Listening && Networking::NetDriver) {
