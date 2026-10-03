@@ -16,6 +16,7 @@ const PARTY_JOIN_WAIT_MS = 2500;
 // while it loads into the island) gets MATCHING for this long and nothing new is started;
 // if they are still asking after it, they are sent to the party's server again
 export const REJOIN_PARK_MS = 20 * 1000;
+const SOLO_REJOIN_WINDOW_MS = 60 * 1000;
 // A hunt queue goes to the deploy server this long after its last join (checked when a queued
 // player polls), or at once when it reaches QUEUE_FULL_PLAYERS
 const QUEUE_WAIT_MS = 20 * 1000;
@@ -277,11 +278,14 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
         if(CurrentEntry.Ready){
             const LastSent = LastSentMap.get(PlayerId);
 
-            if(LastSent !== undefined && LastSent.HuntId === HuntId && LastSent.Host === CurrentEntry.Host && LastSent.Port === CurrentEntry.Port){
-                CurrentEntry.ParkedAt = PartyNow();
+            if(LastSent === undefined){
+                return true;
             }
 
-            return true;
+            if(LastSent.HuntId === HuntId && LastSent.Host === CurrentEntry.Host && LastSent.Port === CurrentEntry.Port && PartyNow() - LastSent.At <= SOLO_REJOIN_WINDOW_MS){
+                CurrentEntry.ParkedAt = PartyNow();
+                return true;
+            }
         }
     }
 
