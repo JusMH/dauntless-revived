@@ -22,6 +22,7 @@ const SOLO_JOIN_DEDUPE_MS = 30 * 1000;
 // player polls), or at once when it reaches QUEUE_FULL_PLAYERS
 const QUEUE_WAIT_MS = 20 * 1000;
 const QUEUE_FULL_PLAYERS = 4;
+const QUEUE_STATUS_LAUNCH_WAIT_MS = 100;
 // Capacity is not an endless queue. End the attempt promptly when the host stays full.
 export const CAPACITY_WAIT_MS = 60 * 1000;
 
@@ -261,7 +262,10 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
         }
 
         if(PartyNow() - MatchmakingQueue.LastPlayerAddedTime > QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
-            await PopQueue(PlayerMatchmakingResult.HuntId, MatchmakingQueue);
+            await Promise.race([
+                PopQueue(PlayerMatchmakingResult.HuntId, MatchmakingQueue),
+                new Promise<void>((Resolve) => setTimeout(Resolve, QUEUE_STATUS_LAUNCH_WAIT_MS))
+            ]);
         }
     }
 
