@@ -17,6 +17,7 @@ const PARTY_JOIN_WAIT_MS = 2500;
 // if they are still asking after it, they are sent to the party's server again
 export const REJOIN_PARK_MS = 20 * 1000;
 const SOLO_REJOIN_WINDOW_MS = 60 * 1000;
+const SOLO_JOIN_DEDUPE_MS = 30 * 1000;
 // A hunt queue goes to the deploy server this long after its last join (checked when a queued
 // player polls), or at once when it reaches QUEUE_FULL_PLAYERS
 const QUEUE_WAIT_MS = 20 * 1000;
@@ -43,7 +44,8 @@ export type MatchmakingResult = {
     Failed?: boolean,          // no game server could be started: the status poll answers FAILED
     PartyCandidate?: boolean,  // part of a party's candidate (no per-hunt queue behind it)
     PartyMemberIds?: string[], // the candidate's members, for the status reply's playerStates
-    ParkedAt?: number          // a re-join after being sent (see REJOIN_PARK_MS)
+    ParkedAt?: number,
+    QueuedAt?: number
 };
 
 type LaunchResult = {
@@ -271,7 +273,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
     const CurrentQueue = PlayerQueueMap.get(PlayerId);
 
     if(CurrentEntry !== undefined && !CurrentEntry.PartyCandidate && !CurrentEntry.Failed && CurrentEntry.HuntId === HuntId){
-        if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId)){
+        if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId) && PartyNow() - (CurrentEntry.QueuedAt ?? 0) <= SOLO_JOIN_DEDUPE_MS){
             return true;
         }
 
@@ -311,7 +313,8 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
         CandidateId: CandidateId,
         HuntId: HuntId,
         Host: "",
-        Port: 0
+        Port: 0,
+        QueuedAt: PartyNow()
     });
 
     if(Queue === undefined){
