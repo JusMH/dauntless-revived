@@ -361,9 +361,7 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
 
     if (Globals::DoListen) {
         Globals::DoListen = false;
-        Networking::Listen(UEngine::GetEngine(), Globals::Port);
-
-        Globals::Listening = true;
+        Globals::Listening = Networking::Listen(UEngine::GetEngine(), Globals::Port);
     }
 
     if (Globals::Listening && Networking::NetDriver) {

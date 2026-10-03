@@ -2,7 +2,7 @@ import { RemoveTestDb } from "./setup";
 import "./matchmakingenv";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { CancelMatchmaking, CheckAndUpdateQueueStatus, DistinctPlayers, HandlePlayerMatchmaking } from "../src/controllers/matchmaking";
+import { CancelMatchmaking, CheckAndUpdateQueueStatus, DistinctPlayers, HandlePlayerMatchmaking, ResetMatchmakingForTests } from "../src/controllers/matchmaking";
 import { GetDb } from "../src/db";
 
 // Matchmaking looks up the player's party (controllers/party.ts), which loads the database
@@ -35,5 +35,70 @@ describe("DistinctPlayers (the expected-player list sent to the deploy server)",
         assert.deepEqual(DistinctPlayers(["UID-v", "UID-v", "UID-o"]), ["UID-v", "UID-o"]);
         assert.deepEqual(DistinctPlayers(["UID-o", "UID-v", "UID-o", "UID-v"]), ["UID-o", "UID-v"]);
         assert.deepEqual(DistinctPlayers([]), []);
+    });
+});
+
+
+describe("concurrent hunt queues", () => {
+    it("keeps a duplicate join on the same candidate", async () => {
+        ResetMatchmakingForTests();
+        assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-a"), true);
+        const first = await CheckAndUpdateQueueStatus("UID-a");
+        assert.ok(first);
+        assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-a"), true);
+        const second = await CheckAndUpdateQueueStatus("UID-a");
+        assert.equal(second?.CandidateId, first.CandidateId);
+    });
+
+    it("opens the next batch while a full batch is still allocating", async () => {
+        ResetMatchmakingForTests();
+        const originalFetch = globalThis.fetch;
+        let release: (() => void) | undefined;
+        let calls = 0;
+
+        globalThis.fetch = (async () => {
+            calls++;
+            await new Promise<void>((resolve) => { release = resolve; });
+            return new Response(JSON.stringify({host: "127.0.0.1", port: 39000}), {
+                status: 200,
+                headers: {"content-type": "application/json"}
+            });
+        }) as typeof fetch;
+
+        try{
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-a"), true);
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-b"), true);
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-c"), true);
+
+            const fourth = HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-d");
+            const returned = await Promise.race([
+                fourth.then(() => true),
+                new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 250))
+            ]);
+            assert.equal(returned, true);
+            assert.equal(calls, 1);
+
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-e"), true);
+            const fifth = await CheckAndUpdateQueueStatus("UID-e");
+            assert.ok(fifth);
+            assert.equal(fifth.Ready, false);
+
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_B", "UID-a"), true);
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Test_A", "UID-a"), true);
+            const newer = await CheckAndUpdateQueueStatus("UID-a");
+            assert.ok(newer);
+
+            release?.();
+            await new Promise<void>((resolve) => setTimeout(resolve, 20));
+
+            const afterOldLaunch = await CheckAndUpdateQueueStatus("UID-a");
+            assert.equal(afterOldLaunch?.CandidateId, newer.CandidateId);
+            assert.equal(afterOldLaunch?.Ready, false);
+        }
+        finally{
+            release?.();
+            globalThis.fetch = originalFetch;
+            ResetMatchmakingForTests();
+        }
     });
 });

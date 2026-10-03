@@ -88,7 +88,7 @@ namespace Networking {
             [Connection](int i) { return Connection->OpenChannels[i]; }, ChannelActor));
     }
 
-    void Listen(UEngine* Engine, int Port) {
+    bool Listen(UEngine* Engine, int Port) {
         BaseAddress = (uintptr_t)GetModuleHandleA(nullptr);
 
         FName GameNetDriver = UKismetStringLibrary::Conv_StringToName(L"GameNetDriver");
@@ -136,6 +136,8 @@ namespace Networking {
             std::ofstream Ready{std::filesystem::path(ReadyPath)};
             Ready << GetCurrentProcessId() << ":" << Port;
         }
+
+        return Listening;
     }
 
     void TickNetworking() {
