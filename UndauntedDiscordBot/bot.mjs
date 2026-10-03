@@ -7,12 +7,16 @@ const adminKey = process.env.METAGAME_ADMIN_KEY;
 if (!token || !adminKey) throw new Error('Configure DISCORD_BOT_TOKEN and METAGAME_ADMIN_KEY');
 const stateFile = resolve(process.env.KEY_STATE_FILE || './data/keys.json');
 const keys = new Keys(await loadState(stateFile), state => saveState(stateFile, state), backend(process.env.METAGAME_URL || 'http://127.0.0.1:61000', adminKey));
+await keys.migrateLinks();
+
 const client = new Client({intents: [GatewayIntentBits.Guilds]});
 const rest = new REST({version: '10'}).setToken(token);
 const command = new SlashCommandBuilder().setName('key').setDescription('Your Dauntless Revived access code')
   .setContexts(0, 1)
   .addSubcommand(option => option.setName('claim').setDescription('Receive your single-use code by direct message'))
-  .addSubcommand(option => option.setName('status').setDescription('Check whether your code has been redeemed'));
+  .addSubcommand(option => option.setName('status').setDescription('Check your account link or code redemption'))
+  .addSubcommand(option => option.setName('link').setDescription('Privately link your existing launcher account')
+    .addStringOption(value => value.setName('key').setDescription('Your existing launcher account key').setRequired(true).setMinLength(16).setMaxLength(512)));
 
 client.once(Events.ClientReady, async () => {
   try {
@@ -37,8 +41,11 @@ client.on(Events.InteractionCreate, async interaction => {
     }
     active.add(id); cooldown.set(id, Date.now() + 10000);
     try {
-      const claim = interaction.options.getSubcommand() === 'claim';
-      const result = await keys.run(id, claim);
+      const subcommand = interaction.options.getSubcommand();
+      const claim = subcommand === 'claim';
+      const result = subcommand === 'link'
+        ? await keys.link(id, interaction.options.getString('key', true).trim())
+        : await keys.run(id, claim);
       if (result.status === 'ready' && claim) {
         try {
           await interaction.user.send({content: `🔑 **Your Revived Code**\n\`\`\`\n${result.code}\n\`\`\`\nEnter this single-use code in the launcher's registration screen. Keep it private.\n**Clear skies, Slayer.**`, allowedMentions: {parse: []}});
@@ -46,6 +53,10 @@ client.on(Events.InteractionCreate, async interaction => {
         } catch { await interaction.editReply('I could not DM you. Enable direct messages, then run `/key claim` again. Your code is saved.'); }
       } else {
         const messages = {
+          linked: '🔑 **Key Accepted**\nYour Discord has been linked to your existing Revived account. Keep using the same launcher key—nothing to replace.\n**Clear skies, Slayer.**',
+          invalid_key: '🔑 **Key Not Accepted**\nCheck your launcher account key and try again. Registration codes cannot link an existing account.',
+          discord_already_linked: 'Your Discord is already linked to another account. Contact the server team to change it.',
+          account_already_linked: 'This account is already linked to another Discord. Contact the server team to change it.',
           ready: '🔑 **Key Ready**\nYour code has not been redeemed. Run `/key claim` to receive it by DM.',
           redeemed: '🔑 **Key Accepted**\nYour Revived code has been redeemed successfully.\n**Clear skies, Slayer.**',
           none: '🔑 **No Key Yet**\nRun `/key claim` and I will send your code by DM.',

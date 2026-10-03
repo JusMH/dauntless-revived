@@ -1,5 +1,5 @@
 (() => {
-  let key = '', busy = false, lastSample = null, accountPage = [], accountOffset = 0, nextOffset = null, accountsBusy = false;
+  let key = '', busy = false, lastSample = null, lastWorker = null, accountPage = [], accountOffset = 0, nextOffset = null, accountsBusy = false;
   const el = id => document.getElementById(id);
   const number = (n, suffix = '') => Number.isFinite(n) ? `${n.toFixed(1)}${suffix}` : '—';
   const duration = seconds => Number.isFinite(seconds) && seconds >= 0 ? `${Math.floor(seconds / 86400)}d ${Math.floor(seconds / 3600) % 24}h ${Math.floor(seconds / 60) % 60}m` : '—';
@@ -22,6 +22,28 @@
     values.forEach((value, i) => { if (value === null) { gap = true; return; } const x = i * canvas.width / Math.max(1, values.length - 1), y = canvas.height - 20 - value / max * (canvas.height - 40); if (gap) ctx.moveTo(x, y); else ctx.lineTo(x, y); gap = false; });
     ctx.stroke(); ctx.fillStyle = '#e4eef5'; ctx.font = `${12 * devicePixelRatio}px system-ui`; ctx.fillText(`Current: ${values.at(-1) == null ? 'unavailable' : Number(values.at(-1)).toFixed(1)} · peak: ${values.some(v => v != null) ? peak.toFixed(1) : 'unavailable'}`, 4, 16 * devicePixelRatio);
   }
+  function renderWorker(worker) {
+    lastWorker=worker;
+    const s=worker?.sample;
+    el('workerConnection').textContent=!worker?.configured ? 'Not configured' : worker.online ? 'Connected' : 'Unavailable · stale';
+    el('workerError').textContent=worker?.error || '';
+    if(!s)return;
+    el('workerFreshness').textContent=`${Date.now()-Date.parse(s.at)>15000?'STALE — ':''}Sample: ${new Date(s.at).toLocaleString()}`;
+    el('workerCpu').textContent=number(s.cpu,'%');el('workerCores').textContent=`${s.logicalCpus} logical processors`;
+    el('workerMemory').textContent=`${number(s.ramUsedMB/1024)} / ${number(s.ramTotalMB/1024)} GB`;
+    el('workerDisk').textContent=`Disk free ${number(s.diskFreeGB)} GB`;
+    el('workerHunts').textContent=s.hunts.length;el('workerUptime').textContent=`Host uptime ${duration(s.hostUptimeSeconds)}`;
+    table('workerServices',[['Worker monitor',worker.online?'Up':'Unavailable'],['Hunt deployment',s.services.deploy?'Up':'Unavailable'],['Shared backend connection',s.services.backend?'Up':'Unavailable'],['Player allowlist',s.services.allowlist?'Up':'Unavailable']]);
+    const f=s.firewall;
+    el('workerFirewall').textContent=f ? `UDP ${f.ports} · ${f.addresses} authenticated addresses · Firewall ${f.ok===false?'update failed':f.enabled?'open for allowed players':'closed'}${f.pending?' · update pending':''}`:'Firewall state unavailable';
+    for(const id of ['workerCpuChart','workerRamChart'])graph(id,worker.history || []);
+    const p=s.processes;
+    el('workerProcessFreshness').textContent=p ? `${Date.now()-Date.parse(p.at)>150000?'STALE — ':''}Process sample: ${new Date(p.at).toLocaleString()}`:'Waiting for process sample';
+    el('workerNetwork').textContent=p ? `Network in ${number(p.netInKbit)} / out ${number(p.netOutKbit)} kbit/s`:'';
+    table('workerProcessRows',(p?.processes || []).map(v=>[v.role,`${v.pid} / ${v.port ?? '—'}`,number(v.cpuPercent,'%'),number(v.workingSetMB,' MB'),number(v.privateMB,' MB'),duration((Date.now()-Date.parse(v.startedAt))/1000)]));
+    table('workerHuntRows',s.hunts.map(v=>[v.huntId || v.kind,v.port,v.expectedPlayers,duration((Date.now()-Date.parse(v.startedAt))/1000)]));
+  }
+
   function list(id, values) { el(id).replaceChildren(...values.map(text => { const item = document.createElement('li'); item.textContent = text; return item; })); }
   async function refresh() {
     if (!key || busy || document.hidden) return;
@@ -29,6 +51,7 @@
     try {
       const result = await get('/api/status');
       el('error').textContent = result.error || '';
+      renderWorker(result.worker);
       el('login').hidden = true; el('data').hidden = false;
       el('invites').hidden = !result.invitesEnabled;
       el('invitesUnavailable').hidden = result.invitesEnabled;
@@ -70,6 +93,7 @@
     for (const tab of document.querySelectorAll('[data-view]')) tab.setAttribute('aria-pressed', String(tab === button));
     if (lastSample) for (const id of charts) graph(id, lastSample.history);
     if (button.dataset.view === 'people') loadAccounts();
+    if (button.dataset.view === 'worker' && lastWorker) renderWorker(lastWorker);
   };
   function showAccounts() {
     const query = el('accountSearch').value.trim().toLowerCase();

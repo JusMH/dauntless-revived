@@ -7,3 +7,13 @@ The bot registers `/key claim` and `/key status` without replacing its other com
 `/key claim` generates one single-use **registration code** per Discord user on the server. The player enters it in the launcher's registration screen and chooses a username; the launcher receives the account's login key from the existing registration API. This is not recovery of an existing account's login key. `/key status` checks actual redemption in the metagame. A retry resends the same unused code, including after a DM failure. Redeemed or revoked codes are never replaced automatically.
 
 The bot's admin key is sent only to loopback HTTP. Configure `KEY_STATE_FILE` outside the application directory on deployments so code updates do not erase claims. Run one instance, with filesystem permissions limited to its service account and administrators. Never paste a bot token into `.gitignore`; ignore the file containing it.
+# Link an existing launcher account
+
+Run `/key link key:<your launcher account key>`. The bot verifies that key against
+the central account service and replies ephemerally, visible only to the caller.
+The metagame database stores the Discord ID, account UID and link time; it never
+stores or echoes the submitted launcher key. Existing keys and saves are unchanged.
+Verified links from the earlier bot state migrate automatically at startup.
+`/key status` reads the central database to confirm the account link.
+An account and Discord ID can each have only one link; conflicting changes require
+the server team. Registration invite codes cannot be used as launcher account keys.

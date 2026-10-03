@@ -33,8 +33,10 @@ service supervision on both hosts and check the reverse backend connection, game
 listeners, allowlist updates and an actual player join before calling the setup verified.
 
 The native dedicated-server tick hook caps the game thread at 30 frames per second.
-The injected replication loop runs once per game frame; the network driver's
-`NetServerMaxTickRate=30` alone did not limit it (a live Ramsgate sample measured
-about 76 replication ticks per second). `DR_SERVER_MAX_FPS` accepts 10–120, or 0 to
+The injected replication loop runs once per game frame. `DR_SERVER_MAX_FPS` accepts 10–120, or 0 to
 restore the original pacing. Restart game processes after changing it. This uses
 elapsed wall time, not a fixed simulation timestep, and does not cap client rendering.
+For read-only diagnostics, the DLL exports `DR_ServerTickCount` and
+`DR_ServerSimulatedSeconds`. Sample their differences over a measured interval to
+check actual frame pacing and simulation time. Do not use the network driver's
+internal tag at offset 0x2AC as a frame counter: replication also advances it.

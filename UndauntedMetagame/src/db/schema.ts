@@ -8,6 +8,13 @@ export const users = sqliteTable("users", {
     isAdmin: integer("isAdmin", {mode: "boolean"}).notNull().default(false)
 })
 
+export const discordlinks = sqliteTable('discordlinks', {
+    discordId: text('discordId').notNull().primaryKey(),
+    userId: text('userId').notNull().unique().references(() => users.userId),
+    linkedAt: text('linkedAt').notNull()
+});
+
+
 export const characters = sqliteTable("characters", {
     characterId: text("characterId").notNull().primaryKey(),
     userId: text("userId").notNull(),

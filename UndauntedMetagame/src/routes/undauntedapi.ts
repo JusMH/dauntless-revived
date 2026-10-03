@@ -1,3 +1,5 @@
+import { DiscordAccount, LinkDiscordAccount } from '../controllers/discordlinks';
+
 import { Router } from "express";
 import { DeleteInviteCode, GetAllUserIds, GetInviteCodes, GetRecentPlayerData, IsRegistrationMode, RegisterInviteCode, REGISTRATION_MODE, SetRegistrationMode } from "../controllers/undauntedapi";
 import { HasUndauntedUserApiKey } from "../middleware/HasUndauntedUserApiKey";
@@ -25,6 +27,17 @@ import { userapikeys, users } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 export const undauntedApiRouter = Router();
+
+undauntedApiRouter.post('/DiscordLink', AdminMutationRateLimit, HasUndauntedAdminApiKey, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(LinkDiscordAccount(req.body?.DiscordId, req.body?.UserId));
+});
+undauntedApiRouter.get('/DiscordLink/:discordId', HealthReadRateLimit, HasUndauntedAdminApiKey, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (!/^\d{17,20}$/.test(String(req.params.discordId))) { res.status(400).json({error:'invalid_discord_id'}); return; }
+    res.json({account: DiscordAccount(String(req.params.discordId)) ?? null});
+});
+
 
 undauntedApiRouter.get('/BackendHealth', HealthReadRateLimit, HasUndauntedAdminApiKey, (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');

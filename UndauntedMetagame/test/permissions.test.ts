@@ -274,6 +274,9 @@ const EXPECTED_ROUTES = [
     "POST /loadout/:userId/:characterId/active/:index [RealProgressionOnly, HasUndauntedMetagameAuth]",
     "GET /loadout/:userId/:characterId/all [HasUndauntedMetagameAuth]",
     "POST /loadout/:userId/:characterId/:index [HasUndauntedMetagameAuth]",
+    "POST /undaunted/api/DiscordLink [HasUndauntedAdminApiKey]",
+    "GET /undaunted/api/DiscordLink/:discordId [HasUndauntedAdminApiKey]",
+
     "GET /undaunted/api/BackendHealth [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/DashboardAccounts [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/RegistrationStatus []",
@@ -452,6 +455,9 @@ const ADMIN_ROUTES = (): [string, string, unknown][] => [
     ["GET", "/undaunted/api/InviteCodes", undefined],
     ["POST", "/undaunted/api/GenerateJWTForUserId", { UserId: C }],
     ["GET", "/undaunted/api/GetAllUsers", undefined],
+    ["POST", "/undaunted/api/DiscordLink", {DiscordId:'12345678901234567',UserId:A}],
+    ["GET", "/undaunted/api/DiscordLink/12345678901234567", undefined],
+
     ["GET", "/undaunted/api/BackendHealth", undefined],
     ["GET", "/undaunted/api/DashboardAccounts", undefined],
     ["POST", "/undaunted/api/RegisterInviteCode", { NewInviteCode: "PERM-TEST-CODE", Uses: 1 }],

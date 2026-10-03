@@ -143,3 +143,18 @@ backend polling, but many tabs can reach that limit.
 
 Tests: `node --test tools/dashboard.test.mjs`. The tests use a fake read-only backend; they cover
 authentication, foreign origins, log path rejection, redaction and external-backend rejection.
+# Server #2 monitoring
+
+Run `worker-health.mjs` with `worker-processes.ps1` beside it on the Windows hunt
+worker. Load the worker's allowlist secret from its protected environment file and
+set `WORKER_ROOT` to its installation root. The monitor binds only
+`127.0.0.1:61111`; tunnel it onto the main server and set
+`DASHBOARD_WORKER_URL=http://127.0.0.1:61112` in the dashboard environment.
+Restart only the dashboard after changing that setting.
+
+The Server #2 tab shows worker resources, processes, hunts, deploy/allowlist
+availability and connectivity to the shared backend. The main server retains
+accounts and saves. Service/resource reads refresh every five seconds; process
+and network counters refresh once per minute. Missing samples are labelled stale.
+The worker monitor does not receive the main dashboard's owner key, and the
+dashboard keeps worker metrics behind the same owner authentication as its other tabs.

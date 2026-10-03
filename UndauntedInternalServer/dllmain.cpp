@@ -327,6 +327,12 @@ float TotalNoPlayersTime = 0.0f;
 
 bool EnableWatchdog = true;
 
+// Read-only counters for diagnostics; the net driver's internal tag is not a frame counter.
+extern "C" {
+    __declspec(dllexport) volatile unsigned long long DR_ServerTickCount = 0;
+    __declspec(dllexport) volatile double DR_ServerSimulatedSeconds = 0;
+}
+
 void* OrigGameEngineTick = nullptr;
 
 void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender) {
@@ -343,6 +349,8 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         PreviousTick = std::chrono::steady_clock::now();
     }
 
+    DR_ServerTickCount = DR_ServerTickCount + 1;
+    DR_ServerSimulatedSeconds = DR_ServerSimulatedSeconds + DeltaTime;
     reinterpret_cast<void(*)(UGameEngine*, float, char)>(OrigGameEngineTick)(GameEngine, DeltaTime, CanRender);
 
     if (Globals::Listening) {
