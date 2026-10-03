@@ -67,6 +67,17 @@ async function FormParty(Leader: string, ...Members: string[]){
     return Party.partyId as string;
 }
 
+async function WaitForDeployCalls(Count: number){
+    const Deadline = Date.now() + 2000;
+
+    while(Deploy.Calls.length < Count && Date.now() < Deadline){
+        await new Promise<void>((Resolve) => setTimeout(Resolve, 5));
+    }
+
+    assert.equal(Deploy.Calls.length, Count);
+    await new Promise<void>((Resolve) => setTimeout(Resolve, 5));
+}
+
 describe("a party of one (every player on their own)", () => {
     it('fails every party member after one minute of unavailable capacity', async () => {
         await FormParty(B, A, C);
@@ -551,7 +562,7 @@ describe("solo matchmaking fixes", () => {
             assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "CR19_PlayerHunt_SoloFail", Player), true);
         }
 
-        assert.equal(Deploy.Calls.length, 1, "the 4th player pops the queue");
+        await WaitForDeployCalls(1);
         for(const Player of [A, B, C, D]){
             assert.equal((await DecideCandidateStatus(Player)).Kind, "failed", Player);
         }
@@ -602,7 +613,7 @@ describe("one queued join per player", () => {
 
         assert.equal(Deploy.Calls.length, 0, "three players, not four");
         assert.equal(await HandlePlayerMatchmaking("ISLAND", "", HUNT, B), true);
-        assert.equal(Deploy.Calls.length, 1, "the 4th distinct player fills it");
+        await WaitForDeployCalls(1);
         assert.deepEqual(Deploy.Calls[0].ExpectedPlayers, [V, O, C, B]);
     });
 
