@@ -82,10 +82,10 @@ async function WaitForServerStartup(Child: ChildProcess, Port: number, IsHunt: b
     }
 
     let OnExit!: (Code: number | null, Signal: NodeJS.Signals | null) => void;
-    let OnError!: (Error: Error) => void;
+    let OnError!: (error: Error) => void;
     const Failed = new Promise<never>((_Resolve, Reject) => {
         OnExit = (Code, Signal) => Reject(new Error(`Game server on port ${Port} exited during startup (${Signal ?? Code ?? "unknown"})`));
-        OnError = (Error) => Reject(new Error(`Game server on port ${Port} failed during startup: ${Error.message}`));
+        OnError = (error) => Reject(new Error(`Game server on port ${Port} failed during startup: ${error.message}`));
         Child.once("exit", OnExit);
         Child.once("error", OnError);
     });
