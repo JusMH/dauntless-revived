@@ -15,4 +15,13 @@ test('dashboard unlock renders both hosts and the CPU mean in actual client scri
  assert.equal(elements.get('fleetMeanCpu').textContent,'27.5%');
  assert.equal(elements.get('fleetHunts').textContent,4);
  assert.equal(elements.get('fleetRows').children.length,2);
+ assert.equal(elements.get('botLinked').textContent,'—');
+ assert.equal(elements.get('botIssued').textContent,'—');
+ data.sample={at:new Date().toISOString(),players:[],instances:[],locations:{},history:[],discord:{at:new Date().toISOString(),linkedAccounts:7,bot:{issued:20,unused:4,redeemed:15,pending:2,revoked:1},error:null}};
+ document.getElementById('key').value='test-owner';document.getElementById('connect').onclick();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(elements.get('error').textContent,'');
+ assert.equal(elements.get('botLinked').textContent,7);
+ assert.equal(elements.get('botIssued').textContent,20);
+ assert.equal(elements.get('botRedeemed').textContent,15);
 });

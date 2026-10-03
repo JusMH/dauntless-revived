@@ -80,6 +80,8 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
       const [accounts, status] = await Promise.all([get('/undaunted/api/GetAllUsers'), get('/undaunted/api/ServerStatus')]);
       let health = null;
       let healthError = null;
+      let discord = null;
+      try { discord = await get('/undaunted/api/DiscordKeyStats'); } catch { /* Older backends: report unavailable, not zero. */ }
       try { health = await get('/undaunted/api/BackendHealth'); if (!health?.requests) { health = null; healthError = 'Backend returned no health metrics.'; } }
       catch { healthError = 'Backend health disabled or unavailable. Set BACKEND_HEALTH=1 and restart the metagame.'; }
       if (performanceDir && Date.now() - performanceAt >= 15000) {
@@ -100,7 +102,7 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
         backendRssMB: health?.memoryMB?.rss ?? null, backendHeapMB: health?.memoryMB?.heapUsed ?? null};
       history.push(point);
       if (history.length > 720) history.shift();
-      sample = { ...point, players: status.players, instances: status.instances, history, uptimeSeconds: status.uptimeSeconds, hostUptimeSeconds: os.uptime(), dashboardUptimeSeconds: process.uptime(), locations, health, healthError, performance: performanceSample, logicalCpus: os.cpus().length, name: status.name };
+      sample = { ...point, players: status.players, instances: status.instances, history, uptimeSeconds: status.uptimeSeconds, hostUptimeSeconds: os.uptime(), dashboardUptimeSeconds: process.uptime(), locations, health, healthError, discord, performance: performanceSample, logicalCpus: os.cpus().length, name: status.name };
       failure = null;
     } catch { failure = 'Backend unavailable or owner key rejected; last readings are stale.'; }
     finally { polling = false; }

@@ -167,3 +167,14 @@ accounts and saves. Service/resource reads refresh every five seconds; process
 and network counters refresh once per minute. Missing samples are labelled stale.
 The worker monitor does not receive the main dashboard's owner key, and the
 dashboard keeps worker metrics behind the same owner authentication as its other tabs.
+# Discord bot counts
+
+The owner dashboard shows current linked accounts and bot-issued, unused, redeemed,
+pending and revoked/missing registration invites. The backend's owner-only
+`DiscordKeyStats` route reads canonical links and compares retained bot claim history
+against invite redemption state; counts do not reset when the dashboard restarts.
+Set `DISCORD_KEY_STATE_FILE` in the metagame environment to the bot's `KEY_STATE_FILE`
+and grant the metagame service read access to that state directory/file. Do not give
+the dashboard access to bot credentials. Missing/corrupt state shows unavailable,
+not zero. Bot invites and launcher account keys are distinct; a redeemed invite is
+not automatically a Discord account link. No keys or Discord IDs are included.

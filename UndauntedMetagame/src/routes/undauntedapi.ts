@@ -1,3 +1,5 @@
+import { DiscordKeyStats } from '../controllers/discordstats';
+
 import { DiscordAccount, LinkDiscordAccount } from '../controllers/discordlinks';
 
 import { Router } from "express";
@@ -27,6 +29,12 @@ import { userapikeys, users } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 export const undauntedApiRouter = Router();
+
+undauntedApiRouter.get('/DiscordKeyStats', HealthReadRateLimit, HasUndauntedAdminApiKey, async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await DiscordKeyStats());
+});
+
 
 undauntedApiRouter.post('/DiscordLink', AdminMutationRateLimit, HasUndauntedAdminApiKey, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');

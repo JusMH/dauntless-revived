@@ -274,6 +274,8 @@ const EXPECTED_ROUTES = [
     "POST /loadout/:userId/:characterId/active/:index [RealProgressionOnly, HasUndauntedMetagameAuth]",
     "GET /loadout/:userId/:characterId/all [HasUndauntedMetagameAuth]",
     "POST /loadout/:userId/:characterId/:index [HasUndauntedMetagameAuth]",
+    "GET /undaunted/api/DiscordKeyStats [HasUndauntedAdminApiKey]",
+
     "POST /undaunted/api/DiscordLink [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/DiscordLink/:discordId [HasUndauntedAdminApiKey]",
 
@@ -455,6 +457,8 @@ const ADMIN_ROUTES = (): [string, string, unknown][] => [
     ["GET", "/undaunted/api/InviteCodes", undefined],
     ["POST", "/undaunted/api/GenerateJWTForUserId", { UserId: C }],
     ["GET", "/undaunted/api/GetAllUsers", undefined],
+    ["GET", "/undaunted/api/DiscordKeyStats", undefined],
+
     ["POST", "/undaunted/api/DiscordLink", {DiscordId:'12345678901234567',UserId:A}],
     ["GET", "/undaunted/api/DiscordLink/12345678901234567", undefined],
 
