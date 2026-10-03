@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { setTimeout } from "node:timers/promises";
+import { existsSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import crypto from "node:crypto";
 
@@ -70,7 +73,7 @@ function GameserverStartupGraceMs(){
     return Value;
 }
 
-async function WaitForServerStartup(Child: ChildProcess, Port: number, IsHunt: boolean){
+async function WaitForServerStartup(Child: ChildProcess, Port: number, IsHunt: boolean, ReadyFile: string){
     if(!IsHunt){
         return;
     }
@@ -90,16 +93,29 @@ async function WaitForServerStartup(Child: ChildProcess, Port: number, IsHunt: b
         Child.once("error", OnError);
     });
 
+    const Deadline = Date.now() + GraceMs;
+
     try{
-        await Promise.race([setTimeout(GraceMs), Failed]);
+        while(Date.now() < Deadline){
+            if(existsSync(ReadyFile)){
+                return;
+            }
+
+            if(Child.pid === undefined || !ProcessIsAlive(Child.pid)){
+                throw new Error(`Game server on port ${Port} did not survive startup`);
+            }
+
+            await Promise.race([setTimeout(Math.min(100, Math.max(1, Deadline - Date.now()))), Failed]);
+        }
+
+        if(!existsSync(ReadyFile)){
+            throw new Error(`Game server on port ${Port} did not become ready within ${GraceMs}ms`);
+        }
     }
     finally{
         Child.off("exit", OnExit);
         Child.off("error", OnError);
-    }
-
-    if(Child.pid === undefined || !ProcessIsAlive(Child.pid)){
-        throw new Error(`Game server on port ${Port} did not survive startup`);
+        rmSync(ReadyFile, {force: true});
     }
 }
 
@@ -218,11 +234,16 @@ function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId
 
     ServerLaunchQueue = Spawned.then(() => undefined, () => undefined);
 
-    return Spawned.then(async ({Server, Child, IsHunt}) => {
+    return Spawned.then(async ({Server, Child, IsHunt, ReadyFile}) => {
         try{
-            await WaitForServerStartup(Child, Server.port, IsHunt);
+            await WaitForServerStartup(Child, Server.port, IsHunt, ReadyFile);
         }
         catch(error){
+            try{
+                Child.kill();
+            }
+            catch{}
+
             if(Gameservers.includes(Server)){
                 await CleanupServer(Server);
             }
@@ -252,6 +273,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     }
 
     const Id = crypto.randomUUID();
+    const ReadyFile = join(tmpdir(), `dauntless-server-ready-${Id}`);
 
     if(Port == undefined){
         ReleaseReservation();
@@ -272,9 +294,11 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
             MY_IP + ":" + Port.toString(),
             ...STANDARD_GAMESERVER_ARGS
         ], {
-            // Keep the long-running Ramsgate and Dojo diagnostic windows visible,
-            // but do not flash a new command window for every temporary hunt.
-            windowsHide: IsHunt
+            windowsHide: IsHunt,
+            env: {
+                ...process.env,
+                DR_GAMESERVER_READY_FILE: ReadyFile
+            }
         });
     }
     catch(error){
@@ -339,7 +363,8 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     return {
         Server: NewGameserver,
         Child: Child,
-        IsHunt: IsHunt
+        IsHunt: IsHunt,
+        ReadyFile: ReadyFile
     };
 }
 
