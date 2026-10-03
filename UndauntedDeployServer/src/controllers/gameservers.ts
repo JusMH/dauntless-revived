@@ -61,7 +61,7 @@ const SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = Number(process.env.SECONDS_TO
 function GameserverStartupGraceMs(){
     const Raw = process.env.GAMESERVER_STARTUP_GRACE_MS;
     if(Raw === undefined){
-        return 5000;
+        return 20000;
     }
 
     const Value = Number(Raw);
