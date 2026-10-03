@@ -63,3 +63,30 @@ test("hunt startup failure during readiness grace is rejected and returns its po
         process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
     }
 });
+
+
+test("startup grace does not serialize concurrent hunt spawns", async () => {
+    game.ResetGameserversForTests();
+    const spawnTimes: number[] = [];
+    game.UseProcessFunctionsForTests({
+        Spawn: () => {
+            spawnTimes.push(Date.now());
+            return Object.assign(new EventEmitter(), { pid: pid++, unref() {} }) as unknown as ChildProcess;
+        },
+        IsAlive: () => true
+    });
+    await game.Startup();
+    process.env.GAMESERVER_STARTUP_GRACE_MS = "400";
+
+    try{
+        await Promise.all([
+            game.StartupGameserverWithArgs(args),
+            game.StartupGameserverWithArgs(args)
+        ]);
+        assert.ok(spawnTimes.length >= 3);
+        assert.ok(spawnTimes[2] - spawnTimes[1] < 550, `hunt launches were serialized by readiness: ${spawnTimes[2] - spawnTimes[1]}ms`);
+    }
+    finally{
+        process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
+    }
+});
