@@ -59,7 +59,7 @@ export function backend(base, key, request = fetch) {
 
 export class Keys {
   queue = Promise.resolve();
-  constructor(state, save, api, generate = () => `DR-${randomBytes(18).toString('base64url')}`) {
+  constructor(state, save, api, generate = () => `DR-${randomBytes(18).toString('hex')}`) {
     this.state = state; this.save = save; this.api = api; this.generate = generate;
   }
   async migrateLinks() {

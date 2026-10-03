@@ -4,6 +4,25 @@ The main deploy server can route whole ISLAND hunt requests, including the party
 to a second deploy server. Accounts, progression, Ramsgate and Training stay on the main
 server. Running hunts are not migrated; the next hunt is allocated to an available host.
 
+## Operator checks and launcher access
+
+Use one main-server launcher invite for all players. The Discord bot wraps its single-use
+registration code in that full invite, including the main gateway's pinned certificate.
+Players paste it into Join, register, and keep the account key saved by the launcher.
+Existing accounts use `/key link` with their original account key; linking never replaces it.
+
+The main owner dashboard's Overview shows Server #1 and Server #2 CPU, RAM and hunt counts,
+followed by summed hunt/RAM totals and **Mean CPU (average across servers)**. This is an
+unweighted arithmetic mean: 50% and 5% produce 27.5%, even on hosts with different CPU counts.
+It is a monitoring statistic, not the overflow routing threshold. Hunt counts include tutorials
+and exclude Ramsgate/Training; the main process sampler updates approximately once a minute.
+Missing/stale readings produce unavailable totals rather than treating a down host as zero load.
+
+Verify all three worker health checks (deploy, shared backend connection, player allowlist),
+then confirm a real worker hunt has a UDP listener and the expected party roster. The separate
+monitor tunnel going down does not itself interrupt the game backend tunnel. Keep all keys,
+bot state, database backups and host-specific runbooks outside the public repository.
+
 Set `OVERFLOW_DEPLOYSERVER_URL` to an HTTP IPv4-loopback SSH tunnel and
 `OVERFLOW_AFTER_HUNTS` to the number of local hunts/tutorials before spilling over
 (default 4). Capacity refusal on either host permits trying the other. A timeout or

@@ -5,6 +5,7 @@ import { timingSafeEqual, createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { readPerformance } from './dashboard-performance.mjs';
+import { fleetSummary } from './dashboard-fleet.mjs';
 
 export function scrubLog(text) {
   return text.split(/\r?\n/).slice(-150).map(line => {
@@ -168,7 +169,7 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
       finally { inviting = false; }
       return;
     }
-    if (req.url === '/api/status') { res.end(JSON.stringify({sample, worker, error: failure, logNames: Object.keys(logs), invitesEnabled: !!serverConfig})); return; }
+    if (req.url === '/api/status') { res.end(JSON.stringify({sample, worker, fleet:fleetSummary(sample,worker,failure), error: failure, logNames: Object.keys(logs), invitesEnabled: !!serverConfig})); return; }
     if (req.url?.startsWith('/api/log?')) {
       const name = new URL(req.url, 'http://localhost').searchParams.get('name');
       if (!name || !Object.hasOwn(logs, name)) { res.writeHead(404).end(); return; }

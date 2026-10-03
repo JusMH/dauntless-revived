@@ -1,6 +1,24 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { Keys, backend } from './keys.mjs';
+import { launcherInvite, inviteMessage } from './invite.mjs';
+const config={Mode:'Public',PublicHost:'game.example.com',Ports:{gateway:443},CertFingerprint:'a'.repeat(64),ServerName:'Test & Hunt'};
+test('claims produce complete launcher invites and valid registration code characters',async()=>{
+  for(let i=0;i<50;i++) {
+    const f=setup();
+    const service=new Keys({version:1,users:{}},async()=>{},f.api);
+    const result=await service.run(user,true);
+    assert.match(result.code,/^[A-Za-z0-9-]{4,64}$/);
+    const invite=launcherInvite(config,result.code), parsed=new URL(invite);
+    assert.equal(parsed.protocol,'dauntless-revived:');assert.equal(parsed.hostname,'join');
+    assert.equal(parsed.searchParams.get('code'),result.code);
+    assert.equal(parsed.searchParams.get('fp'),config.CertFingerprint);
+    assert.equal(parsed.searchParams.get('name'),config.ServerName);
+    assert.ok(inviteMessage(config,result.code).includes(invite));
+  }
+  assert.throws(()=>launcherInvite(config,'DR-invalid_code'));
+  assert.throws(()=>launcherInvite({...config,CertFingerprint:'wrong'},'GOOD-CODE'));
+});
 const user = '123456789012345678';
 function setup() {
   const state = {version: 1, users: {}};

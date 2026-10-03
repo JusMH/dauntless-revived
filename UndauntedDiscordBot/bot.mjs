@@ -1,11 +1,13 @@
 import { Client, Events, GatewayIntentBits, MessageFlags, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import { resolve } from 'node:path';
 import { backend, Keys, loadState, saveState } from './keys.mjs';
+import { loadInviteConfig, inviteMessage } from './invite.mjs';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const adminKey = process.env.METAGAME_ADMIN_KEY;
 if (!token || !adminKey) throw new Error('Configure DISCORD_BOT_TOKEN and METAGAME_ADMIN_KEY');
 const stateFile = resolve(process.env.KEY_STATE_FILE || './data/keys.json');
+const inviteConfig = await loadInviteConfig(process.env.SERVER_CONFIG_FILE);
 const keys = new Keys(await loadState(stateFile), state => saveState(stateFile, state), backend(process.env.METAGAME_URL || 'http://127.0.0.1:61000', adminKey));
 await keys.migrateLinks();
 
@@ -13,7 +15,7 @@ const client = new Client({intents: [GatewayIntentBits.Guilds]});
 const rest = new REST({version: '10'}).setToken(token);
 const command = new SlashCommandBuilder().setName('key').setDescription('Your Dauntless Revived access code')
   .setContexts(0, 1)
-  .addSubcommand(option => option.setName('claim').setDescription('Receive your single-use code by direct message'))
+  .addSubcommand(option => option.setName('claim').setDescription('Receive a complete launcher invite by direct message'))
   .addSubcommand(option => option.setName('status').setDescription('Check your account link or code redemption'))
   .addSubcommand(option => option.setName('link').setDescription('Privately link your existing launcher account')
     .addStringOption(value => value.setName('key').setDescription('Your existing launcher account key').setRequired(true).setMinLength(16).setMaxLength(512)));
@@ -48,8 +50,8 @@ client.on(Events.InteractionCreate, async interaction => {
         : await keys.run(id, claim);
       if (result.status === 'ready' && claim) {
         try {
-          await interaction.user.send({content: `🔑 **Your Revived Code**\n\`\`\`\n${result.code}\n\`\`\`\nEnter this single-use code in the launcher's registration screen. Keep it private.\n**Clear skies, Slayer.**`, allowedMentions: {parse: []}});
-          await interaction.editReply('🔑 **Key Sent**\nCheck your DMs for your Revived code.\n**Clear skies, Slayer.**');
+          await interaction.user.send({content: inviteMessage(inviteConfig, result.code), allowedMentions: {parse: []}});
+          await interaction.editReply('🔑 **Invite Sent**\nCheck your DMs. Paste the complete invite into the launcher’s Join box.\n**Clear skies, Slayer.**');
         } catch { await interaction.editReply('I could not DM you. Enable direct messages, then run `/key claim` again. Your code is saved.'); }
       } else {
         const messages = {

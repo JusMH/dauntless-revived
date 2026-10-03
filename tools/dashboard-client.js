@@ -22,6 +22,17 @@
     values.forEach((value, i) => { if (value === null) { gap = true; return; } const x = i * canvas.width / Math.max(1, values.length - 1), y = canvas.height - 20 - value / max * (canvas.height - 40); if (gap) ctx.moveTo(x, y); else ctx.lineTo(x, y); gap = false; });
     ctx.stroke(); ctx.fillStyle = '#e4eef5'; ctx.font = `${12 * devicePixelRatio}px system-ui`; ctx.fillText(`Current: ${values.at(-1) == null ? 'unavailable' : Number(values.at(-1)).toFixed(1)} · peak: ${values.some(v => v != null) ? peak.toFixed(1) : 'unavailable'}`, 4, 16 * devicePixelRatio);
   }
+  function renderFleet(fleet) {
+    if (!fleet) return;
+    table('fleetRows',fleet.rows.map(s=>[s.name,s.online?'Online':'Unavailable / stale',s.hunts ?? '—',number(s.cpu,'%'),`${number(s.ramUsedMB===null?null:s.ramUsedMB/1024)} / ${number(s.ramTotalMB===null?null:s.ramTotalMB/1024)} GB`,s.huntSampleAt ? new Date(s.huntSampleAt).toLocaleTimeString() : '—']));
+    const t=fleet.totals;
+    el('fleetMeanCpu').textContent=number(t.meanCpu,'%');
+    el('fleetHunts').textContent=t.hunts ?? '—';
+    el('fleetRam').textContent=`${number(t.ramUsedMB===null?null:t.ramUsedMB/1024)} / ${number(t.ramTotalMB===null?null:t.ramTotalMB/1024)} GB`;
+    el('fleetRamPercent').textContent=`${number(t.ramPercent,'%')} of combined capacity`;
+    el('fleetAvailability').textContent=`${t.online}/${t.servers} servers reporting. Totals remain unavailable when a required reading is stale.`;
+  }
+
   function renderWorker(worker) {
     lastWorker=worker;
     const s=worker?.sample;
@@ -51,6 +62,8 @@
     try {
       const result = await get('/api/status');
       el('error').textContent = result.error || '';
+      renderFleet(result.fleet);
+
       renderWorker(result.worker);
       el('login').hidden = true; el('data').hidden = false;
       el('invites').hidden = !result.invitesEnabled;

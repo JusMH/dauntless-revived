@@ -43,7 +43,16 @@ browser on your PC; use an SSH tunnel there. The dashboard remains available whe
 is stopped so the owner can diagnose downtime. To disable it, disable its scheduled task and set
 `DashboardEnabled=false` in the private `server.json`; disable the separate open-dashboard task
 and set `DashboardOpenOnStart=false` to stop automatic browser opening.
-Re-run the installer after server updates to refresh its four static/runtime files.
+Re-run the installer after server updates to refresh its static/runtime files, including `dashboard-fleet.mjs`.
+
+Overview now includes a **Both servers** table with per-host hunts/tutorials, CPU, RAM
+and sample times. **Combined totals** underneath sums hunt counts and RAM used/capacity.
+**Mean CPU (average across servers)** is the unweighted arithmetic mean: 50% and 5%
+display as 27.5%. Hosts have equal weight even when their processor counts differ.
+It is not a CPU scheduling decision or the routing threshold. Missing/stale readings
+are shown as unavailable and do not silently lower the combined figure.
+Main hunt counts use local process samples (approximately once per minute); worker
+counts use its deploy API (every five seconds). Ramsgate and Training are excluded.
 
 ## Accounts and layout
 
