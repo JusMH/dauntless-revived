@@ -11,6 +11,8 @@
 import { createHash } from "node:crypto";
 import { promises as fsp, existsSync } from "node:fs";
 import path from "node:path";
+import { missingDirectX, gameExitDetail } from './windows-runtime';
+
 import { parseInvite, isLoopbackHost, type Invite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
 import { limitedView, type ServerStatus } from "../shared/status";
@@ -72,6 +74,8 @@ import {
 export interface Platform {
   userDataDir: string;
   resourcesDir: string;
+  runtimeFilesExist?: (file: string) => boolean;
+
   defaultInstallDir: string;
   hostPlatform?: NodeJS.Platform;
   appVersion: string;
@@ -160,6 +164,8 @@ export class Controller {
     this.game.onChange((running, code) => {
       log.info(running ? "game started" : `game exited (code ${code ?? "none"})`);
       if (!running) {
+        if (code !== null && code !== 0) this.lastError = {code:'launch_failed',detail:gameExitDetail(code)};
+
         void this.stopRelay().then(() => this.publish());
         return;
       }
@@ -271,7 +277,9 @@ export class Controller {
         freeBytes: this.freeSpace,
         requiredBytes: missingBytes + DISK_MARGIN_BYTES,
         totalBytes: manifest?.totalBytes ?? 0,
-        vcRuntimeMissing: missingVcRuntime(process.env, existsSync, this.hostPlatform),
+        vcRuntimeMissing: missingVcRuntime(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform),
+        directXMissing: missingDirectX(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform),
+
         contentAvailable: this.contentEndpoint() !== null,
       },
       task: this.task,
@@ -1056,6 +1064,9 @@ export class Controller {
     const slot = this.slot();
     if (!sv || !slot) return this.fail("server_unreachable");
     return this.withBusy(async () => {
+      const missing = [...missingVcRuntime(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform), ...missingDirectX(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform)];
+      if (missing.length) return this.fail('windows_runtime_missing', missing.join(', '));
+
       const others = await this.p.findRunningClients();
       if (others.length > 0) return this.fail("already_running");
       const key = await this.keys.load(slot).catch(() => null);

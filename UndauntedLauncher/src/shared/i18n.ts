@@ -148,6 +148,10 @@ const en = {
   vc_title: "One more thing from Microsoft",
   vc_text: "The server DLL needs the Microsoft Visual C++ 2015–2022 runtime (x64), and it's missing ({files}). Install it, then come back.",
   vc_button: "Get it from Microsoft",
+  dx_title: "DirectX components are missing",
+  dx_text: "This game needs legacy DirectX libraries ({files}), even on Windows with DirectX 12. Install the Microsoft runtime, then retry.",
+  dx_button: "Get DirectX from Microsoft",
+
 
   task_verify: "Checking game files",
   task_download: "Downloading Dauntless",
@@ -324,6 +328,8 @@ const en = {
   err_game_files_invalid: "Some game files are missing or changed. Press UPDATE.",
   err_already_running: "Dauntless is already running.",
   err_launch_failed: "Dauntless didn't start. Check the launcher log for the compatibility/runtime error.",
+  err_windows_runtime_missing: "Install the missing Microsoft runtimes using the buttons below, then try Play again.",
+
   err_compat_runtime_missing: "Linux needs Proton or Wine to run the Windows game client. Install Steam Proton, Proton-GE, Wine, or Lutris Wine and try again.",
   err_config_failed: "The game settings couldn't be written.",
   err_busy: "Something else is still running. Try again in a moment.",
@@ -566,6 +572,10 @@ const fi: Record<StringKey, string> = {
   vc_title: "Vielä yksi juttu Microsoftilta",
   vc_text: "Palvelin-DLL tarvitsee Microsoft Visual C++ 2015–2022 -ajonaikaiset kirjastot (x64), ja ne puuttuvat ({files}). Asenna ne ja palaa sitten tänne.",
   vc_button: "Hae Microsoftilta",
+  dx_title: "DirectX-kirjastoja puuttuu",
+  dx_text: "Peli tarvitsee vanhat DirectX-kirjastot ({files}), myös DirectX 12 -järjestelmässä. Asenna Microsoftin paketti ja yritä uudelleen.",
+  dx_button: "Hae DirectX Microsoftilta",
+
 
   task_verify: "Tarkistetaan pelitiedostoja",
   task_download: "Ladataan Dauntlessia",
@@ -742,6 +752,8 @@ const fi: Record<StringKey, string> = {
   err_game_files_invalid: "Osa pelitiedostoista puuttuu tai on muuttunut. Paina PÄIVITÄ.",
   err_already_running: "Dauntless on jo käynnissä.",
   err_launch_failed: "Dauntless ei käynnistynyt. Tarkista käynnistimen lokista yhteensopivuus- tai ajonaikavirhe.",
+  err_windows_runtime_missing: "Asenna puuttuvat Microsoftin kirjastot alla olevista painikkeista ja yritä uudelleen.",
+
   err_compat_runtime_missing: "Linux tarvitsee Protonin tai Winen Windows-peliasiakasohjelman ajamiseen. Asenna Steam Proton, Proton-GE, Wine tai Lutris Wine ja yritä uudelleen.",
   err_config_failed: "Pelin asetuksia ei voitu kirjoittaa.",
   err_busy: "Jokin muu on vielä kesken. Yritä hetken päästä.",

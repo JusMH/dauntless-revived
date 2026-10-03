@@ -29,6 +29,7 @@ const PATREON_URL = "https://patreon.com/DauntlessRevived";
 export const FIXED_LINKS: Readonly<Record<FixedTarget, string>> = Object.freeze({
   tailscale_download: TAILSCALE_DOWNLOAD_URL,
   vc_redist: VC_REDIST_URL,
+  directx_runtime: 'https://www.microsoft.com/en-us/download/details.aspx?id=35',
   project_source: PROJECT_URL,
   project_license: PROJECT_LICENSE_URL,
   project_contributors: PROJECT_CONTRIBUTORS_URL,
@@ -70,6 +71,8 @@ export function isAllowedStaticUrl(url: string): boolean {
   const u = parse(url);
   if (!u) return false;
   switch (u.hostname) {
+    case 'www.microsoft.com':
+      return url === FIXED_LINKS.directx_runtime;
     case "tailscale.com":
     case "login.tailscale.com":
       return true;

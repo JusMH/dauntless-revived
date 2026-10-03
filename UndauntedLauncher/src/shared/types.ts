@@ -63,6 +63,8 @@ export type ErrorCode =
   | "game_files_invalid"
   | "already_running"
   | "launch_failed"
+  | "windows_runtime_missing"
+
   | "compat_runtime_missing"
   | "config_failed"
   | "busy"
@@ -149,6 +151,8 @@ export interface Snapshot {
     requiredBytes: number;
     totalBytes: number;
     vcRuntimeMissing: string[];
+    directXMissing?: string[];
+
     contentAvailable: boolean;
   };
   task: TaskProgress | null;
@@ -178,6 +182,8 @@ export type ExternalTarget =
   | "tailscale_download"
   | "tailscale_share"
   | "vc_redist"
+  | "directx_runtime"
+
   | "server_source"
   | "project_source"
   | "project_license"

@@ -266,12 +266,16 @@ function errorText(e: LauncherError): string {
 // ------------------------------------------------------------------ play view
 
 function vcWarning(snap: Snapshot): HTMLElement | null {
-  if (snap.install.vcRuntimeMissing.length === 0) return null;
-  return card(
-    "card-warn",
-    h("h3", { class: "card-title" }, icon("warning"), t("vc_title")),
-    h("p", { class: "card-text" }, t("vc_text", { files: snap.install.vcRuntimeMissing.join(", ") })),
-    h("div", { class: "card-row", style: undefined }, linkButton(t("vc_button"), () => open("vc_redist"), { icon: "external", fk: "vc" })),
+  const vc = snap.install.vcRuntimeMissing;
+  const dx = snap.install.directXMissing ?? [];
+  if (!vc.length && !dx.length) return null;
+  return card('card-warn',
+    ...(vc.length ? [h('h3', {class:'card-title'}, icon('warning'), t('vc_title')),
+      h('p', {class:'card-text'}, t('vc_text', {files:vc.join(', ')})),
+      linkButton(t('vc_button'), () => open('vc_redist'), {icon:'external',fk:'vc'})] : []),
+    ...(dx.length ? [h('h3', {class:'card-title'}, icon('warning'), t('dx_title')),
+      h('p', {class:'card-text'}, t('dx_text', {files:dx.join(', ')})),
+      linkButton(t('dx_button'), () => open('directx_runtime'), {icon:'external',fk:'directx'})] : []),
   );
 }
 

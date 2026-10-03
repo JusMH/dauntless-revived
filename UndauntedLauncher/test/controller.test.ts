@@ -133,6 +133,8 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
     emitProgress: () => undefined,
     findTailscale: () => null,
     findRunningClients: async () => [],
+    runtimeFilesExist: () => true,
+
     spawn: fakeSpawn,
   };
   const c = new Controller(p);
@@ -222,6 +224,13 @@ test("public mode end to end: join, register, install, play through the relay, g
   assert.equal(hx.c.relayActive, false);
   assert.equal(hx.last().phase, "ready");
   await assert.rejects(get(RELAY_PORT, "/undaunted/api/ServerStatus"));
+  assert.equal(hx.last().lastError, null);
+  assert.deepEqual(await hx.c.play(), {ok:true});
+  hx.child()!.emit('exit', -1073741515);
+  await new Promise(r => setTimeout(r,100));
+  assert.equal(hx.last().lastError?.code, 'launch_failed');
+  assert.match(hx.last().lastError?.detail ?? '', /0xC0000135/);
+  assert.equal(hx.c.relayActive, false);
   await hx.c.shutdown();
 });
 

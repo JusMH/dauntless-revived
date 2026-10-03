@@ -25,6 +25,7 @@ const SHARE = "https://login.tailscale.com/admin/invite/links-test";
 const EXPECTED: Record<FixedTarget, string> = {
   tailscale_download: "https://tailscale.com/download",
   vc_redist: "https://aka.ms/vs/17/release/vc_redist.x64.exe",
+  directx_runtime: 'https://www.microsoft.com/en-us/download/details.aspx?id=35',
   project_source: "https://github.com/mixutin/dauntless-revived",
   project_license: "https://github.com/mixutin/dauntless-revived/blob/dauntless-revived/LICENSE.txt",
   project_contributors: "https://github.com/mixutin/dauntless-revived/graphs/contributors",
@@ -45,6 +46,7 @@ const ALL_TARGETS: Record<ExternalTarget, true> = {
   tailscale_download: true,
   tailscale_share: true,
   vc_redist: true,
+  directx_runtime: true,
   server_source: true,
   project_source: true,
   project_license: true,

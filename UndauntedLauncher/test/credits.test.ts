@@ -163,6 +163,7 @@ test("the page opens links by name only, and community/source controls are in th
     tailscale_download: true,
     tailscale_share: true,
     vc_redist: true,
+    directx_runtime: true,
     server_source: true,
     project_source: true,
     project_license: true,
