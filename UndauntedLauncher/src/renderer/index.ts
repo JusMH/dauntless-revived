@@ -258,6 +258,10 @@ function errorText(e: LauncherError): string {
       return t("err_relay_port_busy", { port: e.detail && /^\d+$/.test(e.detail) ? e.detail : "61000" });
     case "server_unreachable":
       return t(state.snap?.server?.mode === "public" ? "err_server_unreachable_public" : "err_server_unreachable");
+    case 'launch_failed':
+    case 'windows_runtime_missing':
+      return `${tk(`err_${e.code}`)}${e.detail ? ` ${e.detail}` : ''}`;
+
     default:
       return tk(`err_${e.code}`);
   }

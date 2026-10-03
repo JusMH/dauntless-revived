@@ -1071,6 +1071,15 @@ export class Controller {
       if (others.length > 0) return this.fail("already_running");
       const key = await this.keys.load(slot).catch(() => null);
       if (!key) return this.fail("key_invalid");
+      const ep = this.endpoint();
+      if (!ep) return this.fail('server_unreachable');
+      const account = await fetchUserInfo(ep, key);
+      if (!account.ok) {
+        this.keyRejected = account.error === 'key_rejected';
+        return this.fail(account.error);
+      }
+      this.keyRejected = false;
+
 
       const dir = this.installDir;
       await this.inspectInstall();

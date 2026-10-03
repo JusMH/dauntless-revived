@@ -231,6 +231,12 @@ test("public mode end to end: join, register, install, play through the relay, g
   assert.equal(hx.last().lastError?.code, 'launch_failed');
   assert.match(hx.last().lastError?.detail ?? '', /0xC0000135/);
   assert.equal(hx.c.relayActive, false);
+  const storedUser = meta.users.get(key)!;
+  meta.users.delete(key);
+  const rejected = await hx.c.play();
+  assert.deepEqual(rejected, {ok:false,error:{code:'key_rejected'}});
+  assert.equal(hx.spawns.length, 2, 'rejected key never starts a game process');
+  meta.users.set(key, storedUser);
   await hx.c.shutdown();
 });
 
