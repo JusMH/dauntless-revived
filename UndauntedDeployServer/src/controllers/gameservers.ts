@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { setTimeout } from "node:timers/promises";
+import { mkdir, unlink } from "node:fs/promises";
+import path from "node:path";
+import { WaitForReadyFile } from "./readiness";
 
 import crypto from "node:crypto";
 
@@ -207,21 +210,24 @@ let ServerLaunchQueue: Promise<unknown> = Promise.resolve();
 let NextServerLaunchAt = 0;
 
 function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
-    const Launch = ServerLaunchQueue.catch(() => {}).then(async () => {
+    const Previous = ServerLaunchQueue;
+    let ReleaseLaunch!: () => void;
+    ServerLaunchQueue = new Promise<void>(Resolve => { ReleaseLaunch = Resolve; });
+    return Previous.catch(() => {}).then(async () => {
         if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
         const Wait = NextServerLaunchAt - Date.now();
         if (Wait > 0) await setTimeout(Wait);
-        const Server = await StartServerNow(Map, Behemoth, MatchmakerHuntId, ExpectedPlayers, IsRamsgate, IsTrainingDojo);
-        // Failed attempts must not add another cooldown to the queue.
-        NextServerLaunchAt = Date.now() + SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP * 1000;
-        return Server;
-    });
-    ServerLaunchQueue = Launch;
-    return Launch;
+        return StartServerNow(Map, Behemoth, MatchmakerHuntId, ExpectedPlayers, IsRamsgate, IsTrainingDojo, () => {
+            NextServerLaunchAt = Date.now() + SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP * 1000;
+            ReleaseLaunch();
+        });
+    }).finally(ReleaseLaunch);
 }
 
-async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
+async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean, Spawned: () => void){
 
+    const ReadyDir = process.env.GAMESERVER_READY_DIR;
+    if (ReadyDir) await mkdir(ReadyDir, { recursive: true });
     if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
     const ReleaseReservation = memoryAdmission.reserve(!IsRamsgate && !IsTrainingDojo);
     
@@ -238,6 +244,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     }
 
     const Id = crypto.randomUUID();
+    const ReadyFile = ReadyDir ? path.join(ReadyDir, `${Id}.ready`) : undefined;
 
     if(Port == undefined){
         ReleaseReservation();
@@ -260,7 +267,8 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         ], {
             // Keep the long-running Ramsgate and Dojo diagnostic windows visible,
             // but do not flash a new command window for every temporary hunt.
-            windowsHide: IsHunt
+            windowsHide: IsHunt,
+            env: ReadyFile ? { ...process.env, DR_SERVER_READY_FILE: ReadyFile } : process.env
         });
     }
     catch(error){
@@ -278,6 +286,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     Child.on("error", (error) => { ReleaseReservation(); logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`); });
     Child.on("exit", (Code, Signal) => {
         ReleaseReservation();
+        if (ReadyFile) void unlink(ReadyFile).catch(() => {});
         // Release hunt ports immediately instead of waiting up to 60s for the watchdog.
         if (IsHunt) {
             const Finished = Gameservers.find(Server => Server.id === Id);
@@ -307,17 +316,6 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         throw new Error(`Could not start a game server on port ${Port}`);
     }
 
-    try{
-        await WaitForServerStartup(Child, Port, IsHunt);
-    }
-    catch(error){
-        if(IsHunt && !FreePorts.includes(Port)){
-            FreePorts.push(Port);
-        }
-
-        throw error;
-    }
-
     const NewGameserver: Gameserver = {
         id: Id,
         port: Port,
@@ -332,6 +330,15 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     };
 
     Gameservers.push(NewGameserver);
+    Spawned();
+    try {
+        if (ReadyFile) await WaitForReadyFile(Child, Port, ReadyFile);
+        else await WaitForServerStartup(Child, Port, IsHunt);
+    } catch (error) {
+        if (Gameservers.includes(NewGameserver) && Child.pid && ProcessIsAlive(Child.pid)) Child.kill();
+        else if (IsHunt) await CleanupServer(NewGameserver);
+        throw error;
+    }
 
     return NewGameserver;
 }

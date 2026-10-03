@@ -171,6 +171,13 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
     }
 }
 
+async function WaitBriefly(Work: Promise<unknown>) {
+    let Timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+        await Promise.race([Work, new Promise<void>(Resolve => { Timer = setTimeout(Resolve, 1500); })]);
+    } finally { if (Timer) clearTimeout(Timer); }
+}
+
 async function PopQueue(HuntId: string){
     const MatchmakingQueue = MatchmakingQueueMap.get(HuntId);
 
@@ -235,8 +242,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
         } else if (!waiting.busy && PartyNow() >= waiting.next) {
             waiting.busy = true;
             waiting.next = PartyNow() + 10000;
-            try { if (await waiting.retry()) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }
-            finally { waiting.busy = false; }
+            await WaitBriefly(waiting.retry().then(Done => { if (Done) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }).finally(() => { waiting.busy = false; }));
         }
         return PlayerMatchmakingResult;
     }
@@ -253,7 +259,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
         }
 
         if(PartyNow() - MatchmakingQueue.LastPlayerAddedTime > QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
-            await PopQueue(PlayerMatchmakingResult.HuntId);
+            await WaitBriefly(PopQueue(PlayerMatchmakingResult.HuntId));
         }
     }
 
@@ -300,7 +306,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
     Queue.LastPlayerAddedTime = PartyNow();
 
     if(Queue.Players.length >= QUEUE_FULL_PLAYERS){
-        await PopQueue(HuntId);
+        await WaitBriefly(PopQueue(HuntId));
     }
 
     return true;

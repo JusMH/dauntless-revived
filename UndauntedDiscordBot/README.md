@@ -34,3 +34,14 @@ not rewritten; changed definitions preserve the existing command ID. Guild comma
 make updates available immediately. If Discord still shows **command is outdated**,
 close the command picker, reload Discord, and select Revived Warden's `/key link`
 again. This is a cached command-definition error, not an account-key rejection.
+
+## Windows supervision
+
+`Run-Bot.ps1` runs Node with `data/config/discord-keys.env` on every attempt;
+interactive shell variables are not required. Keep that file private and outside
+Git. Set `-Root` and `-Node` if the installation differs from the defaults.
+Run the script from a single startup scheduled task with no execution time limit,
+`IgnoreNew` instance policy and restart-on-failure enabled. The script retries bot
+exits with a 5–60 second delay, including temporary backend outages at startup.
+`discord-keys-supervisor.log` records exits; stdout/stderr logs describe the latest
+attempt. Stop the scheduled task and its bot process before maintenance.

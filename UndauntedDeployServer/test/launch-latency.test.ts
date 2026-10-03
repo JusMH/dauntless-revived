@@ -4,6 +4,9 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import { after, test } from "node:test";
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = "0.3";
 const game = require("../src/controllers/gameservers") as typeof import("../src/controllers/gameservers");
@@ -16,6 +19,31 @@ const spawn = () => {
     return child as unknown as ChildProcess;
 };
 after(RemoveDeployTestDir);
+
+test('cold starts overlap while spawn pacing and listener readiness are preserved', async () => {
+    game.ResetGameserversForTests();
+    const dir = await mkdtemp(path.join(tmpdir(), 'launch-ready-'));
+    const markers: { file: string; pid: number; port: string }[] = [];
+    game.UseProcessFunctionsForTests({ Spawn: spawn, IsAlive: () => true });
+    await game.Startup();
+    process.env.GAMESERVER_READY_DIR = dir;
+    game.UseProcessFunctionsForTests({ Spawn: (_command, args, options) => {
+        const child = spawn();
+        markers.push({file: options.env!.DR_SERVER_READY_FILE!, pid: child.pid!, port: args[1]});
+        return child;
+    }, IsAlive: () => true });
+    try {
+        const first = game.StartupGameserverWithArgs(args);
+        const second = game.StartupGameserverWithArgs(args);
+        await new Promise(resolve => setTimeout(resolve, 850));
+        assert.equal(markers.length, 2, 'one cold start blocked the entire launch queue');
+        for (const marker of markers) await writeFile(marker.file, `${marker.pid}:${marker.port}`);
+        await Promise.all([first, second]);
+    } finally {
+        delete process.env.GAMESERVER_READY_DIR;
+        await rm(dir, {recursive: true, force: true});
+    }
+});
 
 test("failed spawns do not add cooldowns, successful launches remain spaced", async () => {
     game.ResetGameserversForTests();

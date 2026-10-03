@@ -1,3 +1,5 @@
+#include "HuntIdlePolicy.h"
+
 #include "ServerFrameLimit.h"
 #include <chrono>
 #include <thread>
@@ -323,7 +325,7 @@ void EncounterableSetupHook() {
     return;
 }
 
-float TotalNoPlayersTime = 0.0f;
+HuntIdlePolicy HuntIdle;
 
 bool EnableWatchdog = true;
 
@@ -374,14 +376,8 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
             HasConnection = true;
         }
 
-        if (EnableWatchdog) {
-            if (!HasConnection) {
-                TotalNoPlayersTime += DeltaTime;
-
-                if (TotalNoPlayersTime >= 50.0f) {
-                    exit(0);
-                }
-            }
+        if (EnableWatchdog && HuntIdle.Advance(DeltaTime, HasConnection)) {
+            exit(0);
         }
 
         for (UNetConnection* Conn : Networking::NetDriver->ClientConnections) {
