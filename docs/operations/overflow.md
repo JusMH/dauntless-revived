@@ -14,6 +14,9 @@ and an exclusive game-port range. The last two configured ports are reserved and
 All worker hunt ports must be below 8776: the native idle-shutdown exception identifies
 persistent worlds by port. Retain the memory guard and limit the worker's hunt slots to
 its measured CPU/RAM budget. Install the same tested DLL, game files and runtime.
+Fresh Windows hosts also need the Microsoft Visual C++ x64 redistributable and the
+legacy DirectX runtimes used by the game. Check a real game's UDP listener: a successful
+deploy API response does not detect a missing native DLL dependency.
 
 Keep both deploy APIs bound to loopback. A supervised SSH connection forwards the
 worker deploy API and allowlist helper onto the main host, and reverse-forwards the
@@ -28,3 +31,10 @@ belong to that worker and must not be sampled as local PIDs. If the tunnel or wo
 unavailable, its records are omitted and local routing remains available. Configure
 service supervision on both hosts and check the reverse backend connection, game UDP
 listeners, allowlist updates and an actual player join before calling the setup verified.
+
+The native dedicated-server tick hook caps the game thread at 30 frames per second.
+The injected replication loop runs once per game frame; the network driver's
+`NetServerMaxTickRate=30` alone did not limit it (a live Ramsgate sample measured
+about 76 replication ticks per second). `DR_SERVER_MAX_FPS` accepts 10–120, or 0 to
+restore the original pacing. Restart game processes after changing it. This uses
+elapsed wall time, not a fixed simulation timestep, and does not cap client rendering.

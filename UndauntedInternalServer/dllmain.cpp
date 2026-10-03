@@ -1,3 +1,8 @@
+#include "ServerFrameLimit.h"
+#include <chrono>
+#include <thread>
+
+
 #include <windows.h>
 #include <shellapi.h>
 #include <string>
@@ -325,6 +330,19 @@ bool EnableWatchdog = true;
 void* OrigGameEngineTick = nullptr;
 
 void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender) {
+    // Network tick settings do not cap this injected per-frame replication loop.
+    // Pace the dedicated game thread using real elapsed time, without a fixed timestep.
+    static const int FrameLimit = [] {
+        wchar_t Setting[32] = {};
+        const auto Length = GetEnvironmentVariableW(L"DR_SERVER_MAX_FPS", Setting, 32);
+        return ParseServerFrameLimit(Length < 32 ? Setting : nullptr);
+    }();
+    static auto PreviousTick = std::chrono::steady_clock::now();
+    if (Globals::AmServer && FrameLimit > 0) {
+        std::this_thread::sleep_until(PreviousTick + std::chrono::microseconds(1000000 / FrameLimit));
+        PreviousTick = std::chrono::steady_clock::now();
+    }
+
     reinterpret_cast<void(*)(UGameEngine*, float, char)>(OrigGameEngineTick)(GameEngine, DeltaTime, CanRender);
 
     if (Globals::Listening) {
