@@ -1,5 +1,6 @@
 import { Client, Events, GatewayIntentBits, MessageFlags, REST } from 'discord.js';
-import { resolve } from 'node:path';
+import { resolve, dirname, join } from 'node:path';
+import {createCounters, syncCounterCommand} from './counter.mjs';
 import { backend, Keys, loadState, saveState } from './keys.mjs';
 import { loadInviteConfig, inviteMessage } from './invite.mjs';
 import { syncKeyCommands } from './commands.mjs';
@@ -13,21 +14,30 @@ const inviteConfig = await loadInviteConfig(process.env.SERVER_CONFIG_FILE);
 const keys = new Keys(await loadState(stateFile), state => saveState(stateFile, state), backend(process.env.METAGAME_URL || 'http://127.0.0.1:61000', adminKey));
 await keys.migrateLinks();
 
-const client = new Client({intents: [GatewayIntentBits.Guilds]});
+const client = new Client({intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]});
+const counters=await createCounters(client,process.env.COUNTER_STATE_FILE || join(dirname(stateFile),'counters.json'));
 const rest = new REST({version: '10'}).setToken(token);
 
 client.once(Events.ClientReady, async () => {
   try {
     const guilds = process.env.DISCORD_GUILD_ID ? [process.env.DISCORD_GUILD_ID] : [...client.guilds.cache.keys()];
     const changed = await syncKeyCommands(rest, client.application.id, guilds);
+    await syncCounterCommand(rest,client.application.id);
+    await counters.start();
     console.log(`Key command registration: ${changed} scopes updated`);
     console.log('Revived key bot ready');
   } catch { console.error('Could not register /key'); await client.destroy(); process.exitCode = 1; }
 });
 const active = new Set();
+client.on(Events.GuildMemberAdd,member=>counters.schedule(member.guild));
+client.on(Events.GuildMemberRemove,member=>counters.schedule(member.guild));
+setInterval(()=>{for(const guild of client.guilds.cache.values()) counters.schedule(guild);},300000).unref();
 const cooldown = new Map();
 setInterval(() => { const now = Date.now(); for (const [id, until] of cooldown) if (until <= now) cooldown.delete(id); }, 60000).unref();
 client.on(Events.InteractionCreate, async interaction => {
+  if(interaction.isChatInputCommand() && interaction.commandName==='counter') {
+    await counters.configure(interaction).catch(()=>console.error('Counter interaction failed')); return;
+  }
   if (!interaction.isChatInputCommand() || interaction.commandName !== 'key') return;
   const id = interaction.user.id;
   try {

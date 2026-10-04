@@ -1,7 +1,25 @@
 import os from 'node:os';
 
 export class CapacityUnavailable extends Error {
-    constructor(public readonly reason: 'memory' | 'ports') { super(`Game-server capacity unavailable: ${reason}`); }
+    constructor(public readonly reason: 'memory' | 'ports' | 'hunts') { super(`Game-server capacity unavailable: ${reason}`); }
+}
+
+export function HuntLimit() {
+    const name = process.env.HUNT_WORKER === '1' ? 'MAX_HUNTS' : 'MAX_LOCAL_HUNTS';
+    return process.env[name] === undefined ? null : setting(name, 1);
+}
+
+export class HuntAdmission {
+    pending = 0;
+    constructor(private running: () => number, private limit = HuntLimit) {}
+    status() { return {running: this.running(), pending: this.pending, limit: this.limit()}; }
+    reserve() {
+        const {running, pending, limit} = this.status();
+        if (limit !== null && running + pending >= limit) throw new CapacityUnavailable('hunts');
+        this.pending++;
+        let active = true;
+        return () => { if (active) {active = false; this.pending--;} };
+    }
 }
 
 function setting(name: string, fallback: number) {

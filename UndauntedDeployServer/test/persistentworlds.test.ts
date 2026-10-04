@@ -89,6 +89,25 @@ after(() => {
 });
 
 describe("Ramsgate", () => {
+    it('hard primary capacity excludes Ramsgate and dojo and admits only one concurrent last slot', async()=>{
+        await Startup(); await GetTrainingDojoConnectionDetails();
+        process.env.MAX_LOCAL_HUNTS='1';
+        try {
+            const results=await Promise.allSettled(Array.from({length:8},()=>StartupGameserverWithArgs(TUTORIAL_ARGS)));
+            assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+            assert.equal(Spawned.length,3);
+            assert.equal(Gameservers.filter(s=>!s.isRamsgate&&!s.isTrainingDojo).length,1);
+        } finally {delete process.env.MAX_LOCAL_HUNTS;}
+    });
+    it('worker hard capacity rejects concurrent requests beyond three',async()=>{
+        process.env.HUNT_WORKER='1'; process.env.MAX_HUNTS='3';
+        try {
+            await Startup();
+            const results=await Promise.allSettled(Array.from({length:8},()=>StartupGameserverWithArgs(TUTORIAL_ARGS)));
+            assert.equal(results.filter(r=>r.status==='fulfilled').length,3);
+            assert.equal(Spawned.length,3);
+        } finally {delete process.env.HUNT_WORKER;delete process.env.MAX_HUNTS;}
+    });
     it('low memory blocks new worlds before spawn without consuming hunt ports or stopping Ramsgate', async () => {
         await Startup();
         process.env.GAMESERVER_MEMORY_GUARD = '1';

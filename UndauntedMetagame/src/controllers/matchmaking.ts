@@ -137,7 +137,7 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
     if (MatchmakingResult.status === 503) {
         try {
             const body = await MatchmakingResult.json();
-            if (body?.error === 'capacity_unavailable' && ['memory', 'ports'].includes(body.reason)) {
+            if (body?.error === 'capacity_unavailable' && ['memory', 'ports', 'hunts'].includes(body.reason)) {
                 logger.warn({reason: body.reason, huntId: HuntId, capacityWaitMs: CAPACITY_WAIT_MS}, 'mm: allocation waiting for capacity');
                 return {...Failed, capacity: true};
             }

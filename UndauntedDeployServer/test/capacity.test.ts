@@ -1,7 +1,29 @@
 import './setup';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryAdmission, CapacityUnavailable } from '../src/controllers/capacity';
+import { MemoryAdmission, CapacityUnavailable, HuntAdmission, HuntLimit } from '../src/controllers/capacity';
+
+test('hard hunt slots include pending allocations and release exactly once',()=>{
+    let running=4;
+    const slots=new HuntAdmission(()=>running,()=>5);
+    const release=slots.reserve();
+    assert.deepEqual(slots.status(),{running:4,pending:1,limit:5});
+    assert.throws(()=>slots.reserve(),CapacityUnavailable);
+    running++; release(); release();
+    assert.throws(()=>slots.reserve(),CapacityUnavailable);
+    running--; slots.reserve();
+    assert.throws(()=>slots.reserve(),CapacityUnavailable);
+});
+test('worker and primary have independent configured hard limits',()=>{
+    process.env.MAX_LOCAL_HUNTS='5'; process.env.MAX_HUNTS='3';
+    try {
+        assert.equal(HuntLimit(),5);
+        process.env.HUNT_WORKER='1'; assert.equal(HuntLimit(),3);
+        const worker=new HuntAdmission(()=>2); worker.reserve();
+        assert.throws(()=>worker.reserve(),CapacityUnavailable);
+        process.env.MAX_HUNTS='invalid'; assert.throws(HuntLimit,/Invalid/);
+    } finally {delete process.env.HUNT_WORKER; delete process.env.MAX_LOCAL_HUNTS; delete process.env.MAX_HUNTS;}
+});
 
 test('memory floor, startup reservations, release and expiry', () => {
     process.env.GAMESERVER_MEMORY_GUARD = '1';

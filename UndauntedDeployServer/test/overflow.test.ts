@@ -18,6 +18,13 @@ test('threshold spills whole hunt/party; persistent worlds stay local', async ()
     assert.deepEqual(await router.launch({...body, GameMode:'CITY'}, async () => local), local);
     assert.equal(calls, 1);
 });
+test('below threshold prefers primary and both full refuses without another spawn',async()=>{
+    let remoteCalls=0;
+    const router=new HuntRouter(()=>0,async()=>{remoteCalls++;return undefined;});
+    assert.deepEqual(await router.launch(body,async()=>local),local); assert.equal(remoteCalls,0);
+    await assert.rejects(router.launch(body,async()=>{throw new CapacityUnavailable('hunts');}),CapacityUnavailable);
+    assert.equal(remoteCalls,1);
+});
 test('local capacity falls back remotely; explicit worker refusal falls back locally', async () => {
     const router = new HuntRouter(() => 0, async () => worker);
     assert.deepEqual(await router.launch(body, async () => { throw new CapacityUnavailable('ports'); }), worker);

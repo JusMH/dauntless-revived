@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { DescribeGameservers } from "../controllers/gameservers";
+import { DescribeGameservers, huntAdmission } from "../controllers/gameservers";
 import { DescribeOverflow } from '../controllers/overflow';
 
 export const gameserversRouter = Router();
@@ -32,6 +32,7 @@ gameserversRouter.get("/gameservers", async (req, res) => {
 
     res.status(200);
     res.json({
-        servers: [...DescribeGameservers(), ...await DescribeOverflow()]
+        servers: [...DescribeGameservers(), ...await DescribeOverflow()],
+        capacity: huntAdmission.status()
     });
 });

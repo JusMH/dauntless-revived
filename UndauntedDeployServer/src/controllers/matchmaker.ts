@@ -1,9 +1,9 @@
 import { logger } from "../logger";
 import { GetRamsgateConnectionDetails, GetTrainingDojoConnectionDetails, StartupGameserverWithArgs, StartupGameserverWithHuntIdAndPlayers } from "./gameservers";
-import { Gameservers, KindOfGameserver } from './gameservers';
+import { Gameservers, KindOfGameserver, huntAdmission } from './gameservers';
 import { HuntRouter } from './overflow';
 
-const Router = new HuntRouter(() => Gameservers.filter(server => ['hunt', 'tutorial'].includes(KindOfGameserver(server))).length);
+const Router = new HuntRouter(() => Gameservers.filter(server => ['hunt', 'tutorial'].includes(KindOfGameserver(server))).length, undefined, () => huntAdmission.status());
 
 export async function HandleMatchmakingRequest(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined){
     if (process.env.HUNT_WORKER === '1' && GameMode !== 'ISLAND') throw new Error('Hunt worker only accepts ISLAND requests');

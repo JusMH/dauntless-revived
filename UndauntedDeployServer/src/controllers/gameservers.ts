@@ -13,7 +13,7 @@ import TrialsHardHuntTable from "../vendor/trials_hard_table.json";
 import TrialsEliteHuntTable from "../vendor/trials_elite_table.json";
 import { kill } from "node:process";
 import { logger } from "../logger";
-import { CapacityUnavailable, memoryAdmission } from './capacity';
+import { CapacityUnavailable, memoryAdmission, HuntAdmission } from './capacity';
 
 const RAMSGATE_MAP_PATH = "/Game/Maps/ramsgate/ramsgate_01_persistent";
 const TRAINING_DOJO_MAP_PATH = "/Game/Maps/islands/dojo/training_dojo_persistent";
@@ -194,8 +194,10 @@ export function IsPersistentWorldLivenessOn(){
 
 let ServerLaunchQueue: Promise<unknown> = Promise.resolve();
 let NextServerLaunchAt = 0;
+export const huntAdmission = new HuntAdmission(() => Gameservers.filter(server => !server.isRamsgate && !server.isTrainingDojo && ProcessIsAlive(server.processId)).length);
 
 function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
+    const ReleaseHunt = !IsRamsgate && !IsTrainingDojo ? huntAdmission.reserve() : () => {};
     const Previous = ServerLaunchQueue;
     let ReleaseLaunch!: () => void;
     ServerLaunchQueue = new Promise<void>(Resolve => { ReleaseLaunch = Resolve; });
@@ -204,10 +206,11 @@ function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId
         const Wait = NextServerLaunchAt - Date.now();
         if (Wait > 0) await setTimeout(Wait);
         return StartServerNow(Map, Behemoth, MatchmakerHuntId, ExpectedPlayers, IsRamsgate, IsTrainingDojo, () => {
+            ReleaseHunt();
             NextServerLaunchAt = Date.now() + SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP * 1000;
             ReleaseLaunch();
         });
-    }).finally(ReleaseLaunch);
+    }).finally(() => { ReleaseHunt(); ReleaseLaunch(); });
 }
 
 async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean, Spawned: () => void){
