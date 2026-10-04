@@ -32,17 +32,15 @@ export async function IsUdpPortBound(port: number) {
 export async function WaitForReadyFile(child: ChildProcess, port: number, file: string, timeoutMs = 90000) {
     const deadline = Date.now() + timeoutMs;
     let boundSamples = 0;
-    let onExit!: () => void;
-    let onError!: (error: Error) => void;
-    const stopped = new Promise<never>((_resolve, reject) => {
-        onExit = () => reject(new Error(`Game server on port ${port} exited before listening`));
-        onError = error => reject(new Error(`Game server on port ${port} failed before listening: ${error.message}`));
-        child.once('exit', onExit);
-        child.once('error', onError);
-    });
+    let failure: Error | undefined;
+    const onExit = () => { failure = new Error(`Game server on port ${port} exited before listening`); };
+    const onError = (error: Error) => { failure = new Error(`Game server on port ${port} failed before listening: ${error.message}`); };
+    child.once('exit', onExit);
+    child.once('error', onError);
 
     try {
         while (Date.now() < deadline) {
+            if(failure) throw failure;
             if (ChildStopped(child)) throw new Error(`Game server on port ${port} exited before listening`);
 
             try {
@@ -62,7 +60,7 @@ export async function WaitForReadyFile(child: ChildProcess, port: number, file: 
                 boundSamples = 0;
             }
 
-            await Promise.race([setTimeout(Math.min(200, Math.max(1, deadline - Date.now()))), stopped]);
+            await setTimeout(Math.min(200, Math.max(1, deadline - Date.now())));
         }
 
         throw new Error(`Game server on port ${port} did not start listening within ${timeoutMs}ms`);
