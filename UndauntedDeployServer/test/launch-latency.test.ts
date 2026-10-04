@@ -86,7 +86,7 @@ test("hunt startup failure during readiness grace is rejected and returns its po
         return child as unknown as ChildProcess;
     }, IsAlive: () => true });
     try {
-        await assert.rejects(game.StartupGameserverWithArgs(args), /exited during startup/);
+        await assert.rejects(game.StartupGameserverWithArgs(args), /exited before listening/);
         assert.equal(game.GameserverStateForTests().FreePorts.length, before);
     } finally {
         process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
