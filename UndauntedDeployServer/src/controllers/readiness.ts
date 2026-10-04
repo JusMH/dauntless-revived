@@ -29,7 +29,7 @@ export async function IsUdpPortBound(port: number) {
     });
 }
 
-export async function WaitForReadyFile(child: ChildProcess, port: number, file: string, timeoutMs = 90000) {
+export async function WaitForServerReady(child: ChildProcess, port: number, file: string, timeoutMs = 90000) {
     const deadline = Date.now() + timeoutMs;
     let boundSamples = 0;
     let failure: Error | undefined;
