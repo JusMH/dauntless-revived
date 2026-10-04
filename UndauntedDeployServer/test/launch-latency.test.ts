@@ -7,6 +7,7 @@ import { after, test } from "node:test";
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { createSocket, type Socket } from 'node:dgram';
 
 process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = "0.3";
 const game = require("../src/controllers/gameservers") as typeof import("../src/controllers/gameservers");
@@ -89,5 +90,41 @@ test("hunt startup failure during readiness grace is rejected and returns its po
         assert.equal(game.GameserverStateForTests().FreePorts.length, before);
     } finally {
         process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
+    }
+});
+
+
+test("hunt allocation waits for the UDP listener when no readiness marker is written", async () => {
+    game.ResetGameserversForTests();
+    game.UseProcessFunctionsForTests({ Spawn: spawn, IsAlive: () => true });
+    await game.Startup();
+
+    let listener: Socket | undefined;
+    process.env.GAMESERVER_STARTUP_GRACE_MS = "1500";
+    game.UseProcessFunctionsForTests({
+        Spawn: (_command, launchArgs) => {
+            const child = spawn();
+            const port = Number(launchArgs[1]);
+            setTimeout(() => {
+                listener = createSocket("udp4");
+                listener.bind(port, "0.0.0.0");
+            }, 100);
+            return child;
+        },
+        IsAlive: () => true
+    });
+
+    const started = Date.now();
+
+    try {
+        const result = await game.StartupGameserverWithArgs(args);
+        assert.ok(Date.now() - started >= 300);
+        assert.ok(result.port > 0);
+    }
+    finally {
+        process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
+        if(listener !== undefined){
+            await new Promise<void>(resolve => listener!.close(() => resolve()));
+        }
     }
 });
