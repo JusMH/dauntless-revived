@@ -1,8 +1,9 @@
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { setTimeout } from "node:timers/promises";
 import { mkdir, unlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
-import { WaitForReadyFile } from "./readiness";
+import { IsUdpPortBound, WaitForServerReady } from "./readiness";
 
 import crypto from "node:crypto";
 
@@ -58,52 +59,37 @@ const METAGAME_API_KEY = process.env.METAGAME_API_KEY!;
 const MY_IP = process.env.MY_IP!;
 const SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = Number(process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP!);
 
-function GameserverStartupGraceMs(){
+function GameserverStartupTimeoutMs(){
     const Raw = process.env.GAMESERVER_STARTUP_GRACE_MS;
     if(Raw === undefined){
-        return 5000;
+        return 90000;
     }
 
     const Value = Number(Raw);
 
-    if(!/^\d+$/.test(Raw) || !Number.isSafeInteger(Value) || Value < 0 || Value > 60000){
+    if(!/^\d+$/.test(Raw) || !Number.isSafeInteger(Value) || Value < 0 || Value > 180000){
         throw new Error("Invalid GAMESERVER_STARTUP_GRACE_MS");
     }
 
     return Value;
 }
 
-async function WaitForServerStartup(Child: ChildProcess, Port: number, IsHunt: boolean){
-    if(!IsHunt){
-        return;
+async function TakeHuntPort(){
+    const Busy: number[] = [];
+
+    while(FreePorts.length > 0){
+        const Port = FreePorts.pop()!;
+
+        if(!(await IsUdpPortBound(Port))){
+            FreePorts.unshift(...Busy);
+            return Port;
+        }
+
+        Busy.push(Port);
     }
 
-    const GraceMs = GameserverStartupGraceMs();
-
-    if(GraceMs === 0){
-        return;
-    }
-
-    let OnExit!: (Code: number | null, Signal: NodeJS.Signals | null) => void;
-    let OnError!: (error: Error) => void;
-    const Failed = new Promise<never>((_Resolve, Reject) => {
-        OnExit = (Code, Signal) => Reject(new Error(`Game server on port ${Port} exited during startup (${Signal ?? Code ?? "unknown"})`));
-        OnError = (error) => Reject(new Error(`Game server on port ${Port} failed during startup: ${error.message}`));
-        Child.once("exit", OnExit);
-        Child.once("error", OnError);
-    });
-
-    try{
-        await Promise.race([setTimeout(GraceMs), Failed]);
-    }
-    finally{
-        Child.off("exit", OnExit);
-        Child.off("error", OnError);
-    }
-
-    if(Child.pid === undefined || !ProcessIsAlive(Child.pid)){
-        throw new Error(`Game server on port ${Port} did not survive startup`);
-    }
+    FreePorts.unshift(...Busy);
+    throw new CapacityUnavailable('ports');
 }
 
 function TransformExpectedPlayerArgs(ExpectedPlayers: ExpectedPlayer[]){
@@ -226,8 +212,8 @@ function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId
 
 async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean, Spawned: () => void){
 
-    const ReadyDir = process.env.GAMESERVER_READY_DIR;
-    if (ReadyDir) await mkdir(ReadyDir, { recursive: true });
+    const ReadyDir = process.env.GAMESERVER_READY_DIR ?? path.join(tmpdir(), `dauntless-revived-ready-${process.pid}`);
+    await mkdir(ReadyDir, { recursive: true, mode: 0o700 });
     if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
     const ReleaseReservation = memoryAdmission.reserve(!IsRamsgate && !IsTrainingDojo);
     
@@ -240,11 +226,11 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         Port = TRAINING_DOJO_PORT;
     }
     else{
-        Port = FreePorts.pop();
+        Port = await TakeHuntPort();
     }
 
     const Id = crypto.randomUUID();
-    const ReadyFile = ReadyDir ? path.join(ReadyDir, `${Id}.ready`) : undefined;
+    const ReadyFile = path.join(ReadyDir, `${Id}.ready`);
 
     if(Port == undefined){
         ReleaseReservation();
@@ -253,6 +239,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
 
     const IsHunt = !IsRamsgate && !IsTrainingDojo;
     let Child: ChildProcess;
+    await unlink(ReadyFile).catch(() => {});
 
     try{
         Child = SpawnProcess(GAMESERVER_BINARY_PATH, [
@@ -268,7 +255,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
             // Keep the long-running Ramsgate and Dojo diagnostic windows visible,
             // but do not flash a new command window for every temporary hunt.
             windowsHide: IsHunt,
-            env: ReadyFile ? { ...process.env, DR_SERVER_READY_FILE: ReadyFile } : process.env
+            env: { ...process.env, DR_SERVER_READY_FILE: ReadyFile }
         });
     }
     catch(error){
@@ -286,7 +273,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     Child.on("error", (error) => { ReleaseReservation(); logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`); });
     Child.on("exit", (Code, Signal) => {
         ReleaseReservation();
-        if (ReadyFile) void unlink(ReadyFile).catch(() => {});
+        void unlink(ReadyFile).catch(() => {});
         // Release hunt ports immediately instead of waiting up to 60s for the watchdog.
         if (IsHunt) {
             const Finished = Gameservers.find(Server => Server.id === Id);
@@ -332,8 +319,8 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     Gameservers.push(NewGameserver);
     Spawned();
     try {
-        if (ReadyFile) await WaitForReadyFile(Child, Port, ReadyFile);
-        else await WaitForServerStartup(Child, Port, IsHunt);
+        const TimeoutMs = GameserverStartupTimeoutMs();
+        if(TimeoutMs > 0) await WaitForServerReady(Child, Port, ReadyFile, TimeoutMs);
     } catch (error) {
         if (Gameservers.includes(NewGameserver) && Child.pid && ProcessIsAlive(Child.pid)) Child.kill();
         else if (IsHunt) await CleanupServer(NewGameserver);
