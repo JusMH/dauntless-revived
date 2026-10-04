@@ -14,16 +14,25 @@ const inviteConfig = await loadInviteConfig(process.env.SERVER_CONFIG_FILE);
 const keys = new Keys(await loadState(stateFile), state => saveState(stateFile, state), backend(process.env.METAGAME_URL || 'http://127.0.0.1:61000', adminKey));
 await keys.migrateLinks();
 
-const client = new Client({intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers]});
-const counters=await createCounters(client,process.env.COUNTER_STATE_FILE || join(dirname(stateFile),'counters.json'));
 const rest = new REST({version: '10'}).setToken(token);
+const appInfo = await rest.get('/oauth2/applications/@me');
+const memberIntentEnabled = !!(appInfo.flags & ((1 << 14) | (1 << 15)));
+const client = new Client({intents: [GatewayIntentBits.Guilds, ...(memberIntentEnabled ? [GatewayIntentBits.GuildMembers] : [])]});
+const counters=await createCounters(client,process.env.COUNTER_STATE_FILE || join(dirname(stateFile),'counters.json'));
+if (!memberIntentEnabled) {
+  console.error('Counter unavailable: enable Server Members Intent in Discord Developer Portal. Key commands remain online.');
+  setInterval(async()=>{
+    try {const app=await rest.get('/oauth2/applications/@me');if(app.flags & ((1<<14)|(1<<15))) {await client.destroy();process.exit(0);}}
+    catch {console.error('Could not recheck Server Members Intent');}
+  },60000).unref();
+}
 
 client.once(Events.ClientReady, async () => {
   try {
     const guilds = process.env.DISCORD_GUILD_ID ? [process.env.DISCORD_GUILD_ID] : [...client.guilds.cache.keys()];
     const changed = await syncKeyCommands(rest, client.application.id, guilds);
     await syncCounterCommand(rest,client.application.id);
-    await counters.start();
+    if(memberIntentEnabled) await counters.start();
     console.log(`Key command registration: ${changed} scopes updated`);
     console.log('Revived key bot ready');
   } catch { console.error('Could not register /key'); await client.destroy(); process.exitCode = 1; }
@@ -31,11 +40,12 @@ client.once(Events.ClientReady, async () => {
 const active = new Set();
 client.on(Events.GuildMemberAdd,member=>counters.schedule(member.guild));
 client.on(Events.GuildMemberRemove,member=>counters.schedule(member.guild));
-setInterval(()=>{for(const guild of client.guilds.cache.values()) counters.schedule(guild);},300000).unref();
+setInterval(()=>{if(memberIntentEnabled) for(const guild of client.guilds.cache.values()) counters.schedule(guild);},300000).unref();
 const cooldown = new Map();
 setInterval(() => { const now = Date.now(); for (const [id, until] of cooldown) if (until <= now) cooldown.delete(id); }, 60000).unref();
 client.on(Events.InteractionCreate, async interaction => {
   if(interaction.isChatInputCommand() && interaction.commandName==='counter') {
+    if(!memberIntentEnabled) {await interaction.reply({content:'Enable Server Members Intent for this bot in Discord Developer Portal. The bot will reconnect automatically within a minute.',flags:MessageFlags.Ephemeral});return;}
     await counters.configure(interaction).catch(()=>console.error('Counter interaction failed')); return;
   }
   if (!interaction.isChatInputCommand() || interaction.commandName !== 'key') return;
