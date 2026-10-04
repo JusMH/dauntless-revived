@@ -212,8 +212,8 @@ function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId
 
 async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean, Spawned: () => void){
 
-    const ReadyDir = process.env.GAMESERVER_READY_DIR ?? path.join(tmpdir(), "dauntless-revived-ready");
-    await mkdir(ReadyDir, { recursive: true });
+    const ReadyDir = process.env.GAMESERVER_READY_DIR ?? path.join(tmpdir(), `dauntless-revived-ready-${process.pid}`);
+    await mkdir(ReadyDir, { recursive: true, mode: 0o700 });
     if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
     const ReleaseReservation = memoryAdmission.reserve(!IsRamsgate && !IsTrainingDojo);
     
