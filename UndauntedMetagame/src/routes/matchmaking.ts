@@ -173,6 +173,7 @@ matchmakingRouter.post("/candidate/join", HasUndauntedMetagameAuth, async (req: 
     const GameMode = req.body.gameMode;
     const GameArgs = req.body.gameArgs;
     const HuntId = req.body.playerHuntId;
+    const PrivateMatch = req.body.privateMatch === true || req.body.isPrivate === true;
 
     logger.info(`UserId ${UserId} wants to join a game with GameMode ${GameMode} & GameArgs ${GameArgs} & HuntId ${HuntId}`);
 
@@ -180,7 +181,7 @@ matchmakingRouter.post("/candidate/join", HasUndauntedMetagameAuth, async (req: 
     // A reasonable addition would be checks on frequency of MM/server spinup
     // Best scenario is 1-1 for server session<->player and a new server cooldown
 
-    const MatchmakingResult = await HandlePlayerMatchmaking(GameMode, GameArgs, HuntId, UserId);
+    const MatchmakingResult = await HandlePlayerMatchmaking(GameMode, GameArgs, HuntId, UserId, PrivateMatch);
 
     if(!MatchmakingResult){
         res.status(400);
