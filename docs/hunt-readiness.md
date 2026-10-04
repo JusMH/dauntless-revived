@@ -1,11 +1,11 @@
 # Hunt startup and worker operation
 
 Deploy the matching `UndauntedInternalServer.dll` and deploy-server build together.
-Set `GAMESERVER_READY_DIR` to a private writable directory on each game host. The
-native server writes its PID and port only after `InitListen` succeeds; deployment
-waits up to 90 seconds for that launch's marker before returning a travel address.
-Without this setting, the upstream five-second process-survival check remains.
-Never enable marker mode with an older DLL: all launches would time out.
+The deploy server creates a private per-launch readiness marker automatically and waits
+up to 90 seconds before returning a travel address. Newer native servers write the marker
+only after `InitListen` succeeds. Existing installs with an older DLL are also supported:
+the deploy server verifies that the assigned UDP port is actually bound before matchmaking
+can return `IN_PROGRESS`. `GAMESERVER_READY_DIR` may override the marker directory.
 
 Launches retain their configured spacing and memory reservations, but one cold
 world no longer blocks every following launch. Client queue/status requests wait
