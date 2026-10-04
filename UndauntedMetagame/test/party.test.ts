@@ -75,7 +75,19 @@ async function WaitForDeployCalls(Count: number){
     }
 
     assert.equal(Deploy.Calls.length, Count);
-    await new Promise<void>((Resolve) => setTimeout(Resolve, 5));
+}
+
+async function WaitForCandidateKind(Player: string, Kind: "unknown" | "failed" | "matching" | "travel"){
+    const Deadline = Date.now() + 2000;
+    let Decision = await DecideCandidateStatus(Player);
+
+    while(Decision.Kind !== Kind && Date.now() < Deadline){
+        await new Promise<void>((Resolve) => setTimeout(Resolve, 5));
+        Decision = await DecideCandidateStatus(Player);
+    }
+
+    assert.equal(Decision.Kind, Kind, Player);
+    return Decision;
 }
 
 describe("a party of one (every player on their own)", () => {
@@ -564,7 +576,7 @@ describe("solo matchmaking fixes", () => {
 
         await WaitForDeployCalls(1);
         for(const Player of [A, B, C, D]){
-            assert.equal((await DecideCandidateStatus(Player)).Kind, "failed", Player);
+            await WaitForCandidateKind(Player, "failed");
         }
     });
 
