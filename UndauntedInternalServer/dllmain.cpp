@@ -382,7 +382,7 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         static float GroundedTransformRefresh = 0.0f;
         static std::map<ABP_PlayerCharacter_C*, FTransform> LastGroundedTransforms;
         static std::map<ABP_PlayerCharacter_C*, bool> RecoveryState;
-        GroundedTransformRefresh += std::max(0.0f, DeltaTime);
+        GroundedTransformRefresh += DeltaTime > 0.0f ? DeltaTime : 0.0f;
         const bool RefreshGroundedTransform = GroundedTransformRefresh >= 0.5f;
         if (RefreshGroundedTransform)
             GroundedTransformRefresh = 0.0f;
