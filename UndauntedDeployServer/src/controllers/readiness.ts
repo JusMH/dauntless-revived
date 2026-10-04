@@ -56,13 +56,13 @@ export async function WaitForServerReady(child: ChildProcess, port: number, file
                 if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
             }
 
-            if (await IsUdpPortBound(port)) {
+            const Bound = await IsUdpPortBound(port);
+            if(failure) throw failure;
+            if(ChildStopped(child)) throw new Error(`Game server on port ${port} exited before listening`);
+
+            if (Bound) {
                 boundSamples++;
-                if (boundSamples >= 2) {
-                    if(failure) throw failure;
-                    if(ChildStopped(child)) throw new Error(`Game server on port ${port} exited before listening`);
-                    return;
-                }
+                if (boundSamples >= 2) return;
             }
             else {
                 boundSamples = 0;
@@ -71,6 +71,8 @@ export async function WaitForServerReady(child: ChildProcess, port: number, file
             await setTimeout(Math.min(200, Math.max(1, deadline - Date.now())));
         }
 
+        if(failure) throw failure;
+        if(ChildStopped(child)) throw new Error(`Game server on port ${port} exited before listening`);
         throw new Error(`Game server on port ${port} did not start listening within ${timeoutMs}ms`);
     }
     finally {
