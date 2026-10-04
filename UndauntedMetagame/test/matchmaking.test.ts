@@ -4,6 +4,7 @@ import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { CancelMatchmaking, CheckAndUpdateQueueStatus, DistinctPlayers, HandlePlayerMatchmaking, ResetMatchmakingForTests } from "../src/controllers/matchmaking";
 import { GetDb } from "../src/db";
+import { SetPartyClockForTests } from "../src/controllers/party";
 
 // Matchmaking looks up the player's party (controllers/party.ts), which loads the database
 after(() => RemoveTestDb(() => GetDb().$client.close()));
@@ -97,6 +98,61 @@ describe("concurrent hunt queues", () => {
         }
         finally{
             release?.();
+            globalThis.fetch = originalFetch;
+            ResetMatchmakingForTests();
+        }
+    });
+
+    it("keeps a long-running allocation on the same candidate when the client retries", async () => {
+        ResetMatchmakingForTests();
+        const originalFetch = globalThis.fetch;
+        let now = Date.now();
+        let release: (() => void) | undefined;
+        let calls = 0;
+        SetPartyClockForTests(() => now);
+
+        globalThis.fetch = (async () => {
+            calls++;
+            await new Promise<void>((resolve) => { release = resolve; });
+            return new Response(JSON.stringify({host: "127.0.0.1", port: 39002}), {
+                status: 200,
+                headers: {"content-type": "application/json"}
+            });
+        }) as typeof fetch;
+
+        try{
+            for(const player of ["UID-long-a", "UID-long-b", "UID-long-c", "UID-long-d"]){
+                assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Long_A", player), true);
+            }
+
+            for(let retry = 0; retry < 40 && calls === 0; retry++){
+                await new Promise<void>((resolve) => setTimeout(resolve, 5));
+            }
+
+            assert.equal(calls, 1);
+            const before = await CheckAndUpdateQueueStatus("UID-long-a");
+            assert.ok(before);
+            now += 31_000;
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Long_A", "UID-long-a"), true);
+            const after = await CheckAndUpdateQueueStatus("UID-long-a");
+            assert.equal(after?.CandidateId, before.CandidateId);
+            assert.equal(calls, 1);
+
+            release?.();
+            for(let retry = 0; retry < 40; retry++){
+                const entry = await CheckAndUpdateQueueStatus("UID-long-a");
+                if(entry?.Ready){
+                    assert.equal(entry.CandidateId, before.CandidateId);
+                    return;
+                }
+                await new Promise<void>((resolve) => setTimeout(resolve, 5));
+            }
+
+            assert.fail("allocation never completed");
+        }
+        finally{
+            release?.();
+            SetPartyClockForTests();
             globalThis.fetch = originalFetch;
             ResetMatchmakingForTests();
         }
