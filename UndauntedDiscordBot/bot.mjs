@@ -1,6 +1,7 @@
 import { Client, Events, GatewayIntentBits, MessageFlags, REST } from 'discord.js';
 import { resolve, dirname, join } from 'node:path';
 import {createCounters, syncCounterCommand} from './counter.mjs';
+import {acquireInstance} from './instance.mjs';
 import { backend, Keys, loadState, saveState } from './keys.mjs';
 import { loadInviteConfig, inviteMessage } from './invite.mjs';
 import { syncKeyCommands } from './commands.mjs';
@@ -10,6 +11,7 @@ const token = process.env.DISCORD_BOT_TOKEN;
 const adminKey = process.env.METAGAME_ADMIN_KEY;
 if (!token || !adminKey) throw new Error('Configure DISCORD_BOT_TOKEN and METAGAME_ADMIN_KEY');
 const stateFile = resolve(process.env.KEY_STATE_FILE || './data/keys.json');
+await acquireInstance(stateFile);
 const inviteConfig = await loadInviteConfig(process.env.SERVER_CONFIG_FILE);
 const keys = new Keys(await loadState(stateFile), state => saveState(stateFile, state), backend(process.env.METAGAME_URL || 'http://127.0.0.1:61000', adminKey));
 await keys.migrateLinks();
