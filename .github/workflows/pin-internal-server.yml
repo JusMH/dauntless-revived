@@ -1,0 +1,61 @@
+name: Pin internal server
+
+on:
+  push:
+    branches:
+      - fix/hunt-stability-fall-recovery
+
+permissions:
+  contents: write
+
+jobs:
+  pin:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+          fetch-depth: 0
+
+      - shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
+          if (-not $msbuild) { throw 'MSBuild not found' }
+          & $msbuild UndauntedInternalServer\UndauntedInternalServer.sln /m /t:Build /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $dll = Get-ChildItem UndauntedInternalServer -Filter UndauntedInternalServer.dll -Recurse |
+            Where-Object { $_.FullName -match '[\\/]x64[\\/]Release[\\/]' } |
+            Select-Object -First 1
+          if (-not $dll) { throw 'Release x64 DLL not found' }
+
+          Copy-Item -LiteralPath $dll.FullName -Destination UndauntedLauncher\assets\UndauntedInternalServer.dll -Force
+          $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath UndauntedLauncher\assets\UndauntedInternalServer.dll).Hash
+          $lower = $hash.ToLowerInvariant()
+
+          $common = 'deploy\windows-server\DauntlessServer.Common.ps1'
+          $text = [IO.File]::ReadAllText($common)
+          $text = [regex]::Replace($text, "(?m)('UndauntedInternalServer\.dll'\s*=\s*')[A-F0-9]{64}(')", { param($m) $m.Groups[1].Value + $hash + $m.Groups[2].Value })
+          [IO.File]::WriteAllText($common, $text, (New-Object Text.UTF8Encoding($false)))
+
+          $linux = 'deploy\linux-server\prepare-game.sh'
+          $text = [IO.File]::ReadAllText($linux)
+          $text = [regex]::Replace($text, '(?m)^PIN_SERVER=[0-9a-f]{64}$', "PIN_SERVER=$lower")
+          [IO.File]::WriteAllText($linux, $text, (New-Object Text.UTF8Encoding($false)))
+
+          $friend = 'friend-kit\setup.ps1'
+          $text = [IO.File]::ReadAllText($friend)
+          $text = [regex]::Replace($text, '(?m)("UndauntedInternalServer\.dll"\s*=\s*")[A-F0-9]{64}(")', { param($m) $m.Groups[1].Value + $hash + $m.Groups[2].Value })
+          [IO.File]::WriteAllText($friend, $text, (New-Object Text.UTF8Encoding($false)))
+
+          Push-Location UndauntedLauncher
+          npm version patch --no-git-tag-version
+          Pop-Location
+
+          Remove-Item .github\workflows\pin-internal-server.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add UndauntedLauncher\assets\UndauntedInternalServer.dll UndauntedLauncher\package.json UndauntedLauncher\package-lock.json deploy\windows-server\DauntlessServer.Common.ps1 deploy\linux-server\prepare-game.sh friend-kit\setup.ps1 .github\workflows\pin-internal-server.yml
+          git commit -m "Ship hunt stability native server"
+          git push origin HEAD:fix/hunt-stability-fall-recovery
