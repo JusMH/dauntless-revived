@@ -8,6 +8,6 @@ struct HuntIdlePolicy {
     bool Advance(double Seconds, bool HasPlayer) {
         if (HasPlayer) { HadPlayer = true; EmptySeconds = 0; return false; }
         EmptySeconds += std::max(0.0, Seconds);
-        return EmptySeconds >= (HadPlayer ? 60.0 : 180.0);
+        return EmptySeconds >= (HadPlayer ? 180.0 : 180.0);
     }
 };
