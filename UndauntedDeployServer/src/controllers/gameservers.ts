@@ -3,7 +3,7 @@ import { setTimeout } from "node:timers/promises";
 import { mkdir, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { IsUdpPortBound, WaitForReadyFile } from "./readiness";
+import { IsUdpPortBound, WaitForServerReady } from "./readiness";
 
 import crypto from "node:crypto";
 
@@ -59,7 +59,7 @@ const METAGAME_API_KEY = process.env.METAGAME_API_KEY!;
 const MY_IP = process.env.MY_IP!;
 const SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP = Number(process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP!);
 
-function GameserverStartupGraceMs(){
+function GameserverStartupTimeoutMs(){
     const Raw = process.env.GAMESERVER_STARTUP_GRACE_MS;
     if(Raw === undefined){
         return 90000;
@@ -319,8 +319,8 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     Gameservers.push(NewGameserver);
     Spawned();
     try {
-        const TimeoutMs = GameserverStartupGraceMs();
-        if(TimeoutMs > 0) await WaitForReadyFile(Child, Port, ReadyFile, TimeoutMs);
+        const TimeoutMs = GameserverStartupTimeoutMs();
+        if(TimeoutMs > 0) await WaitForServerReady(Child, Port, ReadyFile, TimeoutMs);
     } catch (error) {
         if (Gameservers.includes(NewGameserver) && Child.pid && ProcessIsAlive(Child.pid)) Child.kill();
         else if (IsHunt) await CleanupServer(NewGameserver);
