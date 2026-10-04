@@ -332,7 +332,11 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     Gameservers.push(NewGameserver);
     Spawned();
     try {
-        if (ReadyFile) await WaitForReadyFile(Child, Port, ReadyFile);
+        if (ReadyFile) {
+            await WaitForReadyFile(Child, Port, ReadyFile);
+            // The loaded world is now charged to OS free memory; stop counting its startup twice.
+            ReleaseReservation();
+        }
         else await WaitForServerStartup(Child, Port, IsHunt);
     } catch (error) {
         if (Gameservers.includes(NewGameserver) && Child.pid && ProcessIsAlive(Child.pid)) Child.kill();
@@ -352,7 +356,8 @@ export async function GetRamsgateConnectionDetails(){
 
     return {
         host: MY_IP,
-        port: Server.port
+        port: Server.port,
+        sessionId: Server.id
     };
 }
 
@@ -372,7 +377,8 @@ export async function GetTrainingDojoConnectionDetails(){
 
     return {
         host: MY_IP,
-        port: Server.port
+        port: Server.port,
+        sessionId: Server.id
     };
 }
 
@@ -384,7 +390,8 @@ export async function StartupGameserverWithArgs(GameArgs: string){
 
     return {
         host: MY_IP,
-        port: GameServerToReturn.port
+        port: GameServerToReturn.port,
+        sessionId: GameServerToReturn.id
     };
 }
 
@@ -466,7 +473,8 @@ export async function StartupGameserverWithHuntIdAndPlayers(HuntId: string, Expe
 
     return {
         host: MY_IP,
-        port: GameServerToReturn.port
+        port: GameServerToReturn.port,
+        sessionId: GameServerToReturn.id
     }
 }
 

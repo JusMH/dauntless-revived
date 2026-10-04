@@ -86,13 +86,40 @@ export class Keys {
     this.queue = task;
     return task;
   }
+  deliver(user, send) {
+    const task = this.queue.catch(() => {}).then(async () => {
+      const result = await this.handle(user, true);
+      if (result.status !== 'ready') return result;
+      const entry = this.state.users[user];
+      if (entry.delivery !== 'unsent') return {status: 'already_sent'};
+      // Reserve durably before Discord: an ambiguous timeout must never send twice.
+      entry.delivery = 'reserved';
+      try { await this.save(this.state); }
+      catch (error) { entry.delivery = 'unsent'; throw error; }
+      try { await send(result.code); }
+      catch (error) {
+        // Discord explicitly rejected the DM; no message was delivered.
+        if (error.code === 50007) {
+          entry.delivery = 'unsent';
+          await this.save(this.state);
+          return {status: 'dm_disabled'};
+        }
+        return {status: 'delivery_uncertain'};
+      }
+      entry.delivery = 'sent';
+      await this.save(this.state);
+      return {status: 'sent'};
+    });
+    this.queue = task;
+    return task;
+  }
   async handle(user, claim) {
     if (!/^\d{17,20}$/.test(user)) throw new Error('Invalid Discord user');
     if (await this.api.linkedAccount(user)) return {status:'linked'};
     let entry = this.state.users[user];
     if (!entry) {
       if (!claim) return {status: 'none'};
-      entry = this.state.users[user] = {code: this.generate(), pending: true};
+      entry = this.state.users[user] = {code: this.generate(), pending: true, delivery: 'unsent'};
       // Save before contacting the backend: retries after a crash reuse this code.
       try { await this.save(this.state); }
       catch (error) { delete this.state.users[user]; throw error; }

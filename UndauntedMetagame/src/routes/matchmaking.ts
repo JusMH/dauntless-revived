@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth";
 import { logger } from "../logger";
+import { GameSessionForCandidate } from "../controllers/matchmaking";
 import { CancelMatchmaking, CheckAndUpdateQueueStatus, DecideCandidateStatus, HandlePlayerMatchmaking, JoinPartyCandidateById, LeaveCandidate, MatchmakingResult } from "../controllers/matchmaking";
 
 export const matchmakingRouter = Router();
@@ -135,7 +136,7 @@ matchmakingRouter.get("/candidate/status", HasUndauntedMetagameAuth, async (req:
                 playerStates: PlayerStatesOf(MatchmakingResult),
                 serverInfo: {
                     buildId: TARGET_CHANGELIST + "_1.4.4_shipping", // TODO: pull the end of the buildstring from somewhere nonstatic
-                    gameSessionId: MatchmakingResult.CandidateId,
+                    gameSessionId: GameSessionForCandidate(MatchmakingResult),
                     host: MatchmakingResult.Host,
                     port: MatchmakingResult.Port
                 },
@@ -180,7 +181,8 @@ matchmakingRouter.post("/candidate/join", HasUndauntedMetagameAuth, async (req: 
     // A reasonable addition would be checks on frequency of MM/server spinup
     // Best scenario is 1-1 for server session<->player and a new server cooldown
 
-    const MatchmakingResult = await HandlePlayerMatchmaking(GameMode, GameArgs, HuntId, UserId);
+    const Private = req.body.isPrivate === true || req.body.privateMatch === true;
+    const MatchmakingResult = await HandlePlayerMatchmaking(GameMode, GameArgs, HuntId, UserId, Private);
 
     if(!MatchmakingResult){
         res.status(400);

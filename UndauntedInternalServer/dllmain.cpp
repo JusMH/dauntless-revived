@@ -368,7 +368,7 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         bool HasConnection = false;
 
         for (UNetConnection* Connection : Networking::NetDriver->ClientConnections) {
-            if (!Connection->OwningActor || *(uint32_t*)((uintptr_t)Connection + 0x134) != 3)
+            if (!Connection || !Connection->OwningActor || *(uint32_t*)((uintptr_t)Connection + 0x134) != 3)
                 continue;
 
             HasConnection = true;
@@ -379,8 +379,8 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         }
 
         for (UNetConnection* Conn : Networking::NetDriver->ClientConnections) {
-            if (Conn->PlayerController && Conn->PlayerController->Pawn) {
-                ((ABP_PlayerCharacter_C*)Conn->PlayerController->Pawn)->TickStamina(ECityExecFilter::Both, ERemoteExecFilter::All); // TODO: Risky cast, but IsA brutalizes our speed
+            if (Conn && Conn->PlayerController && Conn->PlayerController->Pawn && Conn->PlayerController->Pawn->IsA(ABP_PlayerCharacter_C::StaticClass())) {
+                ((ABP_PlayerCharacter_C*)Conn->PlayerController->Pawn)->TickStamina(ECityExecFilter::Both, ERemoteExecFilter::All); // Only the player character implements this Blueprint event.
             }
         }
     }

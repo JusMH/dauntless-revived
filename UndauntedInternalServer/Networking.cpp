@@ -15,6 +15,7 @@ namespace Networking {
         std::vector<AActor*> Actors = std::vector<AActor*>();
 
         for (ULevel* Level : World->Levels) {
+            if (!Level) continue;
             for (AActor* Actor : Level->Actors) {
                 if (!Actor)
                     continue;
@@ -89,6 +90,8 @@ namespace Networking {
     }
 
     bool Listen(UEngine* Engine, int Port) {
+        if (!Engine || !UWorld::GetWorld()) return false;
+        NetDriver = nullptr;
         BaseAddress = (uintptr_t)GetModuleHandleA(nullptr);
 
         FName GameNetDriver = UKismetStringLibrary::Conv_StringToName(L"GameNetDriver");
@@ -112,6 +115,10 @@ namespace Networking {
             }
         }
 
+        if (!NetDriver) {
+            std::cerr << "Net driver creation failed" << std::endl;
+            return false;
+        }
         std::cout << NetDriver->GetFullName() << std::endl;
 
         reinterpret_cast<void(*)(UNetDriver*, UWorld*)>(BaseAddress + 0x3491890)(NetDriver, UWorld::GetWorld());
@@ -141,6 +148,7 @@ namespace Networking {
     }
 
     void TickNetworking() {
+        if (!NetDriver || !UWorld::GetWorld()) return;
         UWorld::GetWorld()->NetDriver = NetDriver;
 
         NetDriver->World = UWorld::GetWorld();

@@ -94,7 +94,7 @@ describe("Ramsgate", () => {
         process.env.GAMESERVER_MEMORY_GUARD = '1';
         process.env.GAMESERVER_MIN_FREE_MB = '999999999';
         try {
-            assert.deepEqual(await GetRamsgateConnectionDetails(), {host: '127.0.0.1', port: 8777});
+            assert.deepEqual(await GetRamsgateConnectionDetails(), { host: '127.0.0.1', port: 8777, sessionId: GameserverStateForTests().Ramsgate!.id });
             await assert.rejects(GetTrainingDojoConnectionDetails(), /capacity unavailable: memory/);
             await assert.rejects(StartupGameserverWithArgs(TUTORIAL_ARGS), /capacity unavailable: memory/);
             assert.equal(Spawned.length, 1);
@@ -108,8 +108,8 @@ describe("Ramsgate", () => {
         assert.equal(Spawned[0].Args[1], "8777");
         assert.equal(Spawned[0].Args[2], "/Game/Maps/ramsgate/ramsgate_01_persistent");
         assert.deepEqual(GameserverStateForTests().FreePorts, HUNT_POOL);
-        assert.deepEqual(await GetRamsgateConnectionDetails(), { host: "127.0.0.1", port: 8777 });
-        assert.deepEqual(await HandleMatchmakingRequest("CITY", "", "ShatteredIsles_ReturnToRamsgate", undefined), { host: "127.0.0.1", port: 8777 });
+        assert.deepEqual(await GetRamsgateConnectionDetails(), { host: '127.0.0.1', port: 8777, sessionId: GameserverStateForTests().Ramsgate!.id });
+        assert.deepEqual(await HandleMatchmakingRequest("CITY", "", "ShatteredIsles_ReturnToRamsgate", undefined), { host: '127.0.0.1', port: 8777, sessionId: GameserverStateForTests().Ramsgate!.id });
         assert.equal(Spawned.length, 1);
     });
 
@@ -126,7 +126,7 @@ describe("Ramsgate", () => {
         assert.deepEqual(Gameservers.map((Server) => Server.processId), [Second.processId], "the dead record is gone");
 
         // Upstream kept the dead record: the liveness check would have started a third process here
-        assert.deepEqual(await GetRamsgateConnectionDetails(), { host: "127.0.0.1", port: 8777 });
+        assert.deepEqual(await GetRamsgateConnectionDetails(), { host: '127.0.0.1', port: 8777, sessionId: GameserverStateForTests().Ramsgate!.id });
         assert.equal(Spawned.length, 2);
     });
 
@@ -134,7 +134,7 @@ describe("Ramsgate", () => {
         await Startup();
         Kill(GameserverStateForTests().Ramsgate!.processId);
 
-        assert.deepEqual(await HandleMatchmakingRequest("CITY", "", "ShatteredIsles_ReturnToRamsgate", undefined), { host: "127.0.0.1", port: 8777 });
+        assert.deepEqual(await HandleMatchmakingRequest("CITY", "", "ShatteredIsles_ReturnToRamsgate", undefined), { host: '127.0.0.1', port: 8777, sessionId: GameserverStateForTests().Ramsgate!.id });
         assert.equal(Spawned.length, 2);
         assert.ok(Logged.includes("warn: Ramsgate is not running any more: starting it again before sending anyone there"));
         assert.equal(Gameservers.length, 1);
@@ -180,7 +180,7 @@ describe("Ramsgate", () => {
         const Dead = GameserverStateForTests().Ramsgate!;
         Kill(Dead.processId);
 
-        assert.deepEqual(await GetRamsgateConnectionDetails(), { host: "127.0.0.1", port: 8777 });
+        assert.deepEqual(await GetRamsgateConnectionDetails(), { host: '127.0.0.1', port: 8777, sessionId: GameserverStateForTests().Ramsgate!.id });
         assert.equal(Spawned.length, 1, "no liveness restart");
         assert.equal(GameserverStateForTests().Ramsgate, Dead);
 

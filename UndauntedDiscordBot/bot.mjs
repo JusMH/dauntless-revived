@@ -44,14 +44,14 @@ client.on(Events.InteractionCreate, async interaction => {
       const claim = subcommand === 'claim';
       const result = subcommand === 'link'
         ? await keys.link(id, interaction.options.getString('key', true).trim())
-        : await keys.run(id, claim);
-      if (result.status === 'ready' && claim) {
-        try {
-          await interaction.user.send({content: inviteMessage(inviteConfig, result.code), allowedMentions: {parse: []}});
-          await interaction.editReply('🔑 **Invite Sent**\nCheck your DMs. Paste the complete invite into the launcher’s Join box.\n**Clear skies, Slayer.**');
-        } catch { await interaction.editReply('I could not DM you. Enable direct messages, then run `/key claim` again. Your code is saved.'); }
-      } else {
+        : claim ? await keys.deliver(id, code => interaction.user.send({content: inviteMessage(inviteConfig, code), allowedMentions: {parse: []}}))
+        : await keys.run(id, false);
+      {
         const messages = {
+          sent: '🔑 **Invite Sent**\nCheck your DMs. Paste the complete invite into the launcher’s Join box.\n**Clear skies, Slayer.**',
+          already_sent: '🔑 **Already Claimed**\nYour invite has already been sent. Check your previous DMs; no additional key will be issued.',
+          dm_disabled: 'Enable direct messages, then run `/key claim` again. Your existing code is saved.',
+          delivery_uncertain: 'Discord did not confirm delivery. Check your DMs, then contact the server team if missing. No replacement key will be issued.',
           linked: '🔑 **Key Accepted**\nYour Discord has been linked to your existing Revived account. Keep using the same launcher key—nothing to replace.\n**Clear skies, Slayer.**',
           invite_not_key: `🔑 **Use Your Saved Account Key**\nThat is a Join invite or registration code. It cannot identify your existing account.\n\n${keyInstructions}\n\nIf you have not registered yet, paste the complete invite into the launcher’s Join screen first.`,
           invalid_key_format: `🔑 **Copy Your Saved Account Key**\n${keyInstructions}`,
