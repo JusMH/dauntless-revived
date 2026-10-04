@@ -22,7 +22,6 @@ test('readiness accepts a launch marker by port, cleans it, and detects startup 
         await assert.rejects(access(file));
         await writeFile(file, '999:8765');
         await assert.rejects(WaitForServerReady(child, 8764, file, 50), /did not start listening/);
-        await writeFile(file, '123:8764');
         const exiting = FakeChild();
         const waiting = WaitForServerReady(exiting, 8764, file, 1000);
         setTimeout(() => {
