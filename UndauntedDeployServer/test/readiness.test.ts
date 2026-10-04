@@ -6,7 +6,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { createSocket } from 'node:dgram';
 import type { ChildProcess } from 'node:child_process';
-import { IsUdpPortBound, WaitForReadyFile } from '../src/controllers/readiness';
+import { IsUdpPortBound, WaitForServerReady } from '../src/controllers/readiness';
 
 function FakeChild(pid = 123) {
     return Object.assign(new EventEmitter(), { pid, exitCode: null, signalCode: null }) as unknown as ChildProcess;
@@ -18,13 +18,13 @@ test('readiness accepts a launch marker by port, cleans it, and detects startup 
     const child = FakeChild();
     try {
         await writeFile(file, '999:8764');
-        await WaitForReadyFile(child, 8764, file, 100);
+        await WaitForServerReady(child, 8764, file, 100);
         await assert.rejects(access(file));
         await writeFile(file, '999:8765');
-        await assert.rejects(WaitForReadyFile(child, 8764, file, 50), /did not start listening/);
+        await assert.rejects(WaitForServerReady(child, 8764, file, 50), /did not start listening/);
         await writeFile(file, '123:8764');
         const exiting = FakeChild();
-        const waiting = WaitForReadyFile(exiting, 8764, file, 1000);
+        const waiting = WaitForServerReady(exiting, 8764, file, 1000);
         setTimeout(() => {
             (exiting as any).exitCode = 1;
             exiting.emit('exit', 1, null);
@@ -49,7 +49,7 @@ test('UDP readiness detects a bound port and waits for a listener when no marker
     assert.equal(await IsUdpPortBound(port), false);
 
     const listener = createSocket('udp4');
-    const waiting = WaitForReadyFile(FakeChild(), port, file, 1500);
+    const waiting = WaitForServerReady(FakeChild(), port, file, 1500);
     setTimeout(() => listener.bind(port, '0.0.0.0'), 100);
 
     try {
