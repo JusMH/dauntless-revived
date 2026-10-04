@@ -101,4 +101,43 @@ describe("concurrent hunt queues", () => {
             ResetMatchmakingForTests();
         }
     });
+
+    it("starts a private solo hunt immediately instead of waiting for a public batch", async () => {
+        ResetMatchmakingForTests();
+        const originalFetch = globalThis.fetch;
+        let calls = 0;
+
+        globalThis.fetch = (async () => {
+            calls++;
+            return new Response(JSON.stringify({host: "127.0.0.1", port: 39001}), {
+                status: 200,
+                headers: {"content-type": "application/json"}
+            });
+        }) as typeof fetch;
+
+        try{
+            assert.equal(await HandlePlayerMatchmaking("ISLAND", "", "Hunt_Private_A", "UID-private", true), true);
+
+            for(let retry = 0; retry < 40 && calls === 0; retry++){
+                await new Promise<void>((resolve) => setTimeout(resolve, 5));
+            }
+
+            assert.equal(calls, 1);
+            for(let retry = 0; retry < 40; retry++){
+                const entry = await CheckAndUpdateQueueStatus("UID-private");
+                if(entry?.Ready){
+                    assert.equal(entry.Port, 39001);
+                    return;
+                }
+                await new Promise<void>((resolve) => setTimeout(resolve, 5));
+            }
+
+            assert.fail("private hunt never became ready");
+        }
+        finally{
+            globalThis.fetch = originalFetch;
+            ResetMatchmakingForTests();
+        }
+    });
+
 });
