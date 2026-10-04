@@ -12,20 +12,20 @@ export async function IsUdpPortBound(port: number) {
         const socket = createSocket({ type: 'udp4', reuseAddr: false });
         let settled = false;
 
-        const finish = (value: boolean, error?: Error) => {
-            if (settled) return;
-            settled = true;
-            socket.removeAllListeners();
-            try { socket.close(); } catch {}
-            if (error) reject(error);
-            else resolve(value);
-        };
-
         socket.once('error', (error: NodeJS.ErrnoException) => {
-            if (error.code === 'EADDRINUSE' || error.code === 'EACCES') finish(true);
-            else finish(false, error);
+            if(settled) return;
+            settled = true;
+            try { socket.close(); } catch {}
+            if (error.code === 'EADDRINUSE' || error.code === 'EACCES') resolve(true);
+            else reject(error);
         });
-        socket.bind({ port, address: '0.0.0.0', exclusive: true }, () => finish(false));
+
+        socket.bind({ port, address: '0.0.0.0', exclusive: true }, () => {
+            if(settled) return;
+            settled = true;
+            socket.removeAllListeners('error');
+            socket.close(() => resolve(false));
+        });
     });
 }
 
