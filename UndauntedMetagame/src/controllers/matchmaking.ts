@@ -274,12 +274,12 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
     return PlayerMatchmakingResult;
 }
 
-async function QueuePlayer(HuntId: string, PlayerId: string){
+async function QueuePlayer(HuntId: string, PlayerId: string, StartImmediately = false){
     const CurrentEntry = MatchmakingResultMap.get(PlayerId);
     const CurrentQueue = PlayerQueueMap.get(PlayerId);
 
     if(CurrentEntry !== undefined && !CurrentEntry.PartyCandidate && !CurrentEntry.Failed && CurrentEntry.HuntId === HuntId){
-        if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId) && PartyNow() - (CurrentEntry.QueuedAt ?? 0) <= SOLO_JOIN_DEDUPE_MS){
+        if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId) && (CurrentQueue.Resolved || CurrentQueue.RetryAfter !== undefined || PartyNow() - (CurrentEntry.QueuedAt ?? 0) <= SOLO_JOIN_DEDUPE_MS)){
             return true;
         }
 
@@ -297,7 +297,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
         }
     }
 
-    const ExistingQueue = MatchmakingQueueMap.get(HuntId);
+    const ExistingQueue = StartImmediately ? undefined : MatchmakingQueueMap.get(HuntId);
 
     if(ExistingQueue !== undefined && ExistingQueue.Players.length >= QUEUE_FULL_PLAYERS){
         void PopQueue(HuntId, ExistingQueue);
@@ -305,7 +305,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
 
     LeaveWaitingQueues(PlayerId, "their new join replaces it");
 
-    let Queue = MatchmakingQueueMap.get(HuntId);
+    let Queue = StartImmediately ? undefined : MatchmakingQueueMap.get(HuntId);
 
     if(Queue !== undefined && Queue.Players.length >= QUEUE_FULL_PLAYERS){
         void PopQueue(HuntId, Queue);
@@ -331,7 +331,9 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
             LastPlayerAddedTime: PartyNow(),
             Resolved: false
         };
-        MatchmakingQueueMap.set(HuntId, Queue);
+        if(!StartImmediately){
+            MatchmakingQueueMap.set(HuntId, Queue);
+        }
     }
 
     Queue.Players.push(PlayerId);
@@ -339,7 +341,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string){
     Queue.LastPlayerAddedTime = PartyNow();
     PlayerQueueMap.set(PlayerId, Queue);
 
-    if(Queue.Players.length >= QUEUE_FULL_PLAYERS){
+    if(StartImmediately || Queue.Players.length >= QUEUE_FULL_PLAYERS){
         void PopQueue(HuntId, Queue);
     }
 
@@ -786,7 +788,7 @@ async function HandlePartyMatchmaking(GameMode: unknown, GameArgs: unknown, Hunt
     return true;
 }
 
-export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string, HuntId: string, PlayerId: string){
+export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string, HuntId: string, PlayerId: string, PrivateMatch = false){
     const BadInput = CheckMatchmakingInput(GameMode, GameArgs, HuntId);
 
     if(BadInput != undefined){
@@ -838,7 +840,7 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
             return true;
         }
         else{
-            return await QueuePlayer(HuntId, PlayerId);
+            return await QueuePlayer(HuntId, PlayerId, PrivateMatch);
         }
     }
     else{
