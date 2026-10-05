@@ -1,4 +1,6 @@
 #include "HuntIdlePolicy.h"
+#include "NativeDiagnostics.h"
+
 
 #include "ServerFrameLimit.h"
 #include <chrono>
@@ -333,6 +335,8 @@ bool EnableWatchdog = true;
 extern "C" {
     __declspec(dllexport) volatile unsigned long long DR_ServerTickCount = 0;
     __declspec(dllexport) volatile double DR_ServerSimulatedSeconds = 0;
+    __declspec(dllexport) volatile unsigned long long DR_EngineMicros = 0;
+    __declspec(dllexport) volatile unsigned long long DR_ReplicationMicros = 0;
 }
 
 void* OrigGameEngineTick = nullptr;
@@ -351,12 +355,19 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         PreviousTick = std::chrono::steady_clock::now();
     }
 
+    DR_TickStage = 1;
     DR_ServerTickCount = DR_ServerTickCount + 1;
     DR_ServerSimulatedSeconds = DR_ServerSimulatedSeconds + DeltaTime;
+    const auto EngineStart = std::chrono::steady_clock::now();
     reinterpret_cast<void(*)(UGameEngine*, float, char)>(OrigGameEngineTick)(GameEngine, DeltaTime, CanRender);
+    DR_EngineMicros += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - EngineStart).count();
 
     if (Globals::Listening) {
+        DR_TickStage = 2;
+        const auto ReplicationStart = std::chrono::steady_clock::now();
         Networking::TickNetworking();
+        DR_ReplicationMicros += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - ReplicationStart).count();
+        DR_TickStage = 3;
     }
 
     if (Globals::DoListen) {
@@ -376,7 +387,12 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
 
         if (EnableWatchdog && HuntIdle.Advance(DeltaTime, HasConnection)) {
             std::cout << "Hunt idle timeout on port " << Globals::Port << std::endl;
-            exit(0);
+            DR_WriteDiagnostic("idle_timeout\n", 13);
+            // This is an injected DLL in a multithreaded UE process. CRT exit runs
+            // teardown while engine threads still use its state, hanging/crashing.
+            // Only empty hunts reach here; end the whole process without DLL teardown.
+            TerminateProcess(GetCurrentProcess(), 0);
+            return;
         }
 
         static float GroundedTransformRefresh = 0.0f;
@@ -694,6 +710,10 @@ bool ConfigCacheInitGetStringHook(void* a1, const wchar_t* Section, const wchar_
         return true;
     }
 
+    // Dedicated servers only override Phoenix endpoints; leave other subsystem settings intact.
+    if (Globals::AmServer)
+        return reinterpret_cast<bool(*)(void*, const wchar_t*, const wchar_t*, FString*, FString*)>(OrigConfigCacheIniGetString)(a1, Section, Key, Value, Filename);
+
     if (std::wstring(Section).contains(L"Mcp")) {
         if (std::wstring(Key).contains(L"protocol") || std::wstring(Key).contains(L"Protocol")) {
             *Value = FString(L"http");
@@ -784,6 +804,12 @@ int NetModeHook(void* a1) { //char __fastcall UArchonStaminaComponent_TryConsume
 
 void InitServerHooks() {
     MH_Initialize();
+
+    // SYSTEM and service accounts do not inherit a launcher-generated Game.ini.
+    // The worker reaches the same backend through its loopback SSH tunnel.
+    Globals::MetagameAddress = L"127.0.0.1:61000";
+    MH_CreateHook((void*)(Globals::BaseAddress + 0x1D09D50), ConfigCacheInitGetStringHook, &OrigConfigCacheIniGetString);
+    MH_EnableHook((void*)(Globals::BaseAddress + 0x1D09D50));
 
     MH_CreateHook((void*)(Globals::BaseAddress + 0x25A37C0), GetGameDefaultMap, &OrigGetDefaultMap);
 
@@ -1009,6 +1035,7 @@ void Init() {
             std::cout << "Running as a server!" << std::endl;
         }
 
+        DR_InitDiagnostics();
         InitServerHooks();
     }
     else {

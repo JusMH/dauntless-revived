@@ -2,10 +2,19 @@
 
 #include <iostream>
 #include "ChannelLookup.h"
+#include "OwnerRelevancy.h"
+#include "ReplicationCadence.h"
 #include <fstream>
 #include <filesystem>
+#include "NativeDiagnostics.h"
 
 using namespace SDK;
+
+extern "C" {
+    __declspec(dllexport) volatile unsigned long long DR_ActorReplicationAttempts = 0;
+    __declspec(dllexport) volatile unsigned long long DR_OwnerReplicationSkipped = 0;
+    __declspec(dllexport) volatile unsigned long long DR_ActorUpdatesDeferred = 0;
+}
 
 namespace Networking {
     UNetDriver* NetDriver = nullptr;
@@ -13,6 +22,11 @@ namespace Networking {
 
     static std::vector<AActor*> BuildConsiderList(UWorld* World, UNetDriver* Driver) {
         std::vector<AActor*> Actors = std::vector<AActor*>();
+        static ReplicationCadence Cadence;
+        static UWorld* PreviousWorld = nullptr;
+        if (PreviousWorld != World) { Cadence.Clear();PreviousWorld = World; }
+        const double Now = GetTickCount64() / 1000.0;
+        Cadence.Prune(Now);
 
         for (ULevel* Level : World->Levels) {
             if (!Level) continue;
@@ -27,6 +41,13 @@ namespace Networking {
                     continue;
 
                 if (!reinterpret_cast<UWorld * (*)(AActor*)>(*(void**)((uintptr_t)Actor->VTable + 0x150))(Actor)) {
+                    continue;
+                }
+
+                const bool Urgent = Actor->bReplicateMovement || Actor->bTearOff || Actor->bNetTemporary ||
+                    Actor->IsA(APawn::StaticClass()) || Actor->IsA(AController::StaticClass());
+                if (!Cadence.Due(Actor, Actor->Index, Now, Actor->NetUpdateFrequency, Urgent)) {
+                    ++DR_ActorUpdatesDeferred;
                     continue;
                 }
 
@@ -153,6 +174,23 @@ namespace Networking {
 
         NetDriver->World = UWorld::GetWorld();
 
+        static ULONGLONG NextDiagnostic = 0;
+        static unsigned DiagnosticCount = 0;
+        if (DiagnosticCount < 4096 && GetTickCount64() >= NextDiagnostic) {
+            ++DiagnosticCount;
+            NextDiagnostic = GetTickCount64() + 30000;
+            int Ready = 0, Owned = 0;
+            for (auto* Connection : NetDriver->ClientConnections) {
+                if (!Connection) continue;
+                Owned += Connection->OwningActor != nullptr;
+                Ready += *(uint32_t*)((uintptr_t)Connection + 0x134) == 3;
+            }
+            char Line[512] = {};
+            int Size = sprintf_s(Line, "net driver=%s connections=%d owned=%d open=%d\n",
+                NetDriver->GetName().c_str(), NetDriver->ClientConnections.Num(), Owned, Ready);
+            if (Size > 0) DR_WriteDiagnostic(Line, Size);
+        }
+
         static FName name = FName();
         static bool nameInit = false;
 
@@ -180,6 +218,16 @@ namespace Networking {
 
             const ChannelIndex Channels = IndexActorChannels(Connection);
             for (AActor* Actor : Actors) {
+                // The engine's normal relevancy pass is replaced by this loop. Preserve
+                // owner-only isolation rather than opening private actors on every client.
+                auto* Pawn = Connection->PlayerController ? Connection->PlayerController->Pawn : nullptr;
+                if (Actor->bOnlyRelevantToOwner && !Actor->bAlwaysRelevant &&
+                    !(Pawn && Actor->Instigator == Pawn) &&
+                    !IsConnectionOwner(Actor, Connection->OwningActor,
+                        static_cast<AActor*>(Pawn), [](AActor* Value) { return Value->Owner; })) {
+                    ++DR_OwnerReplicationSkipped;
+                    continue;
+                }
                 if (Actor->Class->CastFlags & EClassCastFlags::PlayerController) {
                     if (Actor != Connection->OwningActor) {
                         continue;
@@ -204,6 +252,7 @@ namespace Networking {
                 }
 
                 if (ActorChannel && ActorChannel->Actor) {
+                    ++DR_ActorReplicationAttempts;
                     if (!(*(int*)((uintptr_t)ActorChannel + 0x90) & 2u)) {
                         *(int*)((uintptr_t)ActorChannel + 0x90) |= 2u;
                     }

@@ -998,6 +998,7 @@ try {
     $meta['BIND_HOST'] = $BindIp
     $meta['AUTH_MODE'] = 'APIKEY'
     $meta['DB_FILENAME'] = & $fwd $P.Db
+    $meta['BACKUP_ROOT'] = & $fwd $P.Backups
     $meta['TARGET_CHANGELIST'] = $DRPinned.Changelist
     # Public mode: every friend's launcher relays the game's traffic from its own 127.0.0.1:61000.
     $meta['QOS_TARGET_URL'] = if ($Public) { "http://127.0.0.1:$DRRelayPort/QoS" } else { "http://${BindIp}:$($ports.metagame)/QoS" }

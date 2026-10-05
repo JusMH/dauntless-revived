@@ -45,6 +45,17 @@ $metaDir = Join-Path $P.App 'UndauntedMetagame'
 if (-not $PSCmdlet.ShouldProcess($P.Backups, 'Back up the database and secrets')) { return }
 
 New-Item -ItemType Directory -Force -Path $P.Backups | Out-Null
+# An OS-held lock covers scheduled and manual/Stack invocations, across accounts.
+# A crashed process releases it automatically; the file itself may remain.
+$lockPath = Join-Path $P.Backups 'backup.lock'
+if (Test-DRReparsePoint $lockPath) { throw 'Backup lock must not be a reparse point' }
+try {
+    $backupLock = [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+} catch [IO.IOException] {
+    Write-Output 'backup skipped: another backup is still running'
+    exit 0
+}
+try {
 $log = Join-Path $P.Backups 'backup.log'
 # backups is service-writable; this may run as an administrator. Never rotate through a planted
 # reparse point (remove the link instead), and refuse to follow a junctioned backups folder.
@@ -67,7 +78,7 @@ New-Item -ItemType Directory -Force -Path $dest | Out-Null
 # 1. The database. No database yet (fresh install before the first start) is not an error.
 $dbNote = 'no database yet'
 if (Test-Path -LiteralPath $P.Db) {
-    $code = Invoke-DRNative -FilePath $node -Arguments @((Join-Path $PSScriptRoot 'lib\dr-db.js'), 'backup', $metaDir, $P.Db, (Join-Path $dest 'undaunted.db')) `
+    $code = Invoke-DRNative -FilePath $node -Arguments @((Join-Path $PSScriptRoot 'lib\dr-db.js'), 'backup', $metaDir, $P.Db, (Join-Path $dest 'undaunted.db'), '--online', $P.DeployEnv) `
         -WorkingDirectory $P.Root -LogBase (Join-Path $P.Logs 'backup-db')
     if ($code -ne 0) {
         Log "backup FAILED: the database copy did not pass its check (see $($P.Logs)\backup-db.err.log)"
@@ -126,4 +137,7 @@ $extra = ''
 if ($skipped.Count) { $extra += "; not readable by this account: $($skipped -join ', ')" }
 if ($removeFailed) { $extra += "; $removeFailed old backup(s) could not be removed" }
 Log "backup: $dest  ($bytes bytes, $dbNote, $($keep.Count) kept$extra)"
+} finally {
+    $backupLock.Dispose()
+}
 exit 0

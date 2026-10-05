@@ -148,6 +148,8 @@ const EXPECTED_ROUTES = [
     "GET /tags [HasUndauntedMetagameAuth]",
     "PUT /gamesession/epic [HasUndauntedMetagameAuth]",
     "POST /accountinfo/public [HasUndauntedMetagameAuth]",
+    // Optional Windows backup root; direct local game-server key only, no proxy callers.
+    "POST /internal/backup [LocalBackupAuth]",
     "POST /account/api/oauth/token []",
     "GET /account/api/oauth/verify [SoftMetagameAuth]",
     "GET /account/api/public/account/:AccId [SoftMetagameAuth]",

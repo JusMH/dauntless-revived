@@ -19,6 +19,7 @@ import { loadoutRouter } from "./routes/loadout.js";
 import { undauntedApiRouter } from "./routes/undauntedapi.js";
 import { DescribeOrigin, RefuseProxiedInDevAuthMode } from "./middleware/RequestOrigin.js";
 import { BodyLog, Redact } from "./middleware/BodyLog.js";
+import { backupRouter } from './routes/backup';
 
 export const app = express();
 app.use(TrackBackendHealth);
@@ -55,6 +56,7 @@ if (process.env.LOG_BODIES === "1") {
 }
 
 app.use("/", loginRouter);
+app.use("/", backupRouter);
 app.use("/", eosRouter);
 app.use("/", systemRouter);
 app.use("/", escalationRouter);

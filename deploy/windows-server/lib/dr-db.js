@@ -16,6 +16,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { backupProgress } = require("./backup-policy.cjs");
 
 const [command, metaDir, dbFile, ...rest] = process.argv.slice(2);
 
@@ -59,9 +60,25 @@ async function main() {
         case "backup": {
             const dest = rest[0];
             if (!dest) fail("backup needs a destination file");
+            if (rest[1] === '--online' && rest[2]) {
+                const env = require(path.join(path.resolve(metaDir), 'node_modules', 'dotenv')).parse(fs.readFileSync(rest[2]));
+                let response;
+                try {
+                    response = await fetch('http://127.0.0.1:61000/internal/backup', {
+                        method: 'POST', headers: {'content-type': 'application/json', 'x-undaunted-gameserver-apikey': env.METAGAME_API_KEY},
+                        body: JSON.stringify({name: path.basename(path.dirname(dest))}), signal: AbortSignal.timeout(65000)
+                    });
+                } catch (error) {
+                    // Only a refused connection proves the metagame is stopped. A timeout
+                    // may still be copying; do not start another backup in that case.
+                    if (error.cause?.code !== 'ECONNREFUSED') throw error;
+                }
+                if (response?.ok) { console.log(`db ${check(dest)}`); return; }
+                if (response && response.status !== 404) throw new Error(`Live backup failed (${response.status})`);
+            }
             const db = open(dbFile, true);
             try {
-                await db.backup(dest);
+                await db.backup(dest, { progress: backupProgress() });
             } finally {
                 db.close();
             }
