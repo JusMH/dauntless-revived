@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildWineLaunch, decodeWorkerPayload } from "../../unix-common/game-runner.mjs";
+import { buildWineLaunch, decodeWorkerPayload, terminateProcessTree } from "../../unix-common/game-runner.mjs";
 import { buildSshLaunch } from "../../openbsd-server/launch-gameserver.mjs";
 
 function exe(file) {
@@ -22,6 +22,7 @@ test("Linux runner keeps deploy arguments and forces native dxgi", () => {
       PATH: path.dirname(wine),
       DISPLAY: ":99",
       DR_GAME_EXE: game,
+      DR_WINE_BINARY: wine,
       DR_WINEPREFIX: path.join(root, "prefix"),
       WINEDLLOVERRIDES: "foo=n",
     });
@@ -68,6 +69,7 @@ test("Linux runner uses Xvfb when a server has no display", () => {
     const spec = buildWineLaunch(["x","1","m","b","h","p","a","-server"], {
       PATH: path.dirname(wine),
       DR_GAME_EXE: game,
+      DR_WINE_BINARY: wine,
       DR_WINEPREFIX: path.join(root, "prefix"),
     });
     assert.equal(spec.command, xvfb);
@@ -76,6 +78,20 @@ test("Linux runner uses Xvfb when a server has no display", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("Unix runner terminates the detached runtime process group before falling back to one child", () => {
+  const sent = [];
+  const child = { pid: 43210, killed: false, kill: (signal) => sent.push(["child", signal]) };
+  const killGroup = (pid, signal) => sent.push([pid, signal]);
+  assert.equal(terminateProcessTree(child, "SIGTERM", killGroup), "group");
+  assert.deepEqual(sent, [[-43210, "SIGTERM"]]);
+
+  const fallback = [];
+  const groupMissing = () => { throw Object.assign(new Error("gone"), { code: "ESRCH" }); };
+  const fallbackChild = { pid: 43211, killed: false, kill: (signal) => fallback.push(signal) };
+  assert.equal(terminateProcessTree(fallbackChild, "SIGINT", groupMissing), "child");
+  assert.deepEqual(fallback, ["SIGINT"]);
 });
 
 test("worker payload round trips", () => {
