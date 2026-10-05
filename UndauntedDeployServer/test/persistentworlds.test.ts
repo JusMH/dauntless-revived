@@ -120,6 +120,18 @@ describe("Ramsgate", () => {
             assert.deepEqual(GameserverStateForTests().FreePorts, HUNT_POOL);
         } finally { process.env.GAMESERVER_MEMORY_GUARD = '0'; delete process.env.GAMESERVER_MIN_FREE_MB; }
     });
+    it("refuses to spawn over a stale listener already holding Ramsgate's fixed port", async () => {
+        UseProcessFunctionsForTests({
+            Spawn: FakeSpawn,
+            IsAlive,
+            IsPortBound: async (Port) => Port === 8777
+        });
+
+        await assert.rejects(Startup(), /port 8777 is already in use/);
+        assert.equal(Spawned.length, 0, "no replacement process is spawned over the stale listener");
+        assert.equal(Gameservers.length, 0);
+    });
+
     it("starts once at boot and is handed out without another start while it runs", async () => {
         await Startup();
 

@@ -135,14 +135,38 @@ export function buildWineLaunch(args, env = process.env) {
   return { command, args: gameArgs, cwd, env: launchEnv, runtime };
 }
 
+export function terminateProcessTree(child, signal = "SIGTERM", killProcess = process.kill) {
+  if (Number.isInteger(child.pid) && child.pid > 0 && process.platform !== "win32") {
+    try {
+      killProcess(-child.pid, signal);
+      return "group";
+    } catch {}
+  }
+  if (!child.killed) {
+    try {
+      child.kill(signal);
+      return "child";
+    } catch {}
+  }
+  return "none";
+}
+
 export async function runWineGame(args, env = process.env) {
   const spec = buildWineLaunch(args, env);
   return await new Promise((resolve) => {
-    const child = spawn(spec.command, spec.args, { cwd: spec.cwd, env: spec.env, stdio: "inherit", windowsHide: false });
+    const child = spawn(spec.command, spec.args, {
+      cwd: spec.cwd,
+      env: spec.env,
+      stdio: "inherit",
+      windowsHide: false,
+      detached: process.platform !== "win32",
+    });
     let done = false;
+    const handlers = new Map();
     const finish = (code) => {
       if (done) return;
       done = true;
+      for (const [signal, handler] of handlers) process.off(signal, handler);
       resolve(Number.isInteger(code) ? code : 1);
     };
     child.once("error", (error) => {
@@ -150,15 +174,14 @@ export async function runWineGame(args, env = process.env) {
       finish(127);
     });
     child.once("exit", (code, signal) => {
+      terminateProcessTree(child);
       if (signal) process.stderr.write("dauntless game worker: runtime exited on " + signal + "\n");
       finish(code ?? 1);
     });
     for (const signal of ["SIGTERM", "SIGINT", "SIGHUP"]) {
-      process.on(signal, () => {
-        if (!child.killed) {
-          try { child.kill(signal); } catch {}
-        }
-      });
+      const handler = () => terminateProcessTree(child, signal);
+      handlers.set(signal, handler);
+      process.on(signal, handler);
     }
   });
 }

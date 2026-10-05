@@ -48,6 +48,7 @@ let TrainingDojoServer : Gameserver | undefined;
 type SpawnFunction = (Command: string, Args: string[], Options: SpawnOptions) => ChildProcess;
 let SpawnProcess: SpawnFunction = spawn;
 let ProcessIsAlive: (ProcessId: number) => boolean = (ProcessId) => IsProcessAlive(ProcessId);
+let PortIsBound: (Port: number) => Promise<boolean> = IsUdpPortBound;
 
 const PORT_RANGE_BEGIN = Number(process.env.PORT_RANGE_BEGIN!);
 const PORT_RANGE_END = Number(process.env.PORT_RANGE_END!);
@@ -80,7 +81,7 @@ async function TakeHuntPort(){
     while(FreePorts.length > 0){
         const Port = FreePorts.pop()!;
 
-        if(!(await IsUdpPortBound(Port))){
+        if(!(await PortIsBound(Port))){
             FreePorts.unshift(...Busy);
             return Port;
         }
@@ -241,6 +242,12 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     }
 
     const IsHunt = !IsRamsgate && !IsTrainingDojo;
+
+    if(!IsHunt && await PortIsBound(Port)){
+        ReleaseReservation();
+        throw new Error(`Persistent game server port ${Port} is already in use; refusing to reuse a stale listener`);
+    }
+
     let Child: ChildProcess;
     await unlink(ReadyFile).catch(() => {});
 
@@ -583,9 +590,14 @@ export function IsGameserverAlive(Server: Gameserver){
 
 // ---- Tests only ----
 
-export function UseProcessFunctionsForTests(Functions: { Spawn?: SpawnFunction, IsAlive?: (ProcessId: number) => boolean }){
+export function UseProcessFunctionsForTests(Functions: {
+    Spawn?: SpawnFunction,
+    IsAlive?: (ProcessId: number) => boolean,
+    IsPortBound?: (Port: number) => Promise<boolean>
+}){
     SpawnProcess = Functions.Spawn ?? spawn;
     ProcessIsAlive = Functions.IsAlive ?? ((ProcessId) => IsProcessAlive(ProcessId));
+    PortIsBound = Functions.IsPortBound ?? (async () => false);
 }
 
 export function ResetGameserversForTests(){
