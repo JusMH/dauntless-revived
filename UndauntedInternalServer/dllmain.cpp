@@ -20,6 +20,7 @@
 #include "MinHook/MinHook.h"
 #include "constants.h"
 #include "Networking.h"
+#include "FallRecovery.h"
 
 #include "SDK/GameplayAbilities_parameters.hpp"
 #include "SDK/Archon_parameters.hpp"
@@ -355,6 +356,9 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
     DR_ServerSimulatedSeconds = DR_ServerSimulatedSeconds + DeltaTime;
     reinterpret_cast<void(*)(UGameEngine*, float, char)>(OrigGameEngineTick)(GameEngine, DeltaTime, CanRender);
 
+    // Recover on the authoritative game thread before replicating this frame.
+    FallRecovery::Tick(Globals::Listening ? Networking::NetDriver : nullptr, DeltaTime);
+
     if (Globals::Listening) {
         Networking::TickNetworking();
     }
@@ -379,35 +383,13 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
             exit(0);
         }
 
-        static float GroundedTransformRefresh = 0.0f;
-        static std::map<ABP_PlayerCharacter_C*, FTransform> LastGroundedTransforms;
-        static std::map<ABP_PlayerCharacter_C*, bool> RecoveryState;
-        GroundedTransformRefresh += DeltaTime > 0.0f ? DeltaTime : 0.0f;
-        const bool RefreshGroundedTransform = GroundedTransformRefresh >= 0.5f;
-        if (RefreshGroundedTransform)
-            GroundedTransformRefresh = 0.0f;
-
         for (UNetConnection* Conn : Networking::NetDriver->ClientConnections) {
-            if (Conn->PlayerController && Conn->PlayerController->Pawn) {
-                auto* Player = (ABP_PlayerCharacter_C*)Conn->PlayerController->Pawn;
-                const bool Recovering = Player->InFallRecovery;
-                auto LastGrounded = LastGroundedTransforms.find(Player);
-
-                if (!Recovering && !Player->IsFalling && (RefreshGroundedTransform || LastGrounded == LastGroundedTransforms.end())) {
-                    Player->SetLastValidPlayerTransform();
-                    LastGroundedTransforms[Player] = Player->LastValidPlayerTransform;
-                    LastGrounded = LastGroundedTransforms.find(Player);
-                }
-
-                const bool WasRecovering = RecoveryState[Player];
-                if (Recovering && !WasRecovering && LastGrounded != LastGroundedTransforms.end()) {
-                    Player->LastValidPlayerTransform = LastGrounded->second;
-                    Player->RecoverFromFall();
-                }
-                RecoveryState[Player] = Recovering;
-
-                Player->TickStamina(ECityExecFilter::Both, ERemoteExecFilter::All);
-            }
+            if (!Conn || !Conn->PlayerController || !Conn->PlayerController->Pawn)
+                continue;
+            auto* Pawn = Conn->PlayerController->Pawn;
+            if (!Pawn->IsA(ABP_PlayerCharacter_C::StaticClass()) || Pawn->IsActorBeingDestroyed())
+                continue;
+            static_cast<ABP_PlayerCharacter_C*>(Pawn)->TickStamina(ECityExecFilter::Both, ERemoteExecFilter::All);
         }
     }
 }
@@ -551,8 +533,10 @@ static AArchonPlayerStart* PickPlayerStartFallback(AArchonPlayerState* PlayerSta
 AArchonPlayerStart* GetStartSpotHook(AArchonPlayerState* PlayerState, FName StartGroup) {
     using GetPlayerStartForPlayerFn = AArchonPlayerStart* (*)(AArchonPlayerState*, FName);
     auto* Start = reinterpret_cast<GetPlayerStartForPlayerFn>(OrigGetStartSpot)(PlayerState, StartGroup);
-    if (Start)
+    if (Start) {
+        FallRecovery::RememberStart(PlayerState, Start);
         return Start;
+    }
 
     Start = PickPlayerStartFallback(PlayerState, StartGroup, true);
     if (!Start)
@@ -570,6 +554,7 @@ AArchonPlayerStart* GetStartSpotHook(AArchonPlayerState* PlayerState, FName Star
         }
     }
 
+    FallRecovery::RememberStart(PlayerState, Start);
     return Start;
 }
 
