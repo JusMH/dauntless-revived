@@ -19,7 +19,7 @@ test('concurrent claims and restart send exactly one DM',async()=>{
 test('ambiguous Discord result is never retried, even after restart',async()=>{
   const f=fixture();
   assert.equal((await f.service.deliver(user,async()=>{throw new Error('timeout');})).status,'delivery_uncertain');
-  assert.equal((await new Keys(f.saved,f.save,f.api).deliver(user,f.send)).status,'already_sent');
+  assert.equal((await new Keys(f.saved,f.save,f.api).deliver(user,f.send)).status,'delivery_uncertain');
   assert.equal(f.sends,0);
 });
 test('explicit DM rejection retries the same code only',async()=>{
@@ -38,4 +38,24 @@ test('failed durable reservation prevents a DM',async()=>{
   const f=fixture(); await f.service.run(user,true);
   f.service.save=async()=>{throw new Error('disk full');};
   await assert.rejects(f.service.deliver(user,f.send)); assert.equal(f.sends,0);
+});
+
+test('reserved delivery reconciles existing message without duplicate',async()=>{
+  const f=fixture(); await f.service.deliver(user,async()=>{throw new Error('timeout');});
+  assert.equal((await f.service.deliver(user,f.send,async()=>({id:'123',createdAt:'2026-10-04T04:00:00Z'}))).status,'already_sent');
+  assert.equal(f.sends,0);assert.equal(f.state.users[user].messageId,'123');
+});
+test('complete history proving no message retries same reserved code',async()=>{
+  const f=fixture();await f.service.deliver(user,async()=>{throw new Error('timeout');});const code=f.state.users[user].code;
+  assert.equal((await f.service.deliver(user,f.send,async()=>null)).status,'sent');
+  assert.equal(f.sends,1);assert.equal(f.state.users[user].code,code);assert.equal(f.rows.size,1);
+});
+test('incomplete history cannot authorize resend',async()=>{
+  const f=fixture();await f.service.deliver(user,async()=>{throw new Error('timeout');});
+  assert.equal((await f.service.deliver(user,f.send,async()=>undefined)).status,'delivery_uncertain');assert.equal(f.sends,0);
+});
+test('no mutual guild rejection preserves invite for retry after joining',async()=>{
+  const f=fixture();assert.equal((await f.service.deliver(user,async()=>{throw Object.assign(new Error(),{code:50278});})).status,'no_mutual_guild');
+  const code=f.state.users[user].code;assert.equal(f.state.users[user].delivery,'unsent');
+  assert.equal((await f.service.deliver(user,f.send)).status,'sent');assert.equal(f.state.users[user].code,code);assert.equal(f.rows.size,1);
 });

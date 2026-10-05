@@ -86,27 +86,43 @@ export class Keys {
     this.queue = task;
     return task;
   }
-  deliver(user, send) {
+  deliver(user, send, reconcile) {
     const task = this.queue.catch(() => {}).then(async () => {
       const result = await this.handle(user, true);
       if (result.status !== 'ready') return result;
       const entry = this.state.users[user];
-      if (entry.delivery !== 'unsent') return {status: 'already_sent'};
+      if (entry.delivery === 'sent') return {status: 'already_sent'};
+      if (entry.delivery !== 'unsent') {
+        if (!reconcile) return {status: entry.delivery === 'reserved' ? 'delivery_uncertain' : 'already_sent'};
+        const previous = await reconcile(result.code);
+        if (previous === undefined) return {status: 'delivery_uncertain'};
+        if (previous) {
+          entry.delivery = 'sent'; entry.messageId = previous.id; entry.sentAt = previous.createdAt;
+          await this.save(this.state);
+          return {status: 'already_sent'};
+        }
+      }
       // Reserve durably before Discord: an ambiguous timeout must never send twice.
       entry.delivery = 'reserved';
+      entry.attemptedAt = new Date().toISOString();
       try { await this.save(this.state); }
       catch (error) { entry.delivery = 'unsent'; throw error; }
-      try { await send(result.code); }
+      let message;
+      try { message = await send(result.code); }
       catch (error) {
         // Discord explicitly rejected the DM; no message was delivered.
-        if (error.code === 50007) {
+        if (error.code === 50007 || error.code === 50278) {
           entry.delivery = 'unsent';
+          entry.lastDeliveryError = error.code;
           await this.save(this.state);
-          return {status: 'dm_disabled'};
+          return {status: error.code === 50278 ? 'no_mutual_guild' : 'dm_disabled'};
         }
         return {status: 'delivery_uncertain'};
       }
       entry.delivery = 'sent';
+      delete entry.lastDeliveryError;
+      entry.sentAt = new Date().toISOString();
+      if (message?.id) entry.messageId = message.id;
       await this.save(this.state);
       return {status: 'sent'};
     });
@@ -119,7 +135,7 @@ export class Keys {
     let entry = this.state.users[user];
     if (!entry) {
       if (!claim) return {status: 'none'};
-      entry = this.state.users[user] = {code: this.generate(), pending: true, delivery: 'unsent'};
+      entry = this.state.users[user] = {code: this.generate(), pending: true, delivery: 'unsent', createdAt: new Date().toISOString()};
       // Save before contacting the backend: retries after a crash reuse this code.
       try { await this.save(this.state); }
       catch (error) { delete this.state.users[user]; throw error; }

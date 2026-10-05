@@ -6,6 +6,7 @@ import { backend, Keys, loadState, saveState } from './keys.mjs';
 import { loadInviteConfig, inviteMessage } from './invite.mjs';
 import { syncKeyCommands } from './commands.mjs';
 import { keyInstructions } from './link-input.mjs';
+import {findInviteMessage} from './dm-history.mjs';
 
 const token = process.env.DISCORD_BOT_TOKEN;
 const adminKey = process.env.METAGAME_ADMIN_KEY;
@@ -66,13 +67,14 @@ client.on(Events.InteractionCreate, async interaction => {
       const claim = subcommand === 'claim';
       const result = subcommand === 'link'
         ? await keys.link(id, interaction.options.getString('key', true).trim())
-        : claim ? await keys.deliver(id, code => interaction.user.send({content: inviteMessage(inviteConfig, code), allowedMentions: {parse: []}}))
+        : claim ? await keys.deliver(id, code => interaction.user.send({content: inviteMessage(inviteConfig, code), allowedMentions: {parse: []}}), code => findInviteMessage(interaction.user, code))
         : await keys.run(id, false);
       {
         const messages = {
           sent: '🔑 **Invite Sent**\nCheck your DMs. Paste the complete invite into the launcher’s Join box.\n**Clear skies, Slayer.**',
           already_sent: '🔑 **Already Claimed**\nYour invite has already been sent. Check your previous DMs; no additional key will be issued.',
           dm_disabled: 'Enable direct messages, then run `/key claim` again. Your existing code is saved.',
+          no_mutual_guild: 'Join the Revived Discord server first, enable direct messages from server members, then run `/key claim` again. Discord cannot DM you without a shared server. Your existing invite is saved.',
           delivery_uncertain: 'Discord did not confirm delivery. Check your DMs, then contact the server team if missing. No replacement key will be issued.',
           linked: '🔑 **Key Accepted**\nYour Discord has been linked to your existing Revived account. Keep using the same launcher key—nothing to replace.\n**Clear skies, Slayer.**',
           invite_not_key: `🔑 **Use Your Saved Account Key**\nThat is a Join invite or registration code. It cannot identify your existing account.\n\n${keyInstructions}\n\nIf you have not registered yet, paste the complete invite into the launcher’s Join screen first.`,
@@ -89,8 +91,8 @@ client.on(Events.InteractionCreate, async interaction => {
         await interaction.editReply(messages[result.status]);
       }
     } finally { active.delete(id); }
-  } catch {
-    console.error('Key interaction failed'); // Never log tokens, codes or Discord payloads.
+  } catch (error) {
+    console.error(JSON.stringify({event:'key_interaction_failed',at:new Date().toISOString(),discordId:id,code:Number.isInteger(error.code)?error.code:undefined})); // No tokens/codes/payloads.
     if (interaction.deferred) await interaction.editReply('The key service is unavailable. Please try again shortly.').catch(() => {});
   }
 });

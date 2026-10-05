@@ -28,7 +28,8 @@ test('creates once, persists ID and edits after 15 seconds', async () => {
   const p = new Publisher(url, {}, async value => saved.push({...value}), async (u, opts) => { calls.push([u, opts.method]); return Response.json({id: '1234'}); });
   await p.send(payload(null), 1000); await p.send(payload(null), 6000); await p.send(payload(null), 16000);
   assert.deepEqual(calls, [[`${url}?wait=true`, 'POST'], [`${url}/messages/1234`, 'PATCH']]);
-  assert.deepEqual(saved, [{creating: true}, {id: '1234'}]);
+  assert.deepEqual(saved.slice(0,2), [{creating: true}, {id: '1234'}]);
+  assert.equal(saved.at(-1).lastSuccess, new Date(16000).toISOString());
 });
 test('honors 429 and exhausted bucket headers', async () => {
   let calls = 0;
@@ -41,6 +42,12 @@ test('uncertain initial send and missing messages cannot spam new messages', asy
   const p = new Publisher(url, {}, async () => {}, async () => { calls++; throw Error('secret'); });
   await p.send({}, 1000); await p.send({}, 999999); assert.equal(calls, 1);
   assert.equal(new Publisher(url, {creating: true}, async () => {}).disabled, true);
-  const deleted = new Publisher(url, {id: '1'}, async () => {}, async () => new Response('', {status: 404}));
-  await deleted.send({}, 1000); assert.equal(deleted.disabled, true);
+  const methods=[];
+  const deleted = new Publisher(url, {id: '1'}, async () => {}, async (u,opts) => {methods.push(opts.method);return new Response('', {status: 404});});
+  await deleted.send({}, 1000); await deleted.send({}, 999999);
+  assert.equal(deleted.disabled, false);assert.deepEqual(methods,['PATCH','PATCH']);
+});
+test('existing message recovers after rejection without replacement',async()=>{
+  let calls=0;const methods=[];const p=new Publisher(url,{id:'1'},async()=>{},async(u,o)=>{methods.push(o.method);return new Response('',{status:++calls===1?403:200});});
+  await p.send({},1000);await p.send({},999999);assert.equal(p.failures,0);assert.equal(p.state.id,'1');assert.deepEqual(methods,['PATCH','PATCH']);
 });

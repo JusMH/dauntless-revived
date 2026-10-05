@@ -368,19 +368,45 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         bool HasConnection = false;
 
         for (UNetConnection* Connection : Networking::NetDriver->ClientConnections) {
-            if (!Connection || !Connection->OwningActor || *(uint32_t*)((uintptr_t)Connection + 0x134) != 3)
-                continue;
-
-            HasConnection = true;
+            if (Connection) {
+                HasConnection = true;
+                break;
+            }
         }
 
         if (EnableWatchdog && HuntIdle.Advance(DeltaTime, HasConnection)) {
+            std::cout << "Hunt idle timeout on port " << Globals::Port << std::endl;
             exit(0);
         }
 
+        static float GroundedTransformRefresh = 0.0f;
+        static std::map<ABP_PlayerCharacter_C*, FTransform> LastGroundedTransforms;
+        static std::map<ABP_PlayerCharacter_C*, bool> RecoveryState;
+        GroundedTransformRefresh += DeltaTime > 0.0f ? DeltaTime : 0.0f;
+        const bool RefreshGroundedTransform = GroundedTransformRefresh >= 0.5f;
+        if (RefreshGroundedTransform)
+            GroundedTransformRefresh = 0.0f;
+
         for (UNetConnection* Conn : Networking::NetDriver->ClientConnections) {
             if (Conn && Conn->PlayerController && Conn->PlayerController->Pawn && Conn->PlayerController->Pawn->IsA(ABP_PlayerCharacter_C::StaticClass())) {
-                ((ABP_PlayerCharacter_C*)Conn->PlayerController->Pawn)->TickStamina(ECityExecFilter::Both, ERemoteExecFilter::All); // Only the player character implements this Blueprint event.
+                auto* Player = (ABP_PlayerCharacter_C*)Conn->PlayerController->Pawn;
+                const bool Recovering = Player->InFallRecovery;
+                auto LastGrounded = LastGroundedTransforms.find(Player);
+
+                if (!Recovering && !Player->IsFalling && (RefreshGroundedTransform || LastGrounded == LastGroundedTransforms.end())) {
+                    Player->SetLastValidPlayerTransform();
+                    LastGroundedTransforms[Player] = Player->LastValidPlayerTransform;
+                    LastGrounded = LastGroundedTransforms.find(Player);
+                }
+
+                const bool WasRecovering = RecoveryState[Player];
+                if (Recovering && !WasRecovering && LastGrounded != LastGroundedTransforms.end()) {
+                    Player->LastValidPlayerTransform = LastGrounded->second;
+                    Player->RecoverFromFall();
+                }
+                RecoveryState[Player] = Recovering;
+
+                Player->TickStamina(ECityExecFilter::Both, ERemoteExecFilter::All);
             }
         }
     }

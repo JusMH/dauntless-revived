@@ -73,10 +73,10 @@ export class Publisher {
       return;
     }
     if (!res.ok) {
-      if (!editing || [401, 403, 404].includes(res.status)) this.disabled = true;
+      if (!editing) this.disabled = true;
       this.next = now + Math.min(300000, 15000 * 2 ** Math.min(++this.failures, 5));
       await res.body?.cancel();
-      console.error('Discord status rejected; check webhook permissions/message existence. No response details logged.');
+      console.error(`Discord status rejected with HTTP ${res.status}; retaining message ID and backing off.`);
       return;
     }
     if (!editing) {
@@ -85,6 +85,8 @@ export class Publisher {
       this.state = {id: data.id}; await this.save(this.state);
     } else { await res.body?.cancel(); }
     this.failures = 0;
+    this.state.lastSuccess = new Date(now).toISOString();
+    await this.save(this.state);
     if (res.headers.get('x-ratelimit-remaining') === '0') this.next = Math.max(this.next, now + (Number(res.headers.get('x-ratelimit-reset-after')) || 15) * 1000 + 1000);
   }
 }
@@ -110,8 +112,10 @@ async function main() {
   const publisher = new Publisher(webhook, state, save);
   if (publisher.disabled) console.error('Status delivery paused: review persisted initial-message state.');
   while (true) {
-    const sample = await sampleBackend(process.env.STATUS_BACKEND || 'http://127.0.0.1:61000', key);
-    await publisher.send(payload(sample));
+    try {
+      const sample = await sampleBackend(process.env.STATUS_BACKEND || 'http://127.0.0.1:61000', key);
+      await publisher.send(payload(sample));
+    } catch { console.error('Status cycle failed; retrying without creating another message.'); }
     await new Promise(resolve => setTimeout(resolve, 5000));
   }
 }

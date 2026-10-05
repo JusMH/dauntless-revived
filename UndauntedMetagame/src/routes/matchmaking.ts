@@ -174,6 +174,7 @@ matchmakingRouter.post("/candidate/join", HasUndauntedMetagameAuth, async (req: 
     const GameMode = req.body.gameMode;
     const GameArgs = req.body.gameArgs;
     const HuntId = req.body.playerHuntId;
+    const PrivateMatch = req.body.privateMatch === true || req.body.isPrivate === true;
 
     logger.info(`UserId ${UserId} wants to join a game with GameMode ${GameMode} & GameArgs ${GameArgs} & HuntId ${HuntId}`);
 

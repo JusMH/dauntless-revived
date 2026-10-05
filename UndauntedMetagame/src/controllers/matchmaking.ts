@@ -291,7 +291,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
     const CurrentQueue = PlayerQueueMap.get(PlayerId);
 
     if(CurrentEntry !== undefined && !CurrentEntry.PartyCandidate && !CurrentEntry.Failed && CurrentEntry.HuntId === HuntId && !!CurrentEntry.Private === Private){
-        if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId) && PartyNow() - (CurrentEntry.QueuedAt ?? 0) <= SOLO_JOIN_DEDUPE_MS){
+        if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId) && (CurrentQueue.Resolved || CurrentQueue.RetryAfter !== undefined || PartyNow() - (CurrentEntry.QueuedAt ?? 0) <= SOLO_JOIN_DEDUPE_MS)){
             return true;
         }
 
