@@ -262,6 +262,30 @@ jobs:
               --output "$tmp/pf.conf"
             pfctl -nf "$tmp/pf.conf"
 
+  native-regressions:
+    name: Native server regression tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Compile and run portable native regression tests
+        run: |
+          set -euo pipefail
+          out="$(mktemp -d)"
+          for source in UndauntedInternalServer/tests/*.cpp; do
+            name="$(basename "$source" .cpp)"
+            g++ -std=c++20 -Wall -Wextra -Werror -O2 "$source" -o "$out/$name"
+            "$out/$name"
+            echo "PASS $name"
+          done
+          g++ -std=c++20 -Wall -Wextra -Werror -g -fsanitize=address,undefined \
+            -fno-omit-frame-pointer UndauntedInternalServer/tests/fall-recovery-policy.cpp \
+            -o "$out/fall-recovery-sanitized"
+          "$out/fall-recovery-sanitized"
+
   internal-server-dll:
     name: Server DLL (Windows x64)
     runs-on: windows-latest
@@ -475,7 +499,7 @@ jobs:
   # On by default; the repository variable LAUNCHER_AUTO_RELEASE=false pauses it (see the top of this file).
   release-check:
     name: Launcher release needed?
-    needs: [node-packages, launcher, launcher-linux, server-port-linux, server-port-openbsd, internal-server-dll, server-kit, docs, repo-hygiene]
+    needs: [node-packages, launcher, launcher-linux, server-port-linux, server-port-openbsd, native-regressions, internal-server-dll, server-kit, docs, repo-hygiene]
     if: >-
       github.event_name == 'push' && github.ref == 'refs/heads/dauntless-revived' &&
       github.repository == 'mixutin/dauntless-revived' && vars.LAUNCHER_AUTO_RELEASE != 'false'

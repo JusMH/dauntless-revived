@@ -140,6 +140,8 @@
     <ClInclude Include="constants.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="Networking.h" />
+    <ClInclude Include="FallRecovery.h" />
+    <ClInclude Include="FallRecoveryPolicy.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
