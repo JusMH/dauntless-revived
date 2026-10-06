@@ -37,3 +37,17 @@ preferences remain stored. Disable the worker only after its active hunts drain.
 Unit/integration tests cover regional queues, private isolation, mixed parties,
 capacity fallback, ambiguous failures and account authorization. These checks
 do not establish real-client combat completion or end-to-end player latency.
+
+## Hunt cleanup and monitoring
+
+The deploy watchdog checks every minute. `HUNT_MAX_AGE_MINUTES` defaults to 120:
+hunts and tutorials stop after two hours, including occupied instances.
+`HUNT_EMPTY_MINUTES` defaults to 10: an earlier stop requires continuously fresh
+native zero-connection samples. Missing or stale telemetry resets the empty
+timer. Ramsgate and Training Grounds are exempt. The original child-process
+handle is used, and ports return to the allocator only after process exit.
+
+The main owner dashboard accepts `DASHBOARD_AUS_URL` in addition to
+`DASHBOARD_WORKER_URL`. Each worker has its own CPU/RAM, health, processes and
+hunt view. Fleet RAM and hunts are summed; CPU is an explicitly labelled
+equal-weight arithmetic mean. A stale host makes combined totals unavailable.

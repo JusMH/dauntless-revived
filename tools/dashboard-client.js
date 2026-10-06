@@ -1,5 +1,5 @@
 (() => {
-  let key = '', busy = false, lastSample = null, lastWorker = null, accountPage = [], accountOffset = 0, nextOffset = null, accountsBusy = false;
+  let key = '', busy = false, lastSample = null, lastWorker = null, lastAus = null, accountPage = [], accountOffset = 0, nextOffset = null, accountsBusy = false;
   const el = id => document.getElementById(id);
   const number = (n, suffix = '') => Number.isFinite(n) ? `${n.toFixed(1)}${suffix}` : '—';
   const duration = seconds => Number.isFinite(seconds) && seconds >= 0 ? `${Math.floor(seconds / 86400)}d ${Math.floor(seconds / 3600) % 24}h ${Math.floor(seconds / 60) % 60}m` : '—';
@@ -40,26 +40,28 @@
     el('fleetAvailability').textContent=`${t.online}/${t.servers} servers reporting. Totals remain unavailable when a required reading is stale.`;
   }
 
-  function renderWorker(worker) {
-    lastWorker=worker;
+  function renderWorker(worker, prefix='worker') {
+    if(prefix==='worker')lastWorker=worker;else lastAus=worker;
+    const el=id=>document.getElementById(id.replace(/^worker/,prefix));
     const s=worker?.sample;
-    el('workerConnection').textContent=!worker?.configured ? 'Not configured' : worker.online ? 'Connected' : 'Unavailable · stale';
-    el('workerError').textContent=worker?.error || '';
+    el('workerConnection').textContent=!worker?.configured?'Not configured':worker.online?'Connected':'Unavailable · stale';
+    el('workerError').textContent=worker?.error||'';
     if(!s)return;
     el('workerFreshness').textContent=`${Date.now()-Date.parse(s.at)>15000?'STALE — ':''}Sample: ${new Date(s.at).toLocaleString()}`;
     el('workerCpu').textContent=number(s.cpu,'%');el('workerCores').textContent=`${s.logicalCpus} logical processors`;
     el('workerMemory').textContent=`${number(s.ramUsedMB/1024)} / ${number(s.ramTotalMB/1024)} GB`;
     el('workerDisk').textContent=`Disk free ${number(s.diskFreeGB)} GB`;
-    el('workerHunts').textContent=s.hunts.length;el('workerUptime').textContent=`Host uptime ${duration(s.hostUptimeSeconds)}`;
-    table('workerServices',[['Worker monitor',worker.online?'Up':'Unavailable'],['Hunt deployment',s.services.deploy?'Up':'Unavailable'],['Shared backend connection',s.services.backend?'Up':'Unavailable'],['Player allowlist',s.services.allowlist?'Up':'Unavailable']]);
+    el('workerHunts').textContent=s.hunts.filter(h=>!['city','dojo'].includes(h.kind)).length;
+    el('workerUptime').textContent=`Host uptime ${duration(s.hostUptimeSeconds)}`;
+    table(prefix+'Services',[['Worker monitor',worker.online?'Up':'Unavailable'],['Hunt deployment',s.services.deploy?'Up':'Unavailable'],['Shared backend connection',s.services.backend?'Up':'Unavailable'],['Player allowlist',s.services.allowlist?'Up':'Unavailable']]);
     const f=s.firewall;
-    el('workerFirewall').textContent=f ? `UDP ${f.ports} · ${f.addresses} authenticated addresses · Firewall ${f.ok===false?'update failed':f.enabled?'open for allowed players':'closed'}${f.pending?' · update pending':''}`:'Firewall state unavailable';
-    for(const id of ['workerCpuChart','workerRamChart'])graph(id,worker.history || []);
+    el('workerFirewall').textContent=f?`UDP ${f.ports} · ${f.addresses} authenticated addresses · Firewall ${f.ok===false?'update failed':f.enabled?'open for allowed players':'closed'}${f.pending?' · update pending':''}`:'Firewall state unavailable';
+    for(const id of ['CpuChart','RamChart'])graph(prefix+id,(worker.history||[]).map(row=>({...row,[prefix+id]:row['worker'+id]})));
     const p=s.processes;
-    el('workerProcessFreshness').textContent=p ? `${Date.now()-Date.parse(p.at)>150000?'STALE — ':''}Process sample: ${new Date(p.at).toLocaleString()}`:'Waiting for process sample';
-    el('workerNetwork').textContent=p ? `Network in ${number(p.netInKbit)} / out ${number(p.netOutKbit)} kbit/s`:'';
-    table('workerProcessRows',(p?.processes || []).map(v=>[v.role,`${v.pid} / ${v.port ?? '—'}`,number(v.cpuPercent,'%'),number(v.workingSetMB,' MB'),number(v.privateMB,' MB'),duration((Date.now()-Date.parse(v.startedAt))/1000)]));
-    table('workerHuntRows',s.hunts.map(v=>[v.huntId || v.kind,v.port,v.expectedPlayers,duration((Date.now()-Date.parse(v.startedAt))/1000)]));
+    el('workerProcessFreshness').textContent=p?`${Date.now()-Date.parse(p.at)>150000?'STALE — ':''}Process sample: ${new Date(p.at).toLocaleString()}`:'Waiting for process sample';
+    el('workerNetwork').textContent=p?`Network in ${number(p.netInKbit)} / out ${number(p.netOutKbit)} kbit/s`:'';
+    table(prefix+'ProcessRows',(p?.processes||[]).map(v=>[v.role,`${v.pid} / ${v.port??'—'}`,number(v.cpuPercent,'%'),number(v.workingSetMB,' MB'),number(v.privateMB,' MB'),duration((Date.now()-Date.parse(v.startedAt))/1000)]));
+    table(prefix+'HuntRows',s.hunts.map(v=>[v.huntId||v.kind,v.port,v.expectedPlayers,duration((Date.now()-Date.parse(v.startedAt))/1000)]));
   }
 
   function list(id, values) { el(id).replaceChildren(...values.map(text => { const item = document.createElement('li'); item.textContent = text; return item; })); }
@@ -74,6 +76,7 @@
       renderFleet(result.fleet);
 
       renderWorker(result.worker);
+      renderWorker(result.aus,'aus');
       el('login').hidden = true; el('data').hidden = false;
       el('invites').hidden = !result.invitesEnabled;
       el('invitesUnavailable').hidden = result.invitesEnabled;
@@ -116,6 +119,7 @@
     if (lastSample) for (const id of charts) graph(id, lastSample.history);
     if (button.dataset.view === 'people') loadAccounts();
     if (button.dataset.view === 'worker' && lastWorker) renderWorker(lastWorker);
+    if (button.dataset.view === 'aus' && lastAus) renderWorker(lastAus,'aus');
   };
   function showAccounts() {
     const query = el('accountSearch').value.trim().toLowerCase();

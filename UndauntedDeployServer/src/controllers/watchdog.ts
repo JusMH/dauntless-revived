@@ -1,5 +1,8 @@
 import { logger } from "../logger";
-import { Gameservers, CleanupServer, IsGameserverAlive } from "./gameservers";
+import { Gameservers, CleanupServer, IsGameserverAlive, StopExpiredHunt } from "./gameservers";
+import { NativeOccupancy } from './nativeoccupancy';
+import { HuntLifetimeFromEnv } from './huntlifetime';
+const Lifetime=HuntLifetimeFromEnv();
 
 /**
  * TODO:
@@ -8,6 +11,7 @@ import { Gameservers, CleanupServer, IsGameserverAlive } from "./gameservers";
 
 export async function RunWatchdog(){
     logger.info(`Running Gameserver Watchdog!`);
+    Lifetime.prune(new Set(Gameservers.map(server=>server.id)));
 
     for(const Gameserver of Gameservers){
         if(!IsGameserverAlive(Gameserver)){
@@ -15,6 +19,13 @@ export async function RunWatchdog(){
 
             // A restart of Ramsgate or the Dojo that fails is logged; it must not end the deploy server
             CleanupServer(Gameserver).catch((error) => logger.error(`Could not restart the game server on port ${Gameserver.port}: ${error instanceof Error ? error.message : String(error)}`));
+        }
+        else {
+            const reason=Lifetime.reason(Gameserver,NativeOccupancy(Gameserver.processId,Gameserver.startTime));
+            if(reason){
+                try {if(StopExpiredHunt(Gameserver))logger.warn({port:Gameserver.port,reason,ageMinutes:(Date.now()-Gameserver.startTime.getTime())/60000},'Hunt lifetime limit: stopping instance');}
+                catch(error){logger.error({error,port:Gameserver.port},'Could not stop expired hunt');}
+            }
         }
     }
 }

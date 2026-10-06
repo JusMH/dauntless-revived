@@ -178,3 +178,13 @@ and grant the metagame service read access to that state directory/file. Do not 
 the dashboard access to bot credentials. Missing/corrupt state shows unavailable,
 not zero. Bot invites and launcher account keys are distinct; a redeemed invite is
 not automatically a Discord account link. No keys or Discord IDs are included.
+
+## Three-server fleet
+
+Set `DASHBOARD_AUS_URL=http://127.0.0.1:61122` on the main dashboard after
+forwarding the AUS worker health listener over the authenticated fleet tunnel.
+Server #2 remains Main overflow; Server #3 shows Australia resources, hunts,
+processes and backend connectivity. All three use the existing owner login.
+Fleet CPU is the arithmetic mean of fresh host percentages; RAM and hunt counts
+are summed. Missing hosts make aggregate values unavailable rather than counting
+as zero. Ramsgate and Dojo are excluded from hunt totals.

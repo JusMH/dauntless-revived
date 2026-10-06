@@ -38,6 +38,12 @@ type ExpectedPlayer = {
 };
 
 export let Gameservers: Gameserver[] = [];
+const SpawnedChildren = new Map<string,ChildProcess>();
+export function StopExpiredHunt(server:Gameserver):boolean {
+    if(!Gameservers.includes(server)||server.isRamsgate||server.isTrainingDojo)return false;
+    const child=SpawnedChildren.get(server.id);
+    return !!child && child.pid===server.processId && child.exitCode===null && !child.killed && child.kill();
+}
 let FreePorts: number[] = [];
 
 let RamsgateServer : Gameserver | undefined;
@@ -112,6 +118,7 @@ function TransformExpectedPlayerArgs(ExpectedPlayers: ExpectedPlayer[]){
 // on one port); a hunt's port goes back to the pool.
 export async function CleanupServer(ServerToShutdown: Gameserver){
     if (!Gameservers.includes(ServerToShutdown)) return; // exit event and watchdog may race
+    SpawnedChildren.delete(ServerToShutdown.id);
     Gameservers = Gameservers.filter(Server => Server !== ServerToShutdown);
 
     if(ServerToShutdown.isRamsgate){
@@ -282,6 +289,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     // as an "error" event. Without a listener that event took the whole deploy server down.
     Child.on("error", (error) => { ReleaseReservation(); logger.error(`Game server on port ${Port} failed: ${error.message} (GAMESERVER_BINARY_PATH is ${GAMESERVER_BINARY_PATH})`); });
     Child.on("exit", (Code, Signal) => {
+        SpawnedChildren.delete(Id);
         ReleaseReservation();
         void unlink(ReadyFile).catch(() => {});
         // Release hunt ports immediately instead of waiting up to 60s for the watchdog.
@@ -327,6 +335,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     };
 
     Gameservers.push(NewGameserver);
+    SpawnedChildren.set(Id,Child);
     Spawned();
     try {
         const TimeoutMs = GameserverStartupTimeoutMs();

@@ -16,3 +16,10 @@ test('offline or stale server cannot produce a misleading fleet total',()=>{
   assert.equal(fleetSummary(main,worker,null,now+16000).totals.online,0);
   assert.equal(fleetSummary({...main,performance:null},worker,null,now).totals.hunts,null);
 });
+test('three-server fleet includes AUS and excludes persistent worlds from worker hunt totals',()=>{
+ const aus={...worker,sample:{...worker.sample,cpu:20,hunts:[{kind:'hunt'},{kind:'city'},{kind:'dojo'}]}};
+ const f=fleetSummary(main,worker,null,now,aus);
+ assert.equal(f.rows.length,3);assert.equal(f.totals.meanCpu,25);
+ assert.equal(f.totals.hunts,4);assert.equal(f.totals.online,3);
+ assert.equal(fleetSummary(main,worker,null,now,{...aus,online:false}).totals.meanCpu,null);
+});
