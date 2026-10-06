@@ -1077,7 +1077,6 @@ const MODS: readonly { icon: IconName; name: StringKey; text: StringKey; use: St
   { icon: "heart", name: "mod_bhb_name", text: "mod_bhb_text", use: "mod_bhb_use" },
   { icon: "hunt", name: "mod_trk_name", text: "mod_trk_text", use: "mod_trk_use" },
   { icon: "settings", name: "mod_menu_name", text: "mod_menu_text", use: "mod_menu_use" },
-  { icon: "check", name: "mod_status_name", text: "mod_status_text", use: "mod_status_use" },
 ];
 
 function renderMods(): void {
