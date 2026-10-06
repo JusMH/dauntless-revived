@@ -123,6 +123,15 @@ if (-not $NoMods) {
       if ((Hash $dst) -ne $want) { Write-Host "   !!  $($f.path) changed while copying. Is antivirus interfering?" -ForegroundColor Yellow; $bad++; continue }
       $copied++
     }
+    # Mods named in "disable": "Name : 1" -> "Name : 0" in the kept mods.txt, nothing else changed.
+    $modsTxt = Join-Path $Win64 'ue4ss\Mods\mods.txt'
+    $off = @($manifest.disable) | Where-Object { $_ -match '^[A-Za-z0-9_]+$' }
+    if ($off -and (Test-Path -LiteralPath $modsTxt)) {
+      $text = [IO.File]::ReadAllText($modsTxt)
+      $new = $text
+      foreach ($n in $off) { $new = [regex]::Replace($new, "(?m)^([ \t]*$n[ \t]*:[ \t]*)1([ \t]*\r?)$", '${1}0${2}') }
+      if ($new -ne $text) { [IO.File]::WriteAllText($modsTxt, $new, (New-Object Text.UTF8Encoding $false)); Write-Host "   --  switched off in mods.txt: $($off -join ', ')" }
+    }
     if ($bad -eq 0) { Ok "UE4SS + mods ready ($copied file(s) installed or updated, $kept setting file(s) kept)" }
     else { Write-Host "   !!  $bad mod file(s) could not be installed; the game still works without them" -ForegroundColor Yellow }
   }

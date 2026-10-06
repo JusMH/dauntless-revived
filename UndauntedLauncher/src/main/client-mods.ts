@@ -5,7 +5,8 @@
 // Files marked "keep" (mods.txt, UE4SS-settings.ini) are only written when missing, so a player's
 // own choices (mods switched off in the in-game menu) survive. Failures never block the game:
 // the caller logs them and launches anyway. Files that earlier versions installed and that the
-// bundle dropped since (manifest "remove") are deleted, with any folder they leave empty.
+// bundle dropped since (manifest "remove") are deleted, with any folder they leave empty, and mods
+// named in "disable" are switched off in the kept mods.txt (only their own line changes).
 
 import { promises as fsp } from "node:fs";
 import path from "node:path";
@@ -24,6 +25,7 @@ export interface ClientModsManifest {
   target: string;
   files: ClientModFile[];
   remove?: string[];
+  disable?: string[];
 }
 
 export interface ClientModsResult {
@@ -31,6 +33,7 @@ export interface ClientModsResult {
   kept: number;
   upToDate: number;
   removed: number;
+  disabled: number;
 }
 
 export class ClientModsError extends Error {
@@ -78,7 +81,7 @@ export async function installClientMods(resourcesDir: string, installDir: string
   if (!manifest) return null;
   const srcRoot = path.join(resourcesDir, CLIENT_MODS_RESOURCE);
   const dstRoot = path.resolve(win64Dir(installDir));
-  const result: ClientModsResult = { installed: 0, kept: 0, upToDate: 0, removed: 0 };
+  const result: ClientModsResult = { installed: 0, kept: 0, upToDate: 0, removed: 0, disabled: 0 };
 
   // Dropped files first. A path the bundle still ships is never removed, an unsafe one is skipped;
   // folders are removed only while empty, and never the Win64 folder or anything above it.
@@ -160,5 +163,36 @@ export async function installClientMods(resourcesDir: string, installDir: string
     await unblock(target);
     result.installed++;
   }
+
+  result.disabled = await disableInModsTxt(path.join(dstRoot, "ue4ss", "Mods", "mods.txt"), Array.isArray(manifest.disable) ? manifest.disable : []);
   return result;
+}
+
+// "Name : 1" -> "Name : 0" in mods.txt for each name (mod folder names only), keeping every other
+// line, the order and the line endings exactly. Returns how many lines changed.
+export function disableModLines(text: string, names: readonly unknown[]): { text: string; changed: number } {
+  const off = new Set(names.filter((n): n is string => typeof n === "string" && /^[A-Za-z0-9_]+$/.test(n)));
+  let changed = 0;
+  const out = text.replace(/^([ \t]*)([A-Za-z0-9_]+)([ \t]*:[ \t]*)1([ \t]*)(\r?)$/gm, (line, pre: string, name: string, sep: string, post: string, cr: string) => {
+    if (!off.has(name)) return line;
+    changed++;
+    return `${pre}${name}${sep}0${post}${cr}`;
+  });
+  return { text: out, changed };
+}
+
+async function disableInModsTxt(file: string, names: readonly unknown[]): Promise<number> {
+  if (names.length === 0) return 0;
+  let text: string;
+  try {
+    text = await fsp.readFile(file, "utf8");
+  } catch {
+    return 0; // no mods.txt: nothing to switch off
+  }
+  const r = disableModLines(text, names);
+  if (r.changed === 0) return 0;
+  const tmp = `${file}.new`;
+  await fsp.writeFile(tmp, r.text, "utf8");
+  await fsp.rename(tmp, file);
+  return r.changed;
 }

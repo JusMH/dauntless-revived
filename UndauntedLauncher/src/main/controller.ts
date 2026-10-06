@@ -914,7 +914,7 @@ export class Controller {
   private async installMods(dir: string): Promise<void> {
     try {
       const r = await installClientMods(this.p.resourcesDir, dir);
-      if (r) log.info(`client mods: ${r.installed} installed, ${r.upToDate} up to date, ${r.kept} kept, ${r.removed} removed`);
+      if (r) log.info(`client mods: ${r.installed} installed, ${r.upToDate} up to date, ${r.kept} kept, ${r.removed} removed, ${r.disabled} switched off`);
     } catch (e) {
       log.warn(`client mods not installed: ${describeError(e)}`);
     }

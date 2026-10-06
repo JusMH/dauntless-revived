@@ -22,6 +22,10 @@ $remove = @(
   'ue4ss/Mods/shared/FrameTick/hb_ModMenu.txt'
 )
 
+# Mods switched off in every player's kept mods.txt ("Name : 1" -> "Name : 0"; no other line is
+# touched), so a removed mod stays off even where its files could not be deleted.
+$disable = @('ZFXStatus')
+
 $files = Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $skip -notcontains $_.Name } |
   Sort-Object FullName | ForEach-Object {
     $rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
@@ -32,6 +36,6 @@ $files = Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $skip 
       keep   = [bool]($keep -contains $rel)
     }
   }
-$json = [ordered]@{ version = 1; target = 'Archon/Binaries/Win64'; files = @($files); remove = @($remove) } | ConvertTo-Json -Depth 4
+$json = [ordered]@{ version = 1; target = 'Archon/Binaries/Win64'; files = @($files); remove = @($remove); disable = @($disable) } | ConvertTo-Json -Depth 4
 [IO.File]::WriteAllText((Join-Path $root 'manifest.json'), $json.Replace("`r`n", "`n") + "`n", (New-Object Text.UTF8Encoding $false))
 Write-Host "manifest.json: $(@($files).Count) files"

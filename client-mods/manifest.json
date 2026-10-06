@@ -81,5 +81,8 @@
                    "ue4ss/Mods/shared/FrameTick/hb_BehemothHealthBars.txt",
                    "ue4ss/Mods/shared/FrameTick/hb_BehemothTracker.txt",
                    "ue4ss/Mods/shared/FrameTick/hb_ModMenu.txt"
-               ]
+               ],
+    "disable":  [
+                    "ZFXStatus"
+                ]
 }
