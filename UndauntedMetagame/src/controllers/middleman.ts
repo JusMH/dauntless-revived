@@ -1,4 +1,5 @@
-import { InventoryConflictError, InventoryValidationError } from "./inventory";
+export class MiddlemanValidationError extends Error {}
+export class MiddlemanConflictError extends Error {}
 
 export const FUSION_CATALOG_ID = "TOKEN_CELL_EXCHANGE";
 
@@ -16,7 +17,7 @@ export function ParseFusionData(Item: any): FusionData {
         Data = typeof Item?.itemData === "string" ? JSON.parse(Item.itemData) : Item?.itemData;
     }
     catch{
-        throw new InventoryValidationError("Invalid Middleman fusion token");
+        throw new MiddlemanValidationError("Invalid Middleman fusion token");
     }
 
     // 1.4.4 exposes an integer SlotID but the dump does not prove whether it is zero- or one-based.
@@ -25,7 +26,7 @@ export function ParseFusionData(Item: any): FusionData {
         typeof Data?.EndTime !== "string" || Number.isNaN(Date.parse(Data.EndTime)) ||
         typeof Data?.ResultCell !== "string" || !Data.ResultCell.startsWith("CELL_") ||
         typeof Data?.ExchangeID !== "string" || Data.ExchangeID.length === 0){
-        throw new InventoryValidationError("Invalid Middleman fusion token");
+        throw new MiddlemanValidationError("Invalid Middleman fusion token");
     }
 
     return Data as FusionData;
@@ -131,20 +132,20 @@ export function ValidateFusionCompletions(CurrentItems: any[], Removing: any[], 
         const Data = ParseFusionData(Current);
 
         if(Date.parse(Data.EndTime) > Now){
-            throw new InventoryConflictError(`Middleman fusion slot ${Data.SlotID} is not complete yet`);
+            throw new MiddlemanConflictError(`Middleman fusion slot ${Data.SlotID} is not complete yet`);
         }
 
         const Reward = AddingStacks.find((Item) => Item?.catalogId === Data.ResultCell);
         const Quantity = Number(Reward?.quantity ?? 0);
 
         if(!Number.isSafeInteger(Quantity) || Quantity < 1){
-            throw new InventoryConflictError(`Middleman fusion slot ${Data.SlotID} did not grant its result cell ${Data.ResultCell}`);
+            throw new MiddlemanConflictError(`Middleman fusion slot ${Data.SlotID} did not grant its result cell ${Data.ResultCell}`);
         }
 
         const OtherCell = AddingStacks.find((Item) => typeof Item?.catalogId === "string" && Item.catalogId.startsWith("CELL_") && Item.catalogId !== Data.ResultCell);
 
         if(OtherCell != undefined){
-            throw new InventoryConflictError(`Middleman fusion slot ${Data.SlotID} tried to grant ${OtherCell.catalogId} instead of ${Data.ResultCell}`);
+            throw new MiddlemanConflictError(`Middleman fusion slot ${Data.SlotID} tried to grant ${OtherCell.catalogId} instead of ${Data.ResultCell}`);
         }
     }
 }
