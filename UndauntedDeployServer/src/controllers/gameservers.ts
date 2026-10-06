@@ -426,12 +426,20 @@ export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
 const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function TrialSuffixes(){
-    const Hard = new Set(Object.keys((TrialsHardHuntTable[0].Rows as any))
-        .map((Id) => Id.match(/_(\d{3})$/)?.[1])
-        .filter((Id): Id is string => Id !== undefined));
-    const Elite = new Set(Object.keys((TrialsEliteHuntTable[0].Rows as any))
-        .map((Id) => Id.match(/_(\d{3})$/)?.[1])
-        .filter((Id): Id is string => Id !== undefined));
+    const StandardRows = (Rows: Record<string, unknown>, Difficulty: "Hard" | "Elite") => {
+        const Prefix = `Arena_MatchmakerHunt_${Difficulty}_`;
+
+        return new Set(Object.keys(Rows)
+            .filter((Id) => Id.startsWith(Prefix) && /^\d{3}$/.test(Id.slice(Prefix.length)))
+            .map((Id) => Id.slice(Prefix.length))
+            // Roadmap 3.8 defines the recovered/cooked weekly rotation as 001-067.
+            // The 1.4.4 tables also contain later numbered and test rows; keep them available
+            // to the data set, but do not silently expand the restored weekly rotation.
+            .filter((Id) => Number(Id) >= 1 && Number(Id) <= 67));
+    };
+
+    const Hard = StandardRows((TrialsHardHuntTable[0].Rows as any), "Hard");
+    const Elite = StandardRows((TrialsEliteHuntTable[0].Rows as any), "Elite");
 
     return [...Hard].filter((Id) => Elite.has(Id)).sort((A, B) => Number(A) - Number(B));
 }
