@@ -1,4 +1,5 @@
 import { DiscordKeyStats } from '../controllers/discordstats';
+import { GetHuntRegion, SaveHuntRegion } from '../controllers/regionpreferences';
 
 import { DiscordAccount, LinkDiscordAccount } from '../controllers/discordlinks';
 
@@ -29,6 +30,19 @@ import { userapikeys, users } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 export const undauntedApiRouter = Router();
+
+undauntedApiRouter.get('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({region:GetHuntRegion((req as any).UndauntedUserInfo.UserId), enabled:process.env.AUS_REGION === '1'});
+});
+undauntedApiRouter.post('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    const region = req.body?.region;
+    if (region !== 'main' && region !== 'aus') { res.status(400).json({error:'invalid_region'}); return; }
+    if (region === 'aus' && process.env.AUS_REGION !== '1') { res.status(503).json({error:'region_unavailable'}); return; }
+    SaveHuntRegion((req as any).UndauntedUserInfo.UserId, region);
+    res.json({region});
+});
 
 undauntedApiRouter.get('/DiscordKeyStats', HealthReadRateLimit, HasUndauntedAdminApiKey, async (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');

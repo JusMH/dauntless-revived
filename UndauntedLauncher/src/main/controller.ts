@@ -16,6 +16,7 @@ import { missingDirectX, gameExitDetail } from './windows-runtime';
 import { parseInvite, isLoopbackHost, type Invite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
 import { limitedView, type ServerStatus } from "../shared/status";
+import { saveHuntRegion } from './hostapi';
 import type {
   ActionResult,
   Branding,
@@ -285,7 +286,7 @@ export class Controller {
       },
       task: this.task,
       game: { running: this.game.running, relayPort: this.relay?.port ?? null },
-      settings: { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language },
+      settings: { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language, ...(this.s.huntRegion ? {huntRegion:this.s.huntRegion} : {}) },
       app: { version: this.p.appVersion, packaged: this.p.packaged, updateReady: this.updateReady },
       status: this.status,
       statusUnsupported: this.statusUnsupported,
@@ -1091,8 +1092,11 @@ export class Controller {
         return this.fail(account.error);
       }
       this.keyRejected = false;
-
-
+      if (this.s.huntRegion) {
+        try {
+          if (!await saveHuntRegion(ep,key,this.s.huntRegion)) return this.fail('server_error','The selected hunt region is unavailable. Choose Main in Settings or try again later.');
+        } catch { return this.fail('server_unreachable'); }
+      }
       const dir = this.installDir;
       await this.inspectInstall();
       if (this.install.missing.length > 0) return this.fail("game_files_invalid", String(this.install.missing.length));
@@ -1216,11 +1220,12 @@ export class Controller {
         if (GRAPHICS_PRESETS.includes(p.graphics as GraphicsPreset)) s.graphics = p.graphics as GraphicsPreset;
         if (EXPOSURE_MODES.includes(p.exposure as ExposureMode)) s.exposure = p.exposure as ExposureMode;
         if (typeof p.windowed === "boolean") s.windowed = p.windowed;
+        if (p.huntRegion === 'main' || p.huntRegion === 'aus') s.huntRegion = p.huntRegion;
         if (p.language === "en" || p.language === "fi") s.language = p.language;
       });
     }
     this.publish();
-    return { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language };
+    return { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language, ...(this.s.huntRegion ? {huntRegion:this.s.huntRegion} : {}) };
   }
 
   async openExternal(target: ExternalTarget): Promise<ActionResult> {

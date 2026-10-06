@@ -6,6 +6,7 @@ import { CancelMatchmaking, CheckAndUpdateQueueStatus, DistinctPlayers, HandlePl
 import { GetDb } from "../src/db";
 import { GameSessionForCandidate } from "../src/controllers/matchmaking";
 import { SetPartyClockForTests } from "../src/controllers/party";
+import { SetRegionReader } from '../src/controllers/huntregion';
 
 // Matchmaking looks up the player's party (controllers/party.ts), which loads the database
 after(() => RemoveTestDb(() => GetDb().$client.close()));
@@ -42,6 +43,28 @@ describe("DistinctPlayers (the expected-player list sent to the deploy server)",
 
 
 describe("concurrent hunt queues", () => {
+    it('same hunt queues fill independently in each region', async () => {
+        ResetMatchmakingForTests();
+        const originalFetch=globalThis.fetch;
+        const requests:any[]=[];
+        SetRegionReader(id=>id.startsWith('AUS')?'aus':'main');
+        globalThis.fetch=(async(_url:any,init:any)=>{
+            requests.push(JSON.parse(init.body));
+            return new Response(JSON.stringify({host:'127.0.0.1',port:39000+requests.length}),{status:200,headers:{'content-type':'application/json'}});
+        }) as typeof fetch;
+        try {
+            for (let i=0;i<4;i++) {
+                await HandlePlayerMatchmaking('ISLAND','','Hunt_Test_A',`AUS${i}`);
+                await HandlePlayerMatchmaking('ISLAND','','Hunt_Test_A',`MAIN${i}`);
+            }
+            await new Promise(resolve=>setTimeout(resolve,20));
+            assert.equal(requests.length,2);
+            assert.deepEqual(requests[0].ExpectedPlayers,['AUS0','AUS1','AUS2','AUS3']);
+            assert.equal(requests[0].Region,'aus');
+            assert.deepEqual(requests[1].ExpectedPlayers,['MAIN0','MAIN1','MAIN2','MAIN3']);
+            assert.equal(requests[1].Region,undefined);
+        } finally {globalThis.fetch=originalFetch;SetRegionReader(()=>'main');ResetMatchmakingForTests();}
+    });
     it("separate city candidates share the native game session for zone chat", async () => {
         ResetMatchmakingForTests();
         const originalFetch=globalThis.fetch;

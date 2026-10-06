@@ -4,6 +4,20 @@ import { Gameservers, KindOfGameserver, huntAdmission, DescribeGameservers } fro
 import { HuntRouter, RemoteLaunch, OverflowUrl, DescribeOverflow } from './overflow';
 import { CityRouter } from './cityrouter';
 import { NativeOccupancy } from './nativeoccupancy';
+import { RegionalRouter, RegionChoice } from './regions';
+
+const Regions = new RegionalRouter(async () => {
+    const local = huntAdmission.status();
+    const url = OverflowUrl();
+    if (!url) return local;
+    try {
+        const response = await fetch(new URL('/gameservers', url), {signal:AbortSignal.timeout(2000),redirect:'error'});
+        const body = await response.json() as any;
+        if (!response.ok || !body.capacity) return local;
+        return {running:local.running + body.capacity.running, pending:local.pending + body.capacity.pending,
+            limit:local.limit !== null && body.capacity.limit !== null ? local.limit + body.capacity.limit : null};
+    } catch { return local; }
+});
 
 const Cities = new CityRouter(async () => {
     const key = process.env.CITY_STATUS_KEY;
@@ -25,7 +39,7 @@ const Cities = new CityRouter(async () => {
 
 const Router = new HuntRouter(() => Gameservers.filter(server => ['hunt', 'tutorial'].includes(KindOfGameserver(server))).length, undefined, () => huntAdmission.status());
 
-export async function HandleMatchmakingRequest(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined){
+export async function HandleMatchmakingRequest(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined, Region: RegionChoice = 'main'){
     if (process.env.HUNT_WORKER === '1' && GameMode !== 'ISLAND' && !(GameMode === 'CITY' && process.env.WORKER_RAMSGATE === '1')) throw new Error('Hunt worker does not accept this world');
     if (GameMode === 'CITY' && process.env.CITY_OVERFLOW === '1') {
         const url = OverflowUrl();
@@ -35,7 +49,8 @@ export async function HandleMatchmakingRequest(GameMode: string, GameArgs: strin
             () => RemoteLaunch(url, {GameMode, GameArgs, HuntId, ExpectedPlayers}),
             Number(process.env.RAMSGATE_PLAYER_LIMIT ?? 28));
     }
-    return Router.launch({GameMode, GameArgs, HuntId, ExpectedPlayers}, () => HandleLocalMatchmaking(GameMode, GameArgs, HuntId, ExpectedPlayers));
+    const body = {GameMode, GameArgs, HuntId, ExpectedPlayers};
+    return Regions.launch(body, Region, () => Router.launch(body, () => HandleLocalMatchmaking(GameMode, GameArgs, HuntId, ExpectedPlayers)));
 }
 
 async function HandleLocalMatchmaking(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined){

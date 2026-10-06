@@ -2,6 +2,7 @@ import { Router } from "express";
 import { DescribeGameservers, huntAdmission, Gameservers } from "../controllers/gameservers";
 import { NativeOccupancy } from '../controllers/nativeoccupancy';
 import { DescribeOverflow } from '../controllers/overflow';
+import { DescribeAus } from '../controllers/regions';
 
 export const gameserversRouter = Router();
 
@@ -31,12 +32,13 @@ gameserversRouter.get("/gameservers", async (req, res) => {
         return;
     }
 
+    const [overflow, aus] = await Promise.all([DescribeOverflow(), DescribeAus()]);
     res.status(200);
     res.json({
         servers: [...DescribeGameservers().map(server => {
             const process=Gameservers.find(s=>s.id===server.id);
             return {...server, connectedPlayers: server.kind==='city' && process ? NativeOccupancy(process.processId,process.startTime) : undefined};
-        }), ...await DescribeOverflow()],
+        }), ...overflow, ...aus],
         capacity: huntAdmission.status()
     });
 });

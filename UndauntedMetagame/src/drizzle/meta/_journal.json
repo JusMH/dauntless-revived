@@ -141,6 +141,13 @@
       "when": 1791309600000,
       "tag": "0019_trials_profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1791400000000,
+      "tag": "0020_hunt_regions",
+      "breakpoints": true
     }
   ]
 }

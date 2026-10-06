@@ -31,6 +31,19 @@ const A = "UID-real-a", B = "UID-real-b", C = "UID-stub-c", ADMIN = "UID-admin";
 type Player = { UserId: string, Key: string, Token: string, CharacterId: string };
 const Players: Record<string, Player> = {};
 
+it('hunt region changes require the account key and cannot target another account', async () => {
+    process.env.AUS_REGION='1';
+    try {
+        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{body:{region:'aus'}})).status,401);
+        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'remote'}})).status,400);
+        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'aus',userId:B}})).status,200);
+        assert.equal((await Call('GET','/undaunted/api/HuntRegion',{key:Players[A].Key})).json.region,'aus');
+        assert.equal((await Call('GET','/undaunted/api/HuntRegion',{key:Players[B].Key})).json.region,'main');
+        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'main'}})).status,200);
+    } finally { delete process.env.AUS_REGION; }
+    assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'aus'}})).status,503);
+});
+
 it('dashboard account directory exposes names and short fingerprints, never login keys or full hashes', async () => {
     const reply = await Call('GET', '/undaunted/api/DashboardAccounts?offset=0', {key: Players[ADMIN].Key});
     assert.equal(reply.status, 200);
@@ -281,6 +294,8 @@ const EXPECTED_ROUTES = [
     "POST /loadout/:userId/:characterId/active/:index [RealProgressionOnly, HasUndauntedMetagameAuth]",
     "GET /loadout/:userId/:characterId/all [HasUndauntedMetagameAuth]",
     "POST /loadout/:userId/:characterId/:index [HasUndauntedMetagameAuth]",
+    "GET /undaunted/api/HuntRegion [HasUndauntedUserApiKey]",
+    "POST /undaunted/api/HuntRegion [HasUndauntedUserApiKey]",
     "GET /undaunted/api/DiscordKeyStats [HasUndauntedAdminApiKey]",
 
     "POST /undaunted/api/DiscordLink [HasUndauntedAdminApiKey]",

@@ -119,6 +119,7 @@ export interface ServerInfo {
 }
 
 export interface Settings {
+  huntRegion?: 'main' | 'aus';
   graphics: GraphicsPreset;
   exposure: ExposureMode;
   windowed: boolean;

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
     userId: text("userId").notNull().primaryKey(),
@@ -13,6 +13,11 @@ export const discordlinks = sqliteTable('discordlinks', {
     userId: text('userId').notNull().unique().references(() => users.userId),
     linkedAt: text('linkedAt').notNull()
 });
+
+export const huntregions = sqliteTable('huntregions', {
+    userId: text('userId').notNull().primaryKey().references(() => users.userId),
+    region: text('region', {enum:['main','aus']}).notNull()
+}, table => [check('huntregions_region', sql`${table.region} IN ('main', 'aus')`)]);
 
 
 export const characters = sqliteTable("characters", {

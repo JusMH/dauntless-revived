@@ -1,3 +1,4 @@
+import { PlayerRegion, PartyRegion, RegionQueueKey, HuntRegion, RegionChoice } from './huntregion';
 import { logger } from "../logger";
 import crypto from "node:crypto";
 import {
@@ -26,6 +27,7 @@ const QUEUE_FULL_PLAYERS = 4;
 export const CAPACITY_WAIT_MS = 60 * 1000;
 
 type MatchmakingQueueData = {
+    Region: HuntRegion,
     HuntId: string,
     RetryAfter?: number,
     CapacityDeadline?: number,
@@ -100,7 +102,7 @@ export function DistinctPlayers(PlayerIds: string[]): string[] {
 }
 
 // Never throws: an unreachable deploy server or an unusable answer is a failed launch
-async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, HuntId: string, AskedPlayers: string[] | undefined): Promise<LaunchResult> {
+async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, HuntId: string, AskedPlayers: string[] | undefined, Region: RegionChoice = 'main'): Promise<LaunchResult> {
     const ExpectedPlayers = AskedPlayers === undefined ? undefined : DistinctPlayers(AskedPlayers);
 
     if(AskedPlayers !== undefined && ExpectedPlayers!.length !== AskedPlayers.length){
@@ -124,7 +126,8 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
                 GameMode: GameMode,
                 GameArgs: GameArgs,
                 HuntId: HuntId,
-                ExpectedPlayers: ExpectedPlayers!
+                ExpectedPlayers: ExpectedPlayers!,
+                ...(GameMode === 'ISLAND' && Region !== 'main' ? {Region} : {})
             })
         });
     }
@@ -203,13 +206,13 @@ async function PopQueue(HuntId: string, MatchmakingQueue: MatchmakingQueueData |
 
     MatchmakingQueue.Resolved = true;
 
-    if(MatchmakingQueueMap.get(HuntId) === MatchmakingQueue){
-        MatchmakingQueueMap.delete(HuntId);
+    if(MatchmakingQueueMap.get(RegionQueueKey(HuntId, MatchmakingQueue.Region)) === MatchmakingQueue){
+        MatchmakingQueueMap.delete(RegionQueueKey(HuntId, MatchmakingQueue.Region));
     }
 
     const GameOnDeployServer: LaunchResult = MatchmakingQueue.CapacityDeadline !== undefined && PartyNow() >= MatchmakingQueue.CapacityDeadline
         ? {succeeded: false, readyNow: false, host: '', port: 0}
-        : await LaunchGameOnDeployserver("ISLAND", "", HuntId, MatchmakingQueue.Players);
+        : await LaunchGameOnDeployserver("ISLAND", "", HuntId, MatchmakingQueue.Players, MatchmakingQueue.Region);
 
     if (GameOnDeployServer.capacity) {
         MatchmakingQueue.CapacityDeadline ??= PartyNow() + CAPACITY_WAIT_MS;
@@ -287,6 +290,8 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
 }
 
 async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
+    const Region = PlayerRegion(PlayerId);
+    const QueueKey = RegionQueueKey(HuntId, Region);
     const CurrentEntry = MatchmakingResultMap.get(PlayerId);
     const CurrentQueue = PlayerQueueMap.get(PlayerId);
 
@@ -309,7 +314,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
         }
     }
 
-    const ExistingQueue = Private ? undefined : MatchmakingQueueMap.get(HuntId);
+    const ExistingQueue = Private ? undefined : MatchmakingQueueMap.get(QueueKey);
 
     if(ExistingQueue !== undefined && ExistingQueue.Players.length >= QUEUE_FULL_PLAYERS){
         void PopQueue(HuntId, ExistingQueue);
@@ -317,7 +322,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
 
     LeaveWaitingQueues(PlayerId, "their new join replaces it");
 
-    let Queue = Private ? undefined : MatchmakingQueueMap.get(HuntId);
+    let Queue = Private ? undefined : MatchmakingQueueMap.get(QueueKey);
 
     if(Queue !== undefined && Queue.Players.length >= QUEUE_FULL_PLAYERS){
         void PopQueue(HuntId, Queue);
@@ -338,13 +343,14 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
 
     if(Queue === undefined){
         Queue = {
+            Region,
             HuntId: HuntId,
             Players: [],
             CandidateIds: new Map<string, string>(),
             LastPlayerAddedTime: PartyNow(),
             Resolved: false
         };
-        if (!Private) MatchmakingQueueMap.set(HuntId, Queue);
+        if (!Private) MatchmakingQueueMap.set(QueueKey, Queue);
     }
 
     Queue.Players.push(PlayerId);
@@ -373,8 +379,8 @@ function LeaveWaitingQueues(PlayerId: string, Why: string){
     Queue.CandidateIds.delete(PlayerId);
     PlayerQueueMap.delete(PlayerId);
 
-    if(Queue.Players.length === 0 && MatchmakingQueueMap.get(Queue.HuntId) === Queue){
-        MatchmakingQueueMap.delete(Queue.HuntId);
+    if(Queue.Players.length === 0 && MatchmakingQueueMap.get(RegionQueueKey(Queue.HuntId, Queue.Region)) === Queue){
+        MatchmakingQueueMap.delete(RegionQueueKey(Queue.HuntId, Queue.Region));
     }
 
     logger.info(`mm: ${PlayerId} taken out of the ${Queue.HuntId} queue: ${Why}`);
@@ -600,6 +606,7 @@ async function FinishPartyCandidate(TheParty: Party, CandidateId: string, Member
 }
 
 async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: string, Members: string[], LeaderId: string){
+    const Region = PartyRegion(Members);
     const CandidateId = crypto.randomUUID();
 
     for(const Member of Members){
@@ -631,7 +638,7 @@ async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: st
     const TryLaunch = async () => {
         const Active = Members.filter(member => MatchmakingResultMap.get(member)?.CandidateId === CandidateId && TheParty.Members.includes(member));
         if (TheParty.Candidate?.CandidateId !== CandidateId || Active.length === 0) return true;
-        const Game = await LaunchGameOnDeployserver(GameMode, '', HuntId, GameMode === 'ISLAND' ? Active : undefined);
+        const Game = await LaunchGameOnDeployserver(GameMode, '', HuntId, GameMode === 'ISLAND' ? Active : undefined, Region);
         if (Game.capacity) return false;
         await FinishPartyCandidate(TheParty, CandidateId, Active, Game);
         return true;
@@ -826,7 +833,7 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
             // Ramsgate, the Dojo or the tutorial instead of a hunt the player was still queued for
             LeaveWaitingQueues(PlayerId, "their new join replaces it");
 
-            const GameOnDeployServer = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined);
+            const GameOnDeployServer = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, PlayerRegion(PlayerId));
 
             const Entry: MatchmakingResult = {
                 Ready: GameOnDeployServer.succeeded,
@@ -840,7 +847,7 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
             if (GameOnDeployServer.capacity) {
                 const parked = ParkCapacity(Entry.CandidateId, async () => {
                     if (MatchmakingResultMap.get(PlayerId) !== Entry) return true;
-                    const result = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined);
+                    const result = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, PlayerRegion(PlayerId));
                     if (result.capacity) return false;
                     if (MatchmakingResultMap.get(PlayerId) === Entry) Object.assign(Entry, {Ready: result.succeeded, Host: result.host, Port: result.port, Failed: !result.succeeded});
                     return true;

@@ -1157,9 +1157,21 @@ function renderSettings(): void {
     const windowed = h("button", { type: "button", class: "switch", role: "switch", "aria-checked": snap.settings.windowed ? "true" : "false", "aria-labelledby": "windowed-label", "data-fk": "windowed" });
     windowed.addEventListener("click", () => void api.setSettings({ windowed: !snap.settings.windowed }));
 
+    const huntRegion = h('select', {class:'select',id:'hunt-region','data-fk':'hunt-region'});
+    for (const [value,label] of [['main','Main'],['aus','Australia (OCE)']]) {
+      const option = h('option',{value},label);
+      option.selected = value === (snap.settings.huntRegion ?? 'main');
+      huntRegion.appendChild(option);
+    }
+    huntRegion.disabled = busy;
+    huntRegion.addEventListener('change',()=>void api.setSettings({huntRegion:huntRegion.value as 'main'|'aus'}));
+
     const game = card(
       "settings-section",
       h("h2", { class: "card-title" }, t("set_game")),
+      h('div',{class:'settings-row'},h('div',{class:'settings-row-text'},
+        h('label',{class:'settings-row-title',for:'hunt-region'},'Hunt region'),
+        h('span',{class:'settings-row-sub'},'Applies when you next press Play. Ramsgate stays shared. Full regions may use overflow; mixed-region parties stay together in the less busy region.')),huntRegion),
       settingsRow(
         t("set_folder"),
         snap.install.dir,
