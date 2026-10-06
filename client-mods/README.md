@@ -9,7 +9,6 @@ Optional client-side mods, installed automatically next to the game exe (`Archon
   whole mods on or off (applied on Ctrl+R); SETTINGS changes the mods live (shield bar, HP numbers,
   two bars in escalations, tracker at any distance). Settings are saved in
   `ue4ss/Mods/shared/ModSettings/settings.txt` on each PC and never shipped or overwritten.
-- **ZFX Status**: the ZFX logo in the top right, outlined blue while the mods run and red if one stalls.
 
 They only change what you see on your own screen. The game works without them.
 

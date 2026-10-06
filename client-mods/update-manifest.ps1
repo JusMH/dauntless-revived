@@ -12,6 +12,16 @@ $root = $PSScriptRoot
 $keep = @('ue4ss/Mods/mods.txt', 'ue4ss/UE4SS-settings.ini')
 $skip = @('manifest.json', 'update-manifest.ps1', 'README.md', '.gitattributes')
 
+# Files earlier versions installed that are gone now: the installers delete them (and then any
+# folder left empty). The Mod Status Indicator (ZFXStatus) and the heartbeat files only it read.
+$remove = @(
+  'ue4ss/Mods/ZFXStatus/Scripts/main.lua',
+  'ue4ss/Mods/ZFXStatus/zfx_logo.png',
+  'ue4ss/Mods/shared/FrameTick/hb_BehemothHealthBars.txt',
+  'ue4ss/Mods/shared/FrameTick/hb_BehemothTracker.txt',
+  'ue4ss/Mods/shared/FrameTick/hb_ModMenu.txt'
+)
+
 $files = Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $skip -notcontains $_.Name } |
   Sort-Object FullName | ForEach-Object {
     $rel = $_.FullName.Substring($root.Length + 1).Replace('\', '/')
@@ -22,6 +32,6 @@ $files = Get-ChildItem -LiteralPath $root -Recurse -File | Where-Object { $skip 
       keep   = [bool]($keep -contains $rel)
     }
   }
-$json = [ordered]@{ version = 1; target = 'Archon/Binaries/Win64'; files = @($files) } | ConvertTo-Json -Depth 4
+$json = [ordered]@{ version = 1; target = 'Archon/Binaries/Win64'; files = @($files); remove = @($remove) } | ConvertTo-Json -Depth 4
 [IO.File]::WriteAllText((Join-Path $root 'manifest.json'), $json.Replace("`r`n", "`n") + "`n", (New-Object Text.UTF8Encoding $false))
 Write-Host "manifest.json: $(@($files).Count) files"

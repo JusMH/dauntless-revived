@@ -92,26 +92,11 @@ function M.Every(interval, name, fn)
     tickers[#tickers + 1] = {interval = interval, name = name, fn = fn, last = -1e9}
 end
 
--- Heartbeat: Start(log, "ModName") makes this mod write the current real time (seconds) to
--- shared\FrameTick\hb_<ModName>.txt every HEARTBEAT_SEC. The ZFXStatus mod reads these to show
--- blue (all mods alive) or red (a mod stopped updating = stalled / crashed).
-local HEARTBEAT_SEC = 2
-local function HeartbeatDir()
-    local src = debug.getinfo(1, "S").source or ""
-    src = src:gsub("^@", ""):gsub("/", "\\")
-    return src:match("^(.*\\)[^\\]+$") or ""
-end
-M.HEARTBEAT_DIR = HeartbeatDir()
-
+-- Start(log[, modName]). modName is accepted and ignored: it named the heartbeat file that the
+-- removed Mod Status Indicator read.
 function M.Start(logFunction, modName)
+    local _ = modName
     if logFunction then logf = logFunction end
-    if modName then
-        local file = M.HEARTBEAT_DIR .. "hb_" .. modName .. ".txt"
-        M.Every(HEARTBEAT_SEC, "heartbeat", function(t)
-            local f = io.open(file, "w")
-            if f then f:write(string.format("%.3f", t)) f:close() end
-        end)
-    end
     if not TryHook() then
         logf("FrameTick: compass not loaded yet - will hook when the player spawns")
     end

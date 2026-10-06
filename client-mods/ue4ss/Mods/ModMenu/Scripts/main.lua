@@ -34,7 +34,7 @@ local HIDDEN = {
     jsbLuaProfilerMod = true,
 }
 -- Friendlier names for known mods (anything else shows its folder name).
-local DISPLAY = {BehemothHealthBars = "Behemoth Health Bars", BehemothTracker = "Behemoth Tracker", ZFXStatus = "Mod Status Indicator"}
+local DISPLAY = {BehemothHealthBars = "Behemoth Health Bars", BehemothTracker = "Behemoth Tracker"}
 
 -- The SETTINGS section. Keys and defaults must match the mods that read them.
 local SETTINGS = {
@@ -128,6 +128,14 @@ local function ReadModsTxt()
     return true
 end
 
+-- True when the mod's folder has a script. mods.txt can name mods that are gone (it is kept when
+-- an update removes a mod), and those are not shown.
+local function ModExists(name)
+    local f = io.open(modsDir .. name .. "\\Scripts\\main.lua", "rb")
+    if f then f:close() return true end
+    return false
+end
+
 -- keepLoaded: remember which state each mod was LOADED with (to mark unapplied changes)
 local function ParseEntries(keepLoaded)
     local old = {}
@@ -136,7 +144,7 @@ local function ParseEntries(keepLoaded)
     for i, line in ipairs(lines) do
         if not line:match("^%s*;") then
             local name, val = line:match("^%s*(.-)%s*:%s*([01])%s*$")
-            if name and name ~= "" and not HIDDEN[name] then
+            if name and name ~= "" and not HIDDEN[name] and ModExists(name) then
                 local on = (val == "1")
                 local loadedOn = on
                 if keepLoaded and old[name] ~= nil then loadedOn = old[name] end

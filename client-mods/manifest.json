@@ -16,8 +16,8 @@
                   },
                   {
                       "path":  "ue4ss/Mods/BehemothHealthBars/Scripts/main.lua",
-                      "sha256":  "98be41397709331c5d74e8d1369ef73b256091bba05dd88fe62ef19be2492774",
-                      "size":  35275,
+                      "sha256":  "7864bb7e215ca29a1b44173ff9631ac4c15652d482cfcf5c9f77d5c6903eabc5",
+                      "size":  35264,
                       "keep":  false
                   },
                   {
@@ -34,20 +34,20 @@
                   },
                   {
                       "path":  "ue4ss/Mods/ModMenu/Scripts/main.lua",
-                      "sha256":  "537e9c2b704c29fd32c6e58ca8ec8de3c7c48611fcb28c30107f3ee63ae79a30",
-                      "size":  25316,
+                      "sha256":  "1cf619a0a703800d1b18b062ad7233c77cf60fb372c41ff888fa9dda761e9ee0",
+                      "size":  25615,
                       "keep":  false
                   },
                   {
                       "path":  "ue4ss/Mods/mods.txt",
-                      "sha256":  "8edc4dfe0f37d29a5d6d2e3aaccd319299fd09ae29a725bd684278d220a3e239",
-                      "size":  127,
+                      "sha256":  "31a1e0e717620dcb745eb5541408625860215971d25e7662516b5160bb6307f5",
+                      "size":  112,
                       "keep":  true
                   },
                   {
                       "path":  "ue4ss/Mods/shared/FrameTick/FrameTick.lua",
-                      "sha256":  "c7c1a952c0ce6134fd3d742b9769407f223b77130706389e733ff10fe49b65da",
-                      "size":  4977,
+                      "sha256":  "a06109ff9f7748e30b89b06e94197468b3aff9e25cf4cf48c1c40c33d0c85c76",
+                      "size":  4359,
                       "keep":  false
                   },
                   {
@@ -63,18 +63,6 @@
                       "keep":  false
                   },
                   {
-                      "path":  "ue4ss/Mods/ZFXStatus/Scripts/main.lua",
-                      "sha256":  "b58413dc24c6e33b47aca1e9c9b20b5e6f365d82fa4e048f096e175bd461acc8",
-                      "size":  9925,
-                      "keep":  false
-                  },
-                  {
-                      "path":  "ue4ss/Mods/ZFXStatus/zfx_logo.png",
-                      "sha256":  "1217674f322693fb2e753ba81dccafca28b48e55e01755ce3e03da605b7e0da2",
-                      "size":  11454,
-                      "keep":  false
-                  },
-                  {
                       "path":  "ue4ss/UE4SS.dll",
                       "sha256":  "680a026890abb4d0df2211251f8defc1681a584275f1521dcc0fe30af480006f",
                       "size":  20605440,
@@ -86,5 +74,12 @@
                       "size":  9420,
                       "keep":  true
                   }
-              ]
+              ],
+    "remove":  [
+                   "ue4ss/Mods/ZFXStatus/Scripts/main.lua",
+                   "ue4ss/Mods/ZFXStatus/zfx_logo.png",
+                   "ue4ss/Mods/shared/FrameTick/hb_BehemothHealthBars.txt",
+                   "ue4ss/Mods/shared/FrameTick/hb_BehemothTracker.txt",
+                   "ue4ss/Mods/shared/FrameTick/hb_ModMenu.txt"
+               ]
 }

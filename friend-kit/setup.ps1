@@ -73,9 +73,10 @@ foreach ($name in "dxgi.dll", "UndauntedInternalServer.dll") {
   Ok "$name installed and checked"
 }
 
-# 2b. UE4SS and the client mods (health bars, tracker, mod menu, ZFX status), from client-mods\.
+# 2b. UE4SS and the client mods (health bars, tracker, mod menu), from client-mods\.
 # Every file is checked against client-mods\manifest.json before and after copying. mods.txt and
-# UE4SS-settings.ini are only written when missing, so a player's own choices are kept.
+# UE4SS-settings.ini are only written when missing, so a player's own choices are kept. Files an
+# earlier kit installed that the bundle dropped since (manifest "remove") are deleted.
 # Problems here only warn: the game still works without the mods.
 if (-not $NoMods) {
   Step "Installing UE4SS and the client mods"
@@ -85,11 +86,28 @@ if (-not $NoMods) {
     Write-Host "   --  client-mods\ not found next to this kit: skipped (the game works without it)" -ForegroundColor Yellow
   } else {
     $manifest = Get-Content -LiteralPath (Join-Path $modsSrc "manifest.json") -Raw | ConvertFrom-Json
+    $shipped = @($manifest.files | ForEach-Object { $_.path })
+    $winRoot = [IO.Path]::GetFullPath($Win64).TrimEnd('\') + '\'
+    foreach ($r in @($manifest.remove)) {
+      # Plain relative paths with "/" only; anything else (backslashes, "..", drives, absolute) is skipped.
+      if (-not $r -or $shipped -contains $r -or $r -match '\\|(^|/)\.\.?(/|$)|^/|:') { continue }
+      $old = [IO.Path]::GetFullPath((Join-Path $Win64 ($r -replace '/', '\')))
+      if (-not $old.StartsWith($winRoot, [StringComparison]::OrdinalIgnoreCase)) { continue }
+      if (-not (Test-Path -LiteralPath $old)) { continue }
+      Remove-Item -LiteralPath $old -Force
+      $dir = Split-Path $old
+      while ($dir.Length -gt $Win64.Length -and -not (Get-ChildItem -LiteralPath $dir -Force)) {
+        Remove-Item -LiteralPath $dir -Force; $dir = Split-Path $dir
+      }
+      Write-Host "   --  removed $r (no longer part of the mods)"
+    }
     $copied = 0; $kept = 0; $bad = 0
     foreach ($f in $manifest.files) {
+      if ($f.path -match '\\|(^|/)\.\.?(/|$)|^/|:') { Write-Host "   !!  $($f.path): unsafe path in manifest.json - skipped" -ForegroundColor Yellow; $bad++; continue }
       $rel = $f.path -replace '/', '\'
       $src = Join-Path $modsSrc $rel
-      $dst = Join-Path $Win64 $rel
+      $dst = [IO.Path]::GetFullPath((Join-Path $Win64 $rel))
+      if (-not $dst.StartsWith($winRoot, [StringComparison]::OrdinalIgnoreCase)) { $bad++; continue }
       $want = $f.sha256.ToUpper()
       if (Test-Path -LiteralPath $dst) {
         if ($f.keep) { $kept++; continue }

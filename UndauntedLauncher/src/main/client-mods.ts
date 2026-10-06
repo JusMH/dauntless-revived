@@ -1,10 +1,11 @@
-// UE4SS and the client mods (health bars, tracker, mod menu, ZFX status) from the repository's
+// UE4SS and the client mods (health bars, tracker, mod menu) from the repository's
 // client-mods/ folder, shipped as the launcher resource "client-mods" (forge.config.ts extraResource).
 // Installed next to the game exe on install, repair and before every launch, the same way as the
 // pinned DLLs: every file must match client-mods/manifest.json before it is copied and after.
 // Files marked "keep" (mods.txt, UE4SS-settings.ini) are only written when missing, so a player's
 // own choices (mods switched off in the in-game menu) survive. Failures never block the game:
-// the caller logs them and launches anyway.
+// the caller logs them and launches anyway. Files that earlier versions installed and that the
+// bundle dropped since (manifest "remove") are deleted, with any folder they leave empty.
 
 import { promises as fsp } from "node:fs";
 import path from "node:path";
@@ -22,12 +23,14 @@ export interface ClientModsManifest {
   version: number;
   target: string;
   files: ClientModFile[];
+  remove?: string[];
 }
 
 export interface ClientModsResult {
   installed: number;
   kept: number;
   upToDate: number;
+  removed: number;
 }
 
 export class ClientModsError extends Error {
@@ -39,13 +42,22 @@ export class ClientModsError extends Error {
 
 export const CLIENT_MODS_RESOURCE = "client-mods";
 
-// Only plain relative paths inside the bundle: no drive letters, no "..", no absolute paths.
-function safeRelative(rel: string): string {
+// Only plain relative paths inside the bundle, written with "/": no backslashes (Windows would read
+// "..\x" as a step up), no drive letters or colons, no "." or "..", no absolute paths.
+export function safeRelative(rel: string): string {
   const parts = rel.split("/");
-  if (rel.length === 0 || rel.startsWith("/") || /^[A-Za-z]:/.test(rel) || parts.some((p) => p === "" || p === "." || p === "..")) {
+  if (rel.length === 0 || rel.startsWith("/") || /[\\:]/.test(rel) || parts.some((p) => p === "" || p === "." || p === "..")) {
     throw new ClientModsError(rel, "unsafe path in manifest.json");
   }
   return path.join(...parts);
+}
+
+// root + rel, refused unless the result is really inside root (a last guard on top of safeRelative).
+export function insideRoot(root: string, rel: string): string {
+  const base = path.resolve(root);
+  const full = path.resolve(base, safeRelative(rel));
+  if (!full.startsWith(base + path.sep)) throw new ClientModsError(rel, "path outside the game folder");
+  return full;
 }
 
 export async function readClientModsManifest(resourcesDir: string): Promise<ClientModsManifest | null> {
@@ -65,13 +77,41 @@ export async function installClientMods(resourcesDir: string, installDir: string
   const manifest = await readClientModsManifest(resourcesDir);
   if (!manifest) return null;
   const srcRoot = path.join(resourcesDir, CLIENT_MODS_RESOURCE);
-  const dstRoot = win64Dir(installDir);
-  const result: ClientModsResult = { installed: 0, kept: 0, upToDate: 0 };
+  const dstRoot = path.resolve(win64Dir(installDir));
+  const result: ClientModsResult = { installed: 0, kept: 0, upToDate: 0, removed: 0 };
+
+  // Dropped files first. A path the bundle still ships is never removed, an unsafe one is skipped;
+  // folders are removed only while empty, and never the Win64 folder or anything above it.
+  const shipped = new Set(manifest.files.map((f) => f.path));
+  for (const r of Array.isArray(manifest.remove) ? manifest.remove : []) {
+    if (typeof r !== "string" || shipped.has(r)) continue;
+    let target: string;
+    try {
+      target = insideRoot(dstRoot, r);
+    } catch {
+      continue;
+    }
+    try {
+      await fsp.unlink(target);
+      result.removed++;
+    } catch {
+      continue; // already gone
+    }
+    let dir = path.dirname(target);
+    while (dir.startsWith(dstRoot + path.sep)) {
+      try {
+        await fsp.rmdir(dir); // fails when not empty: stop there
+      } catch {
+        break;
+      }
+      dir = path.dirname(dir);
+    }
+  }
 
   for (const f of manifest.files) {
     const rel = safeRelative(f.path);
     const want = f.sha256.toLowerCase();
-    const target = path.join(dstRoot, rel);
+    const target = insideRoot(dstRoot, f.path);
 
     let present = false;
     try {

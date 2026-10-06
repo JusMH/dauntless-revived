@@ -760,7 +760,7 @@ end
 
 -- Hot reload (Ctrl+R) restarts this script but leaves old widgets on screen. Ours were added
 -- straight to the viewport; the game's own copies live inside other widgets. Widgets of the
--- other mods are tagged with RenderOpacity 0.99x (ZFX 0.995, tracker 0.996, mod menu 0.997)
+-- other mods are tagged with RenderOpacity 0.99x (tracker 0.996, mod menu 0.997)
 -- and skipped; ours are untagged (opacity 1).
 local function RemoveOld(className)
     local list = FindAllOf(className)
