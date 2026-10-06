@@ -1,6 +1,6 @@
 import { RemoveTestDb } from './setup';
 import './authenv';
-import { after, test } from 'node:test';
+import { after, afterEach, beforeEach, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GetDb } from '../src/db';
 import { CreateStorePurchase, GetStoreOffer, ListStoreOffers, RedeemStorePurchase } from '../src/controllers/freestore';
@@ -10,6 +10,18 @@ import { HasActiveEntitlement, GrantEntitlementInTx } from '../src/controllers/e
 import { MakePlayer, StackQuantity } from './helpers';
 
 after(() => RemoveTestDb(() => GetDb().$client.close()));
+
+beforeEach(() => {
+    process.env.STORE = 'free';
+    process.env.TRIALS_STORE = '0';
+    process.env.MIDDLEMAN_STORE = '0';
+});
+
+afterEach(() => {
+    delete process.env.STORE;
+    delete process.env.TRIALS_STORE;
+    delete process.env.MIDDLEMAN_STORE;
+});
 
 test('curated shop has exactly 30 free cosmetics and blocks excluded direct purchases', async () => {
     const player = await MakePlayer();
