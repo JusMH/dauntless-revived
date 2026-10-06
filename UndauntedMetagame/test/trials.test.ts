@@ -6,8 +6,8 @@ import { eq } from "drizzle-orm";
 import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
 import { entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
-import { MakePlayer } from "./helpers";
-import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialWeekAt, TRIALS_CHAMPION_ENTITLEMENT } from "../src/controllers/trials";
+import { MakePlayer, StackQuantity } from "./helpers";
+import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialWeekAt, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
 
 const Trial = () => TrialIdForWeek(1, TrialWeekAt());
 
@@ -232,6 +232,44 @@ describe("Trials leaderboards", () => {
             assert.equal(GetDb().select().from(entitlements).where(eq(entitlements.accountId, AccountId)).all()
                 .some((Row) => Row.name === TRIALS_CHAMPION_ENTITLEMENT && Row.duration === 0 && Row.revokedDate == null), true);
         }
+    });
+
+    it("awards Trials Champion to top 100 and The Dauntless only to top 5", async () => {
+        const Players = await Promise.all(Array.from({length: 6}, () => MakePlayer()));
+        const CurrentWeek = TrialWeekAt();
+        const PreviousWeek = CurrentWeek - 1;
+        const TrialId = TrialIdForWeek(1, PreviousWeek);
+
+        GetDb().insert(trialruns).values(Players.map((Player, Index) => ({
+            trialId: TrialId,
+            trialWeek: PreviousWeek,
+            difficulty: 1,
+            mode: "solo",
+            runKey: `title-rank-${Index + 1}`,
+            groupKey: Player.UserId,
+            completionTime: 30000 + Index,
+            objectivesCompleted: 3,
+            sessionId: `title-rank-${Index + 1}`,
+            entries: JSON.stringify([{phx_account_id: Player.UserId, platform: "WIN", platform_name: Player.UserId, player_role_id: "PR_FRANK", weapon: 2}]),
+            submittedDate: new Date(Date.UTC(2026, 0, 1, 0, 0, Index)).toISOString()
+        }))).run();
+
+        assert.deepEqual(FinalizeCompletedTrialWeeks(), {FinalizedWeeks: 1, AwardedAccounts: 6});
+
+        for(const Player of Players){
+            assert.equal(StackQuantity(Player.CharacterId, TRIALS_CHAMPION_TITLE), 1);
+        }
+
+        for(const Player of Players.slice(0, 5)){
+            assert.equal(StackQuantity(Player.CharacterId, TRIALS_DAUNTLESS_TITLE), 1);
+        }
+
+        assert.equal(StackQuantity(Players[5].CharacterId, TRIALS_DAUNTLESS_TITLE), 0);
+
+        // Finalization and the inventory transaction ledger make the permanent titles one-copy grants.
+        assert.deepEqual(FinalizeCompletedTrialWeeks(), {FinalizedWeeks: 0, AwardedAccounts: 0});
+        assert.equal(StackQuantity(Players[0].CharacterId, TRIALS_CHAMPION_TITLE), 1);
+        assert.equal(StackQuantity(Players[0].CharacterId, TRIALS_DAUNTLESS_TITLE), 1);
     });
 
     it("returns 404 while the feature switch is off", async () => {

@@ -12,7 +12,7 @@ export type InventoryError = "forbidden" | "not_found" | "conflict" | "insuffici
 export type InventoryResult<T = void> = { success: true, data?: T } | { success: false, error: InventoryError };
 
 // "store": grants of the storefront (roadmap 3.7), made inside its own purchase transaction
-export type InventoryCaller = "client" | "gameserver" | "admin" | "store";
+export type InventoryCaller = "client" | "gameserver" | "admin" | "store" | "trials";
 export type InventoryContext = { Caller: InventoryCaller, Source?: unknown };
 export type TransactionResponse = { createdInstancedItems: any, updatedInstancedItems: any[], updatedStackedItems: any[], removedInstancedItems: any };
 

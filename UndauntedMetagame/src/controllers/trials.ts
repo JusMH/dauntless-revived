@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import { and, eq, lt } from "drizzle-orm";
 import { GetDb } from "../db";
-import { leaderboardprofiles, trialruns, trialweeks } from "../db/schema";
+import { inventory, leaderboardprofiles, trialruns, trialweeks } from "../db/schema";
 import { GrantEntitlementInTx } from "./entitlements";
+import { GetActiveCharacter } from "./activecharacter";
+import { ApplyInventoryTransactionInTx } from "./inventory";
 
 export type TrialMode = "solo" | "group";
 
@@ -44,6 +46,8 @@ const TrialIdPattern = /^Arena_MatchmakerHunt_(Hard|Elite)_\d{3}$/;
 export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
 export const TRIAL_ROTATION_LENGTH = 67;
 export const TRIALS_CHAMPION_ENTITLEMENT = "trials_leaderboard_placement";
+export const TRIALS_CHAMPION_TITLE = "TITLE_TRIALS_00";
+export const TRIALS_DAUNTLESS_TITLE = "TITLE_TRIALS_01";
 const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function Mod(Value: number, Divisor: number){
@@ -347,10 +351,35 @@ function Runs(Query: Query, Mode: TrialMode){
     return BestRuns(Filtered);
 }
 
-// Champion gear was a permanent unlock earned by finishing a Dauntless Trial in the
-// Top 100 at the weekly reset. Finalize every completed week that has recorded runs.
-// This is lazy and idempotent: the first leaderboard/Lady Luck request after rollover
-// performs the grant, then trialweeks prevents it from running again.
+function HasStackedItem(tx: any, CharacterId: string, CatalogId: string){
+    const Row = tx.select({stackedItems: inventory.stackedItems}).from(inventory).where(eq(inventory.characterId, CharacterId)).get();
+    return (JSON.parse(Row?.stackedItems ?? "[]") as any[]).some((Item) => Item?.catalogId === CatalogId && Number(Item.quantity) > 0);
+}
+
+function GrantTrialTitleInTx(tx: any, AccountId: string, CatalogId: string, Week: number){
+    const Character = GetActiveCharacter(tx, AccountId);
+
+    // A leaderboard entry normally implies a real character. Keep finalization resilient to
+    // imported/admin rows that name an account without one; the store entitlement can still be kept.
+    if(Character == undefined || HasStackedItem(tx, Character.characterId, CatalogId)){
+        return false;
+    }
+
+    ApplyInventoryTransactionInTx(tx, {
+        UserId: AccountId,
+        CharacterId: Character.characterId,
+        TransactionId: `trials-title:${Week}:${CatalogId}:${AccountId}`,
+        StackedItemsToAdd: [{catalogId: CatalogId, quantity: 1}]
+    }, {Caller: "trials", Source: `trials:week:${Week}`});
+
+    return true;
+}
+
+// At the weekly reset, a Dauntless global leaderboard finish permanently awards:
+// - Top 100: the Trials Champion title and access to Lady Luck's Champion store;
+// - Top 5: The Dauntless title as well.
+// Solo and group boards are ranked independently; every member of a qualifying group gets the award.
+// Finalization is lazy and idempotent: trialweeks records each completed week after all grants commit.
 export function FinalizeCompletedTrialWeeks(At: Date = new Date()){
     const CurrentWeek = TrialWeekAt(At);
 
@@ -361,28 +390,42 @@ export function FinalizeCompletedTrialWeeks(At: Date = new Date()){
         let AwardedAccounts = 0;
 
         for(const Week of Weeks){
-            const Winners = new Set<string>();
+            const Champions = new Set<string>();
+            const TopFive = new Set<string>();
             const Dauntless = OldRows.filter((Run) => Run.trialWeek === Week && Run.difficulty === 1);
 
             for(const Mode of ["solo", "group"] as const){
-                for(const Run of BestRuns(Dauntless.filter((Entry) => Entry.mode === Mode)).slice(0, 100)){
+                const Ranked = BestRuns(Dauntless.filter((Entry) => Entry.mode === Mode));
+
+                for(const Run of Ranked.slice(0, 100)){
                     for(const PlayerEntry of JSON.parse(Run.entries) as TrialPlayer[]){
-                        Winners.add(PlayerEntry.phx_account_id);
+                        Champions.add(PlayerEntry.phx_account_id);
+                    }
+                }
+
+                for(const Run of Ranked.slice(0, 5)){
+                    for(const PlayerEntry of JSON.parse(Run.entries) as TrialPlayer[]){
+                        TopFive.add(PlayerEntry.phx_account_id);
                     }
                 }
             }
 
-            for(const AccountId of Winners){
+            for(const AccountId of Champions){
                 GrantEntitlementInTx(tx, AccountId, TRIALS_CHAMPION_ENTITLEMENT, 0, `trials:week:${Week}`);
+                GrantTrialTitleInTx(tx, AccountId, TRIALS_CHAMPION_TITLE, Week);
+            }
+
+            for(const AccountId of TopFive){
+                GrantTrialTitleInTx(tx, AccountId, TRIALS_DAUNTLESS_TITLE, Week);
             }
 
             tx.insert(trialweeks).values({
                 week: Week,
                 finalizedDate: At.toISOString(),
-                awardedAccounts: Winners.size
+                awardedAccounts: Champions.size
             }).run();
 
-            AwardedAccounts += Winners.size;
+            AwardedAccounts += Champions.size;
         }
 
         return {FinalizedWeeks: Weeks.length, AwardedAccounts};
