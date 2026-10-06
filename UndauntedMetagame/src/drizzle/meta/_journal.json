@@ -127,6 +127,13 @@
       "when": 1791000000000,
       "tag": "0017_discord_links",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1791266400000,
+      "tag": "0018_trials_leaderboards",
+      "breakpoints": true
     }
   ]
 }
