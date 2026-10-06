@@ -10,6 +10,7 @@ import catalog from "../vendor/store_catalog.json";
 import curated30 from "../vendor/store_curated_30.json";
 import itemKinds from "../vendor/store_item_kinds.json";
 import ladyLuck from "../vendor/store_ladyluck.json";
+import middlemanStore from "../vendor/store_middleman.json";
 import { GetActiveCharacter } from "./activecharacter";
 import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
 import { ApplyInventoryTransactionInTx, InventoryErrorOf } from "./inventory";
@@ -64,14 +65,18 @@ export function SetStoreTokenLimitForTests(Limit?: number){
 }
 
 type LadyLuckCatalog = { offers: StoreOffer[], itemKinds: Record<string, string>, repeatable: string[] };
+type MiddlemanCatalog = { exchange_vendor_slot_2: StoreOffer[], exchange_vendor_slot_3: StoreOffer[] };
 const LadyLuck = ladyLuck as unknown as LadyLuckCatalog;
+const MiddlemanStore = middlemanStore as unknown as MiddlemanCatalog;
 const LADY_LUCK_IDS = new Set(LadyLuck.offers.map((Offer) => Offer.id));
 const LADY_LUCK_ITEM_KINDS = LadyLuck.itemKinds;
 const LADY_LUCK_REPEATABLE = new Set(LadyLuck.repeatable);
 
 const Catalog: Record<string, unknown> = {
     ...(catalog as unknown as Record<string, unknown>),
-    ladyluckstore: LadyLuck.offers
+    ladyluckstore: LadyLuck.offers,
+    exchange_vendor_slot_2: MiddlemanStore.exchange_vendor_slot_2,
+    exchange_vendor_slot_3: MiddlemanStore.exchange_vendor_slot_3
 };
 
 // Every offer under every tag (keys starting with _ are notes)

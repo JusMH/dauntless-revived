@@ -20,9 +20,9 @@ export function ParseFusionData(Item: any): FusionData {
         throw new MiddlemanValidationError("Invalid Middleman fusion token");
     }
 
-    // 1.4.4 exposes an integer SlotID but the dump does not prove whether it is zero- or one-based.
-    // Accept both observed conventions (0-2 and 1-3) and keep the exact id the game sent.
-    if(!Number.isInteger(Data?.SlotID) || Data.SlotID < 0 || Data.SlotID > 3 ||
+    // The exchange UI has three slots and the native exchange code addresses them as 1, 2 and 3.
+    // Slot 0 is not a fourth fusion slot; accepting it creates state the client cannot address again.
+    if(!Number.isInteger(Data?.SlotID) || Data.SlotID < 1 || Data.SlotID > 3 ||
         typeof Data?.EndTime !== "string" || Number.isNaN(Date.parse(Data.EndTime)) ||
         typeof Data?.ResultCell !== "string" || !Data.ResultCell.startsWith("CELL_") ||
         typeof Data?.ExchangeID !== "string" || Data.ExchangeID.length === 0){

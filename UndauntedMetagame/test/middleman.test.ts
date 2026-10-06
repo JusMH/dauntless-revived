@@ -53,20 +53,20 @@ describe("Middleman fusion persistence", () => {
     it("keeps three pending slots independent even when the client sends one generic instance id", async () => {
         const A = await MakePlayer();
         const Tokens = [
-            Fusion(0, "fusion-0", "2099-01-01T00:00:00.000Z", "CELL_TEST_A_UC"),
-            Fusion(1, "fusion-1", "2099-01-01T00:00:00.000Z", "CELL_TEST_B_UC"),
-            Fusion(2, "fusion-2", "2099-01-01T00:00:00.000Z", "CELL_TEST_C_R")
+            Fusion(1, "fusion-1", "2099-01-01T00:00:00.000Z", "CELL_TEST_A_UC"),
+            Fusion(2, "fusion-2", "2099-01-01T00:00:00.000Z", "CELL_TEST_B_UC"),
+            Fusion(3, "fusion-3", "2099-01-01T00:00:00.000Z", "CELL_TEST_C_R")
         ];
 
         assert.equal((await Run(A.UserId, A.CharacterId, "middleman-three", {addInstanced: Tokens})).success, true);
 
         const Held = ReadInventory(A.CharacterId).instanced;
         assert.deepEqual(Held.map((Item) => Item.instanceId).sort(), [
-            "TOKEN_CELL_EXCHANGE:0",
             "TOKEN_CELL_EXCHANGE:1",
-            "TOKEN_CELL_EXCHANGE:2"
+            "TOKEN_CELL_EXCHANGE:2",
+            "TOKEN_CELL_EXCHANGE:3"
         ]);
-        assert.deepEqual(Held.map((Item) => JSON.parse(Item.itemData).ExchangeID).sort(), ["fusion-0", "fusion-1", "fusion-2"]);
+        assert.deepEqual(Held.map((Item) => JSON.parse(Item.itemData).ExchangeID).sort(), ["fusion-1", "fusion-2", "fusion-3"]);
     });
 
     it("accepts a same-version speed-up only when it keeps the slot, exchange and result", async () => {
