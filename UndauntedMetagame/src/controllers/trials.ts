@@ -44,7 +44,8 @@ const TrialIdPattern = /^Arena_MatchmakerHunt_(Hard|Elite)_\d{3}$/;
 
 // UPlayerArenaComponent and the 1.4.4 leaderboard response view-model both carry the
 // current Trial window. Keep this epoch identical to the deploy server's rotation epoch.
-export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
+// Retail Trials reset at 02:00 Pacific; on 2020-11-05 that was 10:00 UTC.
+export const TRIAL_ROTATION_START = "2020-11-05T10:00:00.000Z";
 export const TRIAL_ROTATION_SUFFIXES = (trialRotation as {suffixes: string[]}).suffixes;
 export const TRIAL_ROTATION_LENGTH = TRIAL_ROTATION_SUFFIXES.length;
 export const TRIALS_CHAMPION_ENTITLEMENT = "trials_leaderboard_placement";

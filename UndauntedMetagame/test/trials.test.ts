@@ -56,6 +56,9 @@ describe("Trials leaderboards", () => {
         assert.equal(TRIAL_ROTATION_LENGTH, 88);
         assert.equal(TRIAL_ROTATION_SUFFIXES[0], "001");
         assert.equal(TRIAL_ROTATION_SUFFIXES.at(-1), "088");
+        assert.equal(new Date(TRIAL_ROTATION_START).toISOString(), "2020-11-05T10:00:00.000Z");
+        assert.equal(TrialWeekAt(new Date("2020-11-05T09:59:59.999Z")), -1);
+        assert.equal(TrialWeekAt(new Date("2020-11-05T10:00:00.000Z")), 0);
         assert.ok(TrialIdForWeek(0, 87).endsWith("_088"));
         assert.ok(TrialIdForWeek(1, 88).endsWith("_001"));
     });

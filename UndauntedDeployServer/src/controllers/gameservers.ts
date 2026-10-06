@@ -419,10 +419,10 @@ export type TrialsData = {
     TrialsHuntId: string;
 }
 
-// Trials rotate on Thursdays. 2020-11-05 is the 1.4.4 release Thursday; it is only a
-// deterministic epoch, not a claim that our sorted row order reproduces Phoenix Labs' historic order.
-// Both tables contain holes, so only suffixes cooked in both Normal and Dauntless are eligible.
-export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
+// Trials rotate on Thursdays at the retail reset time. On 2020-11-05 (1.4.4 release Thursday)
+// 02:00 Pacific was 10:00 UTC. This remains only a deterministic epoch; the sorted cooked row
+// order is our restored rotation, not a claim that it reproduces Phoenix Labs' historic sequence.
+export const TRIAL_ROTATION_START = "2020-11-05T10:00:00.000Z";
 const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function BuildTrialSuffixes(HardRows: Record<string, unknown>, EliteRows: Record<string, unknown>){
