@@ -324,6 +324,27 @@ export const storepurchases = sqliteTable("storepurchases", {
     index("storepurchases_account").on(table.accountId)
 ]);
 
+// Trials leaderboard runs (roadmap 3.8). One row is one completed run; entries is the
+// one-to-four player records the leaderboard needs. runKey makes a retried game-server
+// submission idempotent, while groupKey lets reads keep only each solo player or party's best run.
+export const trialruns = sqliteTable("trialruns", {
+    id: integer("id").notNull().primaryKey({autoIncrement: true}),
+    trialId: text("trialId").notNull(),
+    difficulty: integer("difficulty").notNull(),
+    mode: text("mode").notNull(),
+    runKey: text("runKey").notNull(),
+    groupKey: text("groupKey").notNull(),
+    completionTime: integer("completionTime").notNull(),
+    objectivesCompleted: integer("objectivesCompleted").notNull(),
+    sessionId: text("sessionId").notNull(),
+    entries: text("entries").notNull(),
+    submittedDate: text("submittedDate").notNull()
+}, (table) => [
+    uniqueIndex("trialruns_trial_difficulty_run").on(table.trialId, table.difficulty, table.runKey),
+    index("trialruns_board").on(table.trialId, table.difficulty, table.mode, table.completionTime),
+    index("trialruns_group").on(table.trialId, table.difficulty, table.mode, table.groupKey)
+]);
+
 // Guilds (roadmap 3.11, the 1.4.4 client's v2 guild API; docs/findings/social.md). guildId is a
 // random UUID (it also names the chat room Guild-<guildId>). nameKey and nameplateKey are lowercase
 // copies for case-insensitive uniqueness; nameplateKey is NULL for a guild without a nameplate
