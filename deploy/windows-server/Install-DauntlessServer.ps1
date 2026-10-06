@@ -532,7 +532,7 @@ try {
             Copy-Item -LiteralPath $f.FullName -Destination $P.Bin -Force
         }
         New-Item -ItemType Directory -Force -Path (Join-Path $P.Bin 'lib') | Out-Null
-        Copy-Item -Path (Join-Path $PSScriptRoot 'lib\*.js') -Destination (Join-Path $P.Bin 'lib') -Force
+        Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'lib') -File | Where-Object { $_.Extension -in '.js', '.cjs' } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $P.Bin 'lib') -Force }
     }
     Write-DROk "folders under $Root"
 
