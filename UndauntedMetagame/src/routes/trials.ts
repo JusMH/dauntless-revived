@@ -31,7 +31,7 @@ function Send(res: any, Work: () => unknown){
 // 1.4.4 has five endpoint slots. The aggregate endpoint also accepts a game-server result body:
 // a body with completion_time is a submission, otherwise it is the aggregate leaderboard query.
 // Submissions are never accepted from a player token.
-trialsRouter.post("/trials/leaderboards", TrialsOn, HasUndauntedMetagameAuth, (req: any, res) => {
+function AggregateLeaderboard(req: any, res: any){
     if(req.body?.completion_time !== undefined){
         if(!req.AuthData.IsGameserver){
             res.status(403);
@@ -61,7 +61,13 @@ trialsRouter.post("/trials/leaderboards", TrialsOn, HasUndauntedMetagameAuth, (r
     }
 
     Send(res, () => AllLeaderboards(req.body));
-});
+}
+
+// The 1.4.4 DLL points TrialsLeaderboardsEndpoint at /trials/leaderboards. Phoenix Labs' public
+// leaderboard service also exposed the same aggregate contract at /trials/leaderboards/all.
+// Serve both so the preserved client override and captured tooling use one implementation.
+trialsRouter.post("/trials/leaderboards", TrialsOn, HasUndauntedMetagameAuth, AggregateLeaderboard);
+trialsRouter.post("/trials/leaderboards/all", TrialsOn, HasUndauntedMetagameAuth, AggregateLeaderboard);
 
 trialsRouter.post("/trials/leaderboards/solo", TrialsOn, HasUndauntedMetagameAuth, (req: any, res) => Send(res, () => SoloLeaderboard(req.body)));
 trialsRouter.post("/trials/leaderboards/solo/individual", TrialsOn, HasUndauntedMetagameAuth, (req: any, res) => Send(res, () => SoloIndividual(req.body)));

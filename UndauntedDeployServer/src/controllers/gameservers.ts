@@ -428,10 +428,11 @@ export type TrialsData = {
     TrialsHuntId: string;
 }
 
-// Trials rotate on Thursdays at the retail reset time. On 2020-11-05 (1.4.4 release Thursday)
-// 02:00 Pacific was 10:00 UTC. This remains only a deterministic epoch; the sorted cooked row
-// order is our restored rotation, not a claim that it reproduces Phoenix Labs' historic sequence.
-export const TRIAL_ROTATION_START = "2020-11-05T10:00:00.000Z";
+// The cooked Trial row suffixes are historical week numbers. Archived leaderboard data maps
+// row 067 to 2020-10-22 18:00 UTC, 068 to 2020-10-29 and 069 to the 1.4.4 release Thursday,
+// 2020-11-05. Counting back puts row 001 at this epoch, so the cooked 001..088 sequence
+// reproduces its original weekly dates before wrapping for private-server continuity.
+export const TRIAL_ROTATION_START = "2019-07-18T18:00:00.000Z";
 const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function BuildTrialSuffixes(HardRows: Record<string, unknown>, EliteRows: Record<string, unknown>){
