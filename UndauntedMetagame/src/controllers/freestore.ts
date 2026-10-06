@@ -11,6 +11,7 @@ import curated30 from "../vendor/store_curated_30.json";
 import itemKinds from "../vendor/store_item_kinds.json";
 import ladyLuck from "../vendor/store_ladyluck.json";
 import middlemanStore from "../vendor/store_middleman.json";
+import middlemanCells from "../vendor/store_middleman_cells.json";
 import { GetActiveCharacter } from "./activecharacter";
 import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
 import { ApplyInventoryTransactionInTx, InventoryErrorOf } from "./inventory";
@@ -67,8 +68,73 @@ export function SetStoreTokenLimitForTests(Limit?: number){
 
 type LadyLuckCatalog = { offers: StoreOffer[], itemKinds: Record<string, string>, repeatable: string[] };
 type MiddlemanCatalog = { exchange_vendor_slot_2: StoreOffer[], exchange_vendor_slot_3: StoreOffer[] };
+type MiddlemanCellsCatalog = { families: {id: string, name: string}[] };
 const LadyLuck = ladyLuck as unknown as LadyLuckCatalog;
 const MiddlemanStore = middlemanStore as unknown as MiddlemanCatalog;
+const MiddlemanCells = middlemanCells as unknown as MiddlemanCellsCatalog;
+const MIDDLEMAN_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const MIDDLEMAN_ROTATION_EPOCH = Date.UTC(1970, 0, 1, 18); // Thursday 18:00 UTC, the retail weekly reset.
+const MIDDLEMAN_WEEKLY_TAG = "weekly_cell_offering";
+
+const MiddlemanCellOffers: StoreOffer[] = MiddlemanCells.families.flatMap((Family) =>
+    ([["UC", 1, 80], ["R", 2, 200]] as const).map(([Suffix, Rank, Price]) => {
+        const CatalogId = `CELL_${Family.id}_${Suffix}`;
+        return {
+            id: `middleman_weekly_${CatalogId.toLowerCase()}`,
+            displayName: `+${Rank} ${Family.name} Cell`,
+            displayDescription: "Purchase one cell with Aetherdust.",
+            displayPriority: 0,
+            tags: [MIDDLEMAN_WEEKLY_TAG],
+            platinumPrice: null,
+            cellDustPrice: Price,
+            prestigePrice: null,
+            event01Price: null,
+            steelMarksPrice: null,
+            gildedMarksPrice: null,
+            items: [{catalogId: CatalogId, quantity: 1}],
+            entitlements: [],
+            maxAllowed: 1,
+            remaining: 1,
+            loadoutSlots: null,
+            availableFrom: null,
+            availableTo: null,
+            timeAvailabilityReason: null,
+            platformOfferId: null,
+            missingEntitlementNames: null
+        } as StoreOffer;
+    })
+);
+const MIDDLEMAN_CELL_IDS = new Set(MiddlemanCellOffers.map((Offer) => (Offer.items ?? [])[0]?.catalogId).filter((Id): Id is string => typeof Id === "string"));
+const MIDDLEMAN_OFFER_IDS = new Set(MiddlemanCellOffers.map((Offer) => Offer.id));
+
+export function MiddlemanWindowStart(At: Date = new Date()){
+    return MIDDLEMAN_ROTATION_EPOCH + Math.floor((At.getTime() - MIDDLEMAN_ROTATION_EPOCH) / MIDDLEMAN_WEEK_MS) * MIDDLEMAN_WEEK_MS;
+}
+
+export function SelectWeeklyMiddlemanOffers(At: Date = new Date()): StoreOffer[]{
+    const Families = MiddlemanCells.families.map((Family) => ({
+        ...Family,
+        score: createHash("sha256").update(`middleman-weekly-v1:${Family.id}`).digest("hex")
+    })).sort((A, B) => A.score.localeCompare(B.score));
+    if(Families.length === 0) return [];
+
+    const Start = MiddlemanWindowStart(At);
+    const Week = Math.floor((Start - MIDDLEMAN_ROTATION_EPOCH) / MIDDLEMAN_WEEK_MS);
+    const Offset = ((Week * 3) % Families.length + Families.length) % Families.length;
+
+    return Array.from({length: Math.min(3, Families.length)}, (_, Index) => {
+        const Family = Families[(Offset + Index) % Families.length];
+        const Suffix = Index === 2 ? "R" : "UC";
+        const CatalogId = `CELL_${Family.id}_${Suffix}`;
+        const Offer = MiddlemanCellOffers.find((Candidate) => Candidate.items?.[0]?.catalogId === CatalogId)!;
+        return {
+            ...Offer,
+            displayPriority: Index,
+            availableFrom: new Date(Start).toISOString(),
+            availableTo: new Date(Start + MIDDLEMAN_WEEK_MS).toISOString()
+        };
+    });
+}
 const LADY_LUCK_IDS = new Set(LadyLuck.offers.map((Offer) => Offer.id));
 const LADY_LUCK_ITEM_KINDS = LadyLuck.itemKinds;
 const LADY_LUCK_REPEATABLE = new Set(LadyLuck.repeatable);
@@ -78,7 +144,8 @@ const Catalog: Record<string, unknown> = {
     ...(catalog as unknown as Record<string, unknown>),
     ladyluckstore: LadyLuck.offers,
     exchange_vendor_slot_2: MiddlemanStore.exchange_vendor_slot_2,
-    exchange_vendor_slot_3: MiddlemanStore.exchange_vendor_slot_3
+    exchange_vendor_slot_3: MiddlemanStore.exchange_vendor_slot_3,
+    [MIDDLEMAN_WEEKLY_TAG]: MiddlemanCellOffers
 };
 
 // Every offer under every tag (keys starting with _ are notes)
@@ -126,6 +193,10 @@ const Hash = (Value: string) => createHash("sha256").update(Value).digest("hex")
 const OfferHash = (Offer: StoreOffer) => Hash(JSON.stringify(Offer));
 
 export function GrantKind(CatalogId: string): "stacked" | "instanced" | undefined {
+    if(MIDDLEMAN_CELL_IDS.has(CatalogId)){
+        return "stacked";
+    }
+
     const SpecialKind = LADY_LUCK_ITEM_KINDS[CatalogId];
 
     if(SpecialKind === "stacked" || SpecialKind === "instanced"){
@@ -143,7 +214,7 @@ export function GrantKind(CatalogId: string): "stacked" | "instanced" | undefine
 
 // A repeatable offer sells consumables only; it is never "owned", and each purchase grants its full quantity
 function IsRepeatable(Offer: StoreOffer){
-    if(LADY_LUCK_REPEATABLE.has(Offer.id)){
+    if(MIDDLEMAN_OFFER_IDS.has(Offer.id) || LADY_LUCK_REPEATABLE.has(Offer.id)){
         return true;
     }
 
@@ -172,6 +243,9 @@ function FinalizeTrialsForOffer(Offer: StoreOffer | undefined){
 }
 
 function FindOffer(SkuId: string){
+    const Middleman = SelectWeeklyMiddlemanOffers().find((Offer) => Offer.id === SkuId);
+    if(Middleman != undefined) return Middleman;
+    if(MIDDLEMAN_OFFER_IDS.has(SkuId)) return undefined;
     return AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer)) ?? ExtraOffersForTests.find((Offer) => Offer.id === SkuId);
 }
 
@@ -284,7 +358,9 @@ function WithRemaining(tx: Tx, AccountId: string, Held: Set<string>, Offer: Stor
 
 // GET /product/skus/public?requiredTags=<tag>. An unknown tag is an empty list.
 export function ListStoreOffers(AccountId: string, Tag: string): StoreOffer[] {
-    const ForTag = CatalogTags.includes(Tag) ? (Catalog[Tag] as StoreOffer[]).filter(IsListed) : [];
+    const ForTag = Tag === MIDDLEMAN_WEEKLY_TAG
+        ? SelectWeeklyMiddlemanOffers()
+        : CatalogTags.includes(Tag) ? (Catalog[Tag] as StoreOffer[]).filter(IsListed) : [];
 
     if(Tag === "ladyluckstore" && TrialsStore()){
         FinalizeCompletedTrialWeeks();
