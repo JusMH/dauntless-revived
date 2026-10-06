@@ -623,11 +623,13 @@ export function AllLeaderboards(Body: unknown){
             page: Query.Page,
             page_size: Query.PageSize,
             trial_id: Query.TrialId,
-            ...TrialsWindowForWeek(Query.TrialWeek),
             world: {
                 group: {
                     difficulty: Query.Difficulty,
-                    entries: Page(Group, Query)
+                    entries: Page(Group, Query),
+                    page: Query.Page,
+                    page_size: Query.PageSize,
+                    trial_id: Query.TrialId
                 },
                 solo: {
                     all: {

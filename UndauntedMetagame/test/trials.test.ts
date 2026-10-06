@@ -194,8 +194,15 @@ describe("Trials leaderboards", () => {
 
         const All = await Call("POST", "/trials/leaderboards", {as: A.UserId, body: Query()});
         assert.equal(All.status, 200);
+        assert.deepEqual(Object.keys(All.json.payload).sort(), ["difficulty", "guild", "page", "page_size", "trial_id", "world"]);
         assert.deepEqual(All.json.payload.world.solo.all.entries.map((Entry: any) => Entry.phx_account_id), [A.UserId, B.UserId]);
-        assert.deepEqual(All.json.payload.world.group.entries, []);
+        assert.deepEqual(All.json.payload.world.group, {
+            difficulty: 1,
+            entries: [],
+            page: 0,
+            page_size: 100,
+            trial_id: Trial()
+        });
 
         const CapturedAll = await Call("POST", "/trials/leaderboards/all", {as: A.UserId, body: Query()});
         assert.equal(CapturedAll.status, 200);
