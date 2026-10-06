@@ -19,7 +19,9 @@ after(async () => {
 });
 
 beforeEach(() => {
-    process.env.STORE = "free";
+    process.env.STORE = "off";
+    process.env.TRIALS_STORE = "0";
+    process.env.MIDDLEMAN_STORE = "1";
 });
 
 function HasEntitlement(AccountId: string, Name: string){
@@ -58,7 +60,7 @@ describe("Middleman store", () => {
         }
     });
 
-    it("is reachable by the authenticated 1.4.4 store routes when STORE=free", async () => {
+    it("is reachable by the authenticated 1.4.4 store routes while STORE remains off", async () => {
         const A = await MakePlayer();
 
         const Listed = await Call("GET", "/product/skus/public?requiredTags=exchange_vendor_slot_2", {as: A.UserId});
@@ -68,5 +70,20 @@ describe("Middleman store", () => {
         const Single = await Call("GET", "/product/sku/single_exchange_slot_3", {as: A.UserId});
         assert.equal(Single.status, 200);
         assert.equal(Single.json.id, "single_exchange_slot_3");
+
+        const WebStore = await Call("GET", "/product/skus/public?requiredTags=webstore", {as: A.UserId});
+        assert.equal(WebStore.status, 400);
+    });
+
+    it("hides direct Middleman offers when MIDDLEMAN_STORE is off", async () => {
+        const A = await MakePlayer();
+        process.env.MIDDLEMAN_STORE = "0";
+
+        assert.deepEqual(ListStoreOffers(A.UserId, "exchange_vendor_slot_2"), []);
+        assert.throws(() => GetStoreOffer(A.UserId, "single_exchange_slot_2"), {Status: 404});
+
+        const Listed = await Call("GET", "/product/skus/public?requiredTags=exchange_vendor_slot_2", {as: A.UserId});
+        assert.equal(Listed.status, 400);
+        assert.equal((await Call("GET", "/product/sku/single_exchange_slot_2", {as: A.UserId})).status, 404);
     });
 });

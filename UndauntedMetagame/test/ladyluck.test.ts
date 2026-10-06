@@ -3,7 +3,7 @@ import "./authenv";
 import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
-import { StartApp, StopApp } from "./appclient";
+import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
 import { inventory } from "../src/db/schema";
 import { CreateStorePurchase, GetStoreOffer, GrantKind, ListStoreOffers, RedeemStorePurchase } from "../src/controllers/freestore";
@@ -21,8 +21,9 @@ after(async () => {
 });
 
 beforeEach(() => {
-    process.env.STORE = "free";
+    process.env.STORE = "off";
     process.env.TRIALS_STORE = "1";
+    process.env.MIDDLEMAN_STORE = "0";
 });
 
 function Credit(CharacterId: string, CatalogId: string, Quantity: number){
@@ -110,6 +111,21 @@ describe("Lady Luck Trials store", () => {
         assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 50);
         assert.equal(StackQuantity(A.CharacterId, "PART_CB_PASSIVE_TRIALS_02"), 1);
         assert.equal(GetStoreOffer(A.UserId, "ladyluck_cb_passive_trials_02").remaining, 0);
+    });
+
+    it("uses its priced routes while the unrelated free cosmetic store stays off", async () => {
+        const A = await MakePlayer();
+
+        const Listed = await Call("GET", "/product/skus/public?requiredTags=ladyluckstore", {as: A.UserId});
+        assert.equal(Listed.status, 200);
+        assert.equal(Listed.json.length, 29);
+
+        const Single = await Call("GET", "/product/sku/ladyluck_cb_passive_trials_02", {as: A.UserId});
+        assert.equal(Single.status, 200);
+        assert.equal(Single.json.steelMarksPrice, 250);
+
+        const WebStore = await Call("GET", "/product/skus/public?requiredTags=webstore", {as: A.UserId});
+        assert.equal(WebStore.status, 400);
     });
 
     it("is hidden behind TRIALS_STORE without exposing single-offer purchases", async () => {

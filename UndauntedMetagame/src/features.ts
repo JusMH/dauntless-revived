@@ -130,12 +130,23 @@ export const StoreRepeatableTokens = DefineSwitch({
     Show: ShowOnOff
 });
 
-// Lady Luck's Trials store. STORE=free still gates the store service itself; this second switch keeps
-// the priced Steel/Gilded Marks catalogue hidden until its later-service capture has been exercised by
-// the 1.4.4 client. Purchases spend the character's inventory currency atomically with the grant.
+// Lady Luck's Trials store. Independent of STORE: the normal real-money/free-cosmetic storefront can
+// remain off while Lady Luck uses the same recovered purchase-token service for Steel/Gilded Marks.
+// Kept off by default until the restored catalogue has been exercised by a real 1.4.4 client.
 export const TrialsStore = DefineSwitch({
     Env: "TRIALS_STORE",
     Label: "trialsStore",
+    Default: false,
+    Parse: ParseOnOff,
+    Show: ShowOnOff
+});
+
+// Middleman's store-backed offers: the two permanent fusion-slot offers and the weekly Aetherdust
+// cell rotation. Independent of STORE for the same reason as Lady Luck; off until an in-game pass
+// confirms the 1.4.4 vendor request flow.
+export const MiddlemanStore = DefineSwitch({
+    Env: "MIDDLEMAN_STORE",
+    Label: "middlemanStore",
     Default: false,
     Parse: ParseOnOff,
     Show: ShowOnOff
