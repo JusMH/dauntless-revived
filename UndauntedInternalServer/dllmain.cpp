@@ -366,6 +366,9 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
     // Recover on the authoritative game thread before replicating this frame.
     FallRecovery::Tick(Globals::Listening ? Networking::NetDriver : nullptr, DeltaTime);
 
+    // Recover on the authoritative game thread before replicating this frame.
+    FallRecovery::Tick(Globals::Listening ? Networking::NetDriver : nullptr, DeltaTime);
+
     if (Globals::Listening) {
         DR_TickStage = 2;
         const auto ReplicationStart = std::chrono::steady_clock::now();
