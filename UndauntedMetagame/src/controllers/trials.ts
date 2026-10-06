@@ -104,10 +104,8 @@ function TrialWeekForId(TrialIdValue: string, DifficultyValue: number, At: Date 
     return CurrentWeek - Mod(CurrentIndex - TargetIndex, TRIAL_ROTATION_LENGTH);
 }
 
-export function TrialsWindow(At: Date = new Date()){
-    const Epoch = TrialEpoch();
-    const Week = TrialWeekAt(At);
-    const Start = Epoch + Week * TRIAL_WEEK_MS;
+export function TrialsWindowForWeek(Week: number, At: Date = new Date()){
+    const Start = TrialEpoch() + Week * TRIAL_WEEK_MS;
     const End = Start + TRIAL_WEEK_MS;
 
     return {
@@ -115,6 +113,10 @@ export function TrialsWindow(At: Date = new Date()){
         trial_end: Math.floor(End / 1000),
         time_to_refresh: Math.max(0, Math.ceil((End - At.getTime()) / 1000))
     };
+}
+
+export function TrialsWindow(At: Date = new Date()){
+    return TrialsWindowForWeek(TrialWeekAt(At), At);
 }
 
 function ProfileText(Value: unknown, Name: string, Required = false){
@@ -472,7 +474,7 @@ export function SoloLeaderboard(Body: unknown){
             page: Query.Page,
             page_size: Query.PageSize,
             trial_id: Query.TrialId,
-            ...TrialsWindow()
+            ...TrialsWindowForWeek(Query.TrialWeek)
         }
     };
 }
@@ -491,7 +493,7 @@ export function GroupLeaderboard(Body: unknown){
             page: Query.Page,
             page_size: Query.PageSize,
             trial_id: Query.TrialId,
-            ...TrialsWindow()
+            ...TrialsWindowForWeek(Query.TrialWeek)
         }
     };
 }
@@ -511,7 +513,7 @@ export function AllLeaderboards(Body: unknown){
             page: Query.Page,
             page_size: Query.PageSize,
             trial_id: Query.TrialId,
-            ...TrialsWindow(),
+            ...TrialsWindowForWeek(Query.TrialWeek),
             world: {
                 group: {
                     difficulty: Query.Difficulty,

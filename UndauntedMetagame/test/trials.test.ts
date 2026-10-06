@@ -7,7 +7,7 @@ import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
 import { entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
 import { MakePlayer, StackQuantity } from "./helpers";
-import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialWeekAt, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
+import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialWeekAt, TrialsWindowForWeek, TRIAL_ROTATION_START, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
 
 const Trial = () => TrialIdForWeek(1, TrialWeekAt());
 
@@ -48,6 +48,18 @@ function Query(Extra = {}){
 }
 
 describe("Trials leaderboards", () => {
+    it("reports timing for the Trial week being queried, not always the current week", () => {
+        const At = new Date(Date.parse(TRIAL_ROTATION_START) + 10 * 7 * 24 * 60 * 60 * 1000 + 2 * 24 * 60 * 60 * 1000);
+        const CurrentWeek = TrialWeekAt(At);
+        const Current = TrialsWindowForWeek(CurrentWeek, At);
+        const Previous = TrialsWindowForWeek(CurrentWeek - 1, At);
+
+        assert.equal(Current.trial_end - Current.trial_start, 7 * 24 * 60 * 60);
+        assert.equal(Current.time_to_refresh, 5 * 24 * 60 * 60);
+        assert.equal(Previous.trial_end, Current.trial_start);
+        assert.equal(Previous.time_to_refresh, 0);
+    });
+
     it("stores game-server solo results, keeps each player's best time and serves aggregate and individual shapes", async () => {
         const A = await MakePlayer(), B = await MakePlayer();
 
