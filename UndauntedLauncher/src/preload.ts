@@ -43,6 +43,7 @@ const api = {
       ...(patch.graphics !== undefined ? { graphics: patch.graphics } : {}),
       ...(patch.exposure !== undefined ? { exposure: patch.exposure } : {}),
       ...(patch.windowed !== undefined ? { windowed: patch.windowed } : {}),
+      ...(patch.huntRegion !== undefined ? { huntRegion: patch.huntRegion } : {}),
       ...(patch.language !== undefined ? { language: patch.language } : {}),
     }),
   setStatusPolling: (on: boolean): Promise<void> => ipcRenderer.invoke(IPC.setStatusPolling, on === true),
