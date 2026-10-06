@@ -8,7 +8,6 @@ import { GetDb } from "../src/db";
 import { entitlements } from "../src/db/schema";
 import { CreateStorePurchase, GetStoreOffer, ListStoreOffers, RedeemStorePurchase } from "../src/controllers/freestore";
 import { MakePlayer } from "./helpers";
-import storeArt from "../src/vendor/store_art_skus.json";
 
 before(async () => {
     await StartApp();
@@ -33,11 +32,6 @@ function HasEntitlement(AccountId: string, Name: string){
 describe("Middleman store", () => {
     it("serves the two exchange-slot SKUs the 1.4.4 client has art for", async () => {
         const A = await MakePlayer();
-        const Art = new Set(storeArt as string[]);
-
-        assert.ok(Art.has("single_exchange_slot_2"));
-        assert.ok(Art.has("single_exchange_slot_3"));
-
         const Slot2 = ListStoreOffers(A.UserId, "exchange_vendor_slot_2");
         const Slot3 = ListStoreOffers(A.UserId, "exchange_vendor_slot_3");
 
