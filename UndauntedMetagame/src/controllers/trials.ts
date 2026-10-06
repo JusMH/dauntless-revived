@@ -42,10 +42,10 @@ export class TrialsError extends Error {
 
 const TrialIdPattern = /^Arena_MatchmakerHunt_(Hard|Elite)_\d{3}$/;
 
-// UPlayerArenaComponent and the 1.4.4 leaderboard response view-model both carry the
-// current Trial window. Keep this epoch identical to the deploy server's rotation epoch.
-// Retail Trials reset at 02:00 Pacific; on 2020-11-05 that was 10:00 UTC.
-export const TRIAL_ROTATION_START = "2020-11-05T10:00:00.000Z";
+// Keep this epoch identical to the deploy server's rotation epoch. The cooked suffixes are
+// historical Trial week numbers: archived leaderboard data places row 069 on the 1.4.4 release
+// Thursday (2020-11-05 18:00 UTC), which maps row 001 to 2019-07-18 18:00 UTC.
+export const TRIAL_ROTATION_START = "2019-07-18T18:00:00.000Z";
 export const TRIAL_ROTATION_SUFFIXES = (trialRotation as {suffixes: string[]}).suffixes;
 export const TRIAL_ROTATION_LENGTH = TRIAL_ROTATION_SUFFIXES.length;
 export const TRIALS_CHAMPION_ENTITLEMENT = "trials_leaderboard_placement";
@@ -623,11 +623,13 @@ export function AllLeaderboards(Body: unknown){
             page: Query.Page,
             page_size: Query.PageSize,
             trial_id: Query.TrialId,
-            ...TrialsWindowForWeek(Query.TrialWeek),
             world: {
                 group: {
                     difficulty: Query.Difficulty,
-                    entries: Page(Group, Query)
+                    entries: Page(Group, Query),
+                    page: Query.Page,
+                    page_size: Query.PageSize,
+                    trial_id: Query.TrialId
                 },
                 solo: {
                     all: {

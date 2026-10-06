@@ -68,13 +68,17 @@ describe("Trials weekly rotation", () => {
         assert.deepEqual(BuildTrialSuffixes(Hard, Elite), ["001", "003"]);
     });
 
-    it("keeps every player on one trial for the week and advances at the Thursday retail reset", () => {
+    it("maps the cooked weekly ids to their historical Thursday 18:00 UTC reset", () => {
         const Start = new Date(TRIAL_ROTATION_START);
         const OneMsBefore = new Date(Start.getTime() - 1);
         const SameWeek = new Date(Start.getTime() + 6 * 24 * 60 * 60 * 1000 + 23 * 60 * 60 * 1000);
         const NextWeek = new Date(Start.getTime() + 7 * 24 * 60 * 60 * 1000);
+        const Release144 = new Date("2020-11-05T18:00:00.000Z");
 
-        assert.equal(Start.toISOString(), "2020-11-05T10:00:00.000Z");
+        assert.equal(Start.toISOString(), "2019-07-18T18:00:00.000Z");
+        assert.ok(GetTrialsData(false, Start).TrialsHuntId.endsWith("_001"));
+        assert.ok(GetTrialsData(false, Release144).TrialsHuntId.endsWith("_069"));
+
         const First = GetTrialsData(false, Start);
         assert.notEqual(GetTrialsData(false, OneMsBefore).TrialsHuntId, First.TrialsHuntId);
         assert.deepEqual(GetTrialsData(false, SameWeek), First);

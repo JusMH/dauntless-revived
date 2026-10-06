@@ -56,9 +56,12 @@ describe("Trials leaderboards", () => {
         assert.equal(TRIAL_ROTATION_LENGTH, 88);
         assert.equal(TRIAL_ROTATION_SUFFIXES[0], "001");
         assert.equal(TRIAL_ROTATION_SUFFIXES.at(-1), "088");
-        assert.equal(new Date(TRIAL_ROTATION_START).toISOString(), "2020-11-05T10:00:00.000Z");
-        assert.equal(TrialWeekAt(new Date("2020-11-05T09:59:59.999Z")), -1);
-        assert.equal(TrialWeekAt(new Date("2020-11-05T10:00:00.000Z")), 0);
+        assert.equal(new Date(TRIAL_ROTATION_START).toISOString(), "2019-07-18T18:00:00.000Z");
+        assert.equal(TrialWeekAt(new Date("2019-07-18T17:59:59.999Z")), -1);
+        assert.equal(TrialWeekAt(new Date("2019-07-18T18:00:00.000Z")), 0);
+        assert.equal(TrialWeekAt(new Date("2020-11-05T17:59:59.999Z")), 67);
+        assert.equal(TrialWeekAt(new Date("2020-11-05T18:00:00.000Z")), 68);
+        assert.ok(TrialIdForWeek(1, 68).endsWith("_069"));
         assert.ok(TrialIdForWeek(0, 87).endsWith("_088"));
         assert.ok(TrialIdForWeek(1, 88).endsWith("_001"));
     });
@@ -191,8 +194,19 @@ describe("Trials leaderboards", () => {
 
         const All = await Call("POST", "/trials/leaderboards", {as: A.UserId, body: Query()});
         assert.equal(All.status, 200);
+        assert.deepEqual(Object.keys(All.json.payload).sort(), ["difficulty", "guild", "page", "page_size", "trial_id", "world"]);
         assert.deepEqual(All.json.payload.world.solo.all.entries.map((Entry: any) => Entry.phx_account_id), [A.UserId, B.UserId]);
-        assert.deepEqual(All.json.payload.world.group.entries, []);
+        assert.deepEqual(All.json.payload.world.group, {
+            difficulty: 1,
+            entries: [],
+            page: 0,
+            page_size: 100,
+            trial_id: Trial()
+        });
+
+        const CapturedAll = await Call("POST", "/trials/leaderboards/all", {as: A.UserId, body: Query()});
+        assert.equal(CapturedAll.status, 200);
+        assert.deepEqual(CapturedAll.json, All.json);
     });
 
     it("stores one group run once on retry and serves group and member lookup", async () => {

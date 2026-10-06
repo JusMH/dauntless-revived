@@ -645,7 +645,7 @@ Before starting M2, 0.1 must be running and 0.4 must be done.
 
 - [ ] **3.8 Trials** (rotation S–M, leaderboards M, schedule XL)
   - **What:**
-    - (a) Everyone faces the same trial each week: cycle through the exact Hard/Elite row intersection from the cooked tables (88 rows in 1.4.4) from a fixed Thursday reset instead of a random pick. *Built on the Trials/Middleman/Lady Luck branch.*
+    - (a) Everyone faces the same trial each week: cycle through the 67 cooked rows from a fixed start date instead of a random pick.
     - (b) Leaderboard tables and the 5 routes.
     - (c) Research making the client's expired schedule (it ends 2021-03-25) agree without the DLL force-unlock.
   - **Needs:** 1.9 (group leaderboards) and 4.4 (for c).
