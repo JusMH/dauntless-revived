@@ -69,14 +69,14 @@ const LADY_LUCK_IDS = new Set(LadyLuck.offers.map((Offer) => Offer.id));
 const LADY_LUCK_ITEM_KINDS = LadyLuck.itemKinds;
 const LADY_LUCK_REPEATABLE = new Set(LadyLuck.repeatable);
 
-const Catalog = {
+const Catalog: Record<string, unknown> = {
     ...(catalog as unknown as Record<string, unknown>),
     ladyluckstore: LadyLuck.offers
 };
 
 // Every offer under every tag (keys starting with _ are notes)
-const CatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key as keyof typeof Catalog]));
-const AllOffers = CatalogTags.flatMap((Tag) => Catalog[Tag as keyof typeof Catalog] as StoreOffer[]);
+const CatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key]));
+const AllOffers = CatalogTags.flatMap((Tag) => Catalog[Tag] as StoreOffer[]);
 
 let ExtraOffersForTests: StoreOffer[] = [];
 
