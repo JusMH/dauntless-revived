@@ -561,7 +561,7 @@ export async function Startup(){
         FreePorts.push(i);
     }
 
-    if (process.env.HUNT_WORKER === '1') return;
+    if (process.env.HUNT_WORKER === '1' && process.env.WORKER_RAMSGATE !== '1') return;
 
     await EnsurePersistentWorld("ramsgate");
 
