@@ -2,7 +2,7 @@ import "./setup";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
-import { DescribeGameservers, Gameserver, Gameservers, KindOfGameserver } from "../src/controllers/gameservers";
+import { DescribeGameservers, Gameserver, Gameservers, GetTrialsData, KindOfGameserver, TRIAL_ROTATION_START, TRIAL_ROTATION_SUFFIXES } from "../src/controllers/gameservers";
 import { IsLoopbackAddress } from "../src/routes/gameservers";
 import { app } from "../src/app";
 
@@ -41,6 +41,51 @@ const Hunt = Fake({
         { playerUid: "UID-a", playerHuntId: "CR19_PlayerHunt_FTUE_Pursuit_Beta_LeRawr" },
         { playerUid: "UID-b", playerHuntId: "CR19_PlayerHunt_FTUE_Pursuit_Beta_LeRawr" }
     ]
+});
+
+describe("Trials weekly rotation", () => {
+    it("uses exactly the rows cooked in both Hard and Elite tables", () => {
+        assert.equal(TRIAL_ROTATION_SUFFIXES.length, 67);
+        assert.equal(new Set(TRIAL_ROTATION_SUFFIXES).size, 67);
+    });
+
+    it("keeps every player on one trial for the week and advances on Thursday", () => {
+        const Start = new Date(TRIAL_ROTATION_START);
+        const SameWeek = new Date(Start.getTime() + 6 * 24 * 60 * 60 * 1000 + 23 * 60 * 60 * 1000);
+        const NextWeek = new Date(Start.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+        const First = GetTrialsData(false, Start);
+        assert.deepEqual(GetTrialsData(false, SameWeek), First);
+        assert.notEqual(GetTrialsData(false, NextWeek).TrialsHuntId, First.TrialsHuntId);
+    });
+
+    it("uses the same row suffix for Normal and Dauntless and wraps after the cooked rotation", () => {
+        const Start = new Date(TRIAL_ROTATION_START);
+        const Normal = GetTrialsData(false, Start);
+        const Dauntless = GetTrialsData(true, Start);
+        const Wrapped = GetTrialsData(false, new Date(Start.getTime() + TRIAL_ROTATION_SUFFIXES.length * 7 * 24 * 60 * 60 * 1000));
+
+        assert.equal(Normal.TrialsHuntId.replace("_Hard_", "_"), Dauntless.TrialsHuntId.replace("_Elite_", "_"));
+        assert.equal(Wrapped.TrialsHuntId, Normal.TrialsHuntId);
+        assert.ok(Normal.Behemoth.includes("/Game/Monsters/"));
+        assert.ok(Dauntless.Behemoth.includes("/Game/Monsters/"));
+    });
+
+    it("accepts a host override for the epoch and rejects a bad one", () => {
+        const Old = process.env.TRIAL_ROTATION_START;
+
+        try{
+            process.env.TRIAL_ROTATION_START = "2026-10-01T00:00:00.000Z";
+            assert.ok(GetTrialsData(false, new Date("2026-10-01T12:00:00.000Z")).TrialsHuntId.endsWith(`_${TRIAL_ROTATION_SUFFIXES[0]}`));
+
+            process.env.TRIAL_ROTATION_START = "not-a-date";
+            assert.throws(() => GetTrialsData(false, new Date()), /Invalid TRIAL_ROTATION_START/);
+        }
+        finally{
+            if(Old === undefined) delete process.env.TRIAL_ROTATION_START;
+            else process.env.TRIAL_ROTATION_START = Old;
+        }
+    });
 });
 
 describe("KindOfGameserver", () => {
