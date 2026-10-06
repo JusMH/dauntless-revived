@@ -20,14 +20,14 @@ ref: findings/store
 {: .no_toc }
 
 This page describes how the **1.4.4** client's store screen lists offers and buys one, and the store
-the metagame now answers it with. The original store sold cosmetics for Platinum, bought with real
-money; that store is gone for good. Ours is **free**: every offer costs nothing, and a purchase only
-unlocks the cosmetic.
+the metagame now answers it with. The original real-money store is gone. The ordinary restored
+`webstore` remains free, while the same purchase service now also carries the gameplay-priced
+Lady Luck and Middleman offers that use inventory currencies.
 
-**Status (23 September 2026): built and tested without the game, off by default (`STORE=off`).**
-Two things are open before it goes on: the owner's decision whether the store stays free or gets
-prices in in-game currency (roadmap 3.7), and a store test in game on our server. With `STORE=off`
-the store screen gets the same error as before.
+**Status (6 October 2026): backend built and covered by automated tests, off by default
+(`STORE=off`; Lady Luck also needs `TRIALS_STORE=1`).** The free catalogue has prior 1.4.4 evidence
+from Harmonic's fork. Lady Luck, the Middleman Aetherdust rotation and fusion persistence have not yet
+been exercised end to end by our real 1.4.4 client, so their safety switches remain conservative.
 
 The catalogue, the purchase-token flow, the tab layout and the list of how each item is granted come
 from **Harmonic's** Dauntless 1.4.4 fork
@@ -68,8 +68,11 @@ The store uses four endpoint keys, all of them already pointed at the metagame b
 - The two purchase calls are made in that order by the purchase code (B `0x140b39657` for the token,
   `0x140b55011` for the confirm). That the `POST` is the confirmation, the point where the purchase
   happens, is strong inference (S): nothing else follows it.
-- The currency in the path is `platinum` for every offer we sell (S: the client picks it from the
-  offer's price fields; any other currency is refused with 400).
+- The currency in the path must match the offer's one populated flat price field. The ordinary
+  `webstore` uses Platinum at price 0; Lady Luck uses Steel/Gilded Marks and the Middleman weekly
+  cells use Aetherdust. The backend accepts the service spellings (such as
+  `id_currency_marks_gilded`) and canonical inventory ids (such as `CURRENCY_MARKS_GILDED`) as
+  aliases for the same balance (C).
 - The offer's price fields are **flat**: `platinumPrice`, `platinumSalePrice`, `cellDustPrice`,
   `prestigePrice`, `event01Price`, `steelMarksPrice` and `gildedMarksPrice` (B, the field names in the
   1.4.4 executable, read by Harmonic). The newer `prices: [{currencyId, price}]` array of later clients
@@ -93,6 +96,9 @@ by its id every time.
 | `season09b_pass` | 1 | `season09b_premium`, the Elite Hunt Pass. Every account already owns it (`ENTITLEMENTS_DEFAULT`), so it shows as owned. |
 | `season09b_rank` | 0 | Hunt Pass rank skips. Served empty: a rank skip would be a progression grant, not an item (see below). |
 | `loadout_slots`, `fountain_daily_free_bundle` | 0 | Tags the 1.4.4 client asks for; nothing is sold under them. |
+| `ladyluckstore` | 43 captured offers (29 before Champion placement) | Trials gameplay/cosmetic rewards priced in Steel or Gilded Marks. Served only with `TRIALS_STORE=1`; Champion-tagged gear requires the permanent leaderboard-placement entitlement. |
+| `exchange_vendor_slot_2`, `exchange_vendor_slot_3` | 1 each | Permanent second/third Middleman fusion-slot entitlements, currently free in this private-server economy. |
+| `weekly_cell_offering` | 3 per week | Deterministic Thursday 18:00 UTC selection of two +1 cells (80 Aetherdust) and one +2 cell (200 Aetherdust), from the restored 1.4.4-era cell families. |
 
 These five are the tags Harmonic saw the 1.4.4 client ask for (O). Any other tag gets an empty list and
 a warning line. Every offer has `platinumPrice` 0. A few facts about the list, from Harmonic's work:
@@ -153,7 +159,7 @@ accounts have more than one has not been counted yet.
 
 ## The purchase, step by step {#redeem}
 
-1. **The token.** `GET /token/platinum/<sku>` checks that the offer exists, is free and grants only
+1. **The token.** `GET /token/<currency>/<sku>` checks that the offer exists, that the named currency matches its flat price field and that it grants only
    allowed things, that the player does not already own everything it grants (409; the bounty-token
    bundle is never owned) and that the account has had fewer than 60 tokens in the last 10 minutes
    (409), then stores a row in `storepurchases`: the SHA-256 of a random 64-hex token (the token itself
@@ -161,14 +167,15 @@ accounts have more than one has not been counted yet.
    an expiry 10 minutes later. The account's own unredeemed tokens past their expiry are deleted when it
    gets a new one; the whole table is swept at every start and then at most once an hour (expired
    tokens never redeemed, and receipts redeemed more than 30 days ago).
-2. **The confirm.** `POST /notification/platinum?token=<token>` runs in one database transaction:
+2. **The confirm.** `POST /notification/<currency>?token=<token>` runs in one database transaction:
    - another account's token or an unknown one: 403; a token whose character moved: 403; an expired
      token: 410; an offer that changed since the token, or is no longer sold: 409;
    - a token that was **already redeemed**: 204 again, and nothing is granted (a retry after a lost
      answer);
-   - the items go through the same inventory code as `POST /inventory`, with the caller `store`, the
-     source `store:<sku>` and the transaction id `store:<token hash>`: one row in the transaction ledger
-     and one `inventorylog` row per item. Something the character already holds is not granted again;
+   - the items and any non-zero currency charge go through the same inventory code as `POST /inventory`,
+     with the caller `store`, the source `store:<sku>` and the transaction id `store:<token hash>`.
+     The balance is rechecked inside that transaction, so charge and grant commit or roll back together.
+     Something the character already holds is not granted again unless the offer is explicitly repeatable;
    - the entitlements go through the same code as the game server's grants, with the source
      `store:<sku>`;
    - the token row is marked redeemed. If anything fails, nothing of it is kept. The row is the receipt
@@ -187,9 +194,9 @@ alone gets 403. Purchases can be traced (`inventorylog.caller = 'store'`, `entit
 | Left out | Why |
 |:---------|:----|
 | Harmonic's `season09b_10_ranks` offer (ten Hunt Pass ranks) | It granted `CURRENCY_PRESTIGE`, which the fork's own store code could not sell (no grant kind: 409). A real rank skip is a progression grant through the rank rules, not an item. |
-| Prices | Every offer is free until the owner decides otherwise (roadmap 3.7). The code refuses any offer whose `platinumPrice` is not 0. |
 | The bounty-token bundle, by default | `bundle_currency_bounty_small` gives 20 `TOKEN_BOUNTY_DRAFT_PREMIUM`, the premium bounty token that lasts into the next season, and may be bought any number of times: unlimited free premium bounty drafts. It is listed only with `STORE_REPEATABLE_TOKENS=1`, an owner decision. A token issued while it was on is refused (409) after it is switched off. |
-| The Trials, event and prestige stores, the cell-dust exchange, loadout-slot purchases | The same service ran them; nothing is built for them yet (roadmap 3.7, 3.9). |
+| Event, Hunt Pass prestige and loadout-slot purchase catalogues | The generic purchase core can charge their currencies, but these catalogues/flows are not restored here yet. |
+| A fully server-authored Middleman fusion service | In 1.4.4 the fusion operations live on `AArchonInventory` and persist through inventory transactions. We preserve the three pending slot tokens, dust spending and timer speed-ups instead of inventing an unproven HTTP API. |
 
 ## Switches {#switches}
 
@@ -197,6 +204,8 @@ alone gets 403. Purchases can be traced (`inventorylog.caller = 'store'`, `entit
 |:--------|:--------|:-------------|
 | `STORE` | `off` | `off`: the store screen gets the old 400 (`{"code": "400", "message": "The store is not available on Dauntless Revived yet."}`) and the three purchase routes the 404 they always got. `free`: the catalogue above, the token and the confirm. |
 | `STORE_REPEATABLE_TOKENS` | off | `1` lists and sells the bounty-token bundle, unlimited. |
+| `TRIALS_STORE` | off | `1` exposes Lady Luck's Steel/Gilded Marks catalogue; Champion gear still requires leaderboard placement. |
+| `MIDDLEMAN_FUSION_GUARDS` | off | Not a store switch: `1` adds strict finished-fusion time/result validation. Stable three-slot fusion persistence is always enabled. |
 
 The full descriptions are on [Configuration]({{ config_page.url | relative_url }}#metagame-store), the
 routes on [HTTP API]({{ api_page.url | relative_url }}#store), the table on

@@ -137,6 +137,9 @@ development are off.
 | `ESCALATION_STRICT` | metagame | `1` | Makes the Escalation rules that depend on our modelling refuse a save instead of warning. After the logs stay clean. |
 | `STORE` | metagame | `free` | The free in-game store. Waits for the decision free or priced (roadmap 3.7) and an in-game store test. |
 | `STORE_REPEATABLE_TOKENS` | metagame | `1` | Sells the bounty-token bundle any number of times: unlimited free premium bounty drafts. The owner's decision. |
+| `TRIALS_STORE` | metagame | `1` | Enables Lady Luck's Steel/Gilded Marks catalogue. Built and covered by automated purchase tests, but not yet exercised by the 1.4.4 client on this server. |
+| `TRIALS_LEADERBOARDS` | metagame | `1` | Enables the five 1.4.4 Trials leaderboard routes and game-server result ingestion. Backend tests pass; the real client still needs a throwaway-account check. |
+| `MIDDLEMAN_FUSION_GUARDS` | metagame | `1` | Enforces the inferred finished-fusion reveal shape and timer. Slot persistence itself is always on; this stricter guard waits for a captured 1.4.4 completion transaction. |
 | `PROGRESSION_CONFIRM_ENTITLEMENTS` | metagame | `1` | A rank confirm also grants the rank's permanent entitlements. Only if the in-game test shows the game server never grants them itself. |
 | `VERIFY_STUB_ACCOUNT` | metagame | `1` | A rollback only: the old placeholder account in `oauth/verify`. |
 | `MATCHMAKING_CANCEL` | metagame | `1` | Experimental. The client sends a cancel right after every queued join, and hunts start only because that cancel gets a 404. |
@@ -180,13 +183,14 @@ also warns while there are players with no stored progression yet; see the
 After that come two lines for the settings added with the port of Harmonic's fork:
 
 ```text
-features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=on verifyStubAccount=off
+features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off trialsStore=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on middlemanFusionGuards=off trialsLeaderboards=off slayerLinks=on chatPresence=on verifyStubAccount=off
 Progression config: bundled, 10 tracks; active Hunt Pass season09b
 ```
 
 Those switches (`BODY_LOG_PER_PATH`, `ESCALATION_MODE`, `ESCALATION_STRICT`, `STORE`,
-`STORE_REPEATABLE_TOKENS`, `PROGRESSION_REPLAY_WINDOW_S`, `PROGRESSION_CONFIRM_ENTITLEMENTS`,
-`BALANCE_FROM_INVENTORY`, `SLAYER_LINKS`, `CHAT_PRESENCE` and `VERIFY_STUB_ACCOUNT`) share one parser:
+`STORE_REPEATABLE_TOKENS`, `TRIALS_STORE`, `PROGRESSION_REPLAY_WINDOW_S`, `PROGRESSION_CONFIRM_ENTITLEMENTS`,
+`BALANCE_FROM_INVENTORY`, `MIDDLEMAN_FUSION_GUARDS`, `TRIALS_LEADERBOARDS`, `SLAYER_LINKS`,
+`CHAT_PRESENCE` and `VERIFY_STUB_ACCOUNT`) share one parser:
 on and off take `1`, `true`, `on` or `yes` and `0`, `false`, `off` or `no`, in any case; counts are
 whole numbers; unset or empty is the default. A value that does not parse logs one warning,
 `<NAME>="<value>" is not a valid value; using the default (<default>)`, and the default is used. A bad
@@ -287,6 +291,14 @@ All **fork only**, and read on every request. How the store works is on
 |:-----|:--------|:-------|:-------------|:-------|
 | `STORE` | `off` | `off` or `free`, any case; anything else is a warning and `off` | `off`: the store screen gets the old 400 and the purchase routes 404, as before. `free`: the catalogue of free offers in `vendor/store_catalog.json`, the purchase token and the confirm; items go to the account's active character. Before turning it on for real players, count the characters per account (the purchase goes to the character saved last). | Nobody by default |
 | `STORE_REPEATABLE_TOKENS` | off | on/off | Only with `free`. On: the bundle of 20 premium bounty tokens (`bundle_currency_bounty_small`) is listed and can be bought any number of times, which means unlimited free premium bounty drafts. Off: it is not listed and answers 404, and a token issued while it was on is refused (409). | Nobody by default |
+| `TRIALS_STORE` | off | on/off | Only with `STORE=free`. On: serves Lady Luck's 43 captured offers in the 1.4.4 flat-price shape. Steel and Gilded Marks are spent atomically with the grant. Champion-tagged gear stays hidden until a completed Dauntless leaderboard week awards the permanent placement entitlement. Off: the Lady Luck tag is empty and direct purchase lookups answer 404. | Nobody by default |
+
+### Trials {#metagame-trials}
+
+| Name | Default | Values | What it does | Set by |
+|:-----|:--------|:-------|:-------------|:-------|
+| `TRIALS_LEADERBOARDS` | off | on/off | **Fork only.** On: enables the five endpoint paths present in the 1.4.4 client, stores game-server submissions, keeps each solo player or group party's best time per Trial week, persists `/profile/update`, and finalizes completed Dauntless boards for Champion access/titles. Off: the five leaderboard routes fall through to 404. Automated tests cover the contract; real-client verification is still pending. | Nobody by default |
+| `TRIAL_ROTATION_START` | `2020-11-05T00:00:00.000Z` | ISO-8601 timestamp | Shared deterministic epoch used by the metagame's week mapping and the deploy server's 67-row Trials rotation. Change it in both processes if overriding it. This does not replace the 1.4.4 client's expired schedule; the DLL Arena unlock compatibility hook is still required. | Nobody by default |
 
 ### Saves and inventory {#metagame-saves}
 
@@ -297,6 +309,7 @@ All **fork only**, and read on every request. How the store works is on
 | `SAVE_HISTORY_DAILY` | `30` (also when empty, negative or not a whole number) | whole number of days, 0 or more (0 turns this tier off) | And the last version of each day for this many days. At the defaults that is at most about 3.5 MB per character. | Nobody by default |
 | `INVENTORY_REFUSE_OVERSPEND` | off | `1` or anything else | `1` refuses (409) an inventory transaction that removes more than the player has. Off because a refusal drops the whole transaction, rewards included; meanwhile an overspend is clamped at 0 and logged. | Nobody by default; kit: kept |
 | `INVENTORY_REPORT_REMOVALS` | on | `0` or anything else | **Fork only.** Inventory replies list every stack the transaction touched with its final count (0 for a used-up stack), so the game server sees what was spent. `0` puts back upstream's additions-only reply, which made upgrades free. | Nobody by default |
+| `MIDDLEMAN_FUSION_GUARDS` | off | on/off | **Fork only.** Pending `TOKEN_CELL_EXCHANGE` items are always normalized by slot so three fusions persist independently, and same-version timer speed-ups are preserved. On additionally refuses an early completion or a reveal that grants a different result cell. It stays off until a real 1.4.4 completion transaction confirms that inferred reveal shape. | Nobody by default |
 
 ### Friends, parties and guilds {#metagame-social}
 

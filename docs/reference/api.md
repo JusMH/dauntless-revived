@@ -266,6 +266,9 @@ it, and everyone else gets upstream's fixed max ranks
 | `ESCALATION_MODE` | unset: `stub` | `real` stores Escalation for real-progression accounts: `GET /escalation/...` reads the stored season and `POST /escalation/...` exists (404 otherwise). |
 | `STORE` | unset: `off` | `free` turns on the four store routes; with `off` the storefront answers the old 400 and the three purchase routes 404. |
 | `STORE_REPEATABLE_TOKENS` | unset: off | `1` lists and sells the bounty-token bundle (only with `STORE=free`). |
+| `TRIALS_STORE` | unset: off | `1` exposes Lady Luck's Steel/Gilded Marks offers (only with `STORE=free`); Champion offers additionally require the permanent Trials placement entitlement. |
+| `MIDDLEMAN_FUSION_GUARDS` | unset: off | `1` turns on strict completion-time/result validation for pending Middleman fusion tokens; slot-stable persistence is always enabled. |
+| `TRIALS_LEADERBOARDS` | unset: off | `1` enables the five Trials leaderboard routes and game-server result submissions. |
 | `SLAYER_LINKS` | unset: on | `0` makes every `/slayerlink` route answer 404, as before. |
 | `VERIFY_STUB_ACCOUNT` | unset: off | `1` puts back the fixed placeholder `account_id` in `GET /account/api/oauth/verify`. |
 | `BALANCE_FROM_INVENTORY` | unset: on | `0` puts back the fixed currency sheet in `GET /balance` and `POST /reconcile`. |
@@ -308,7 +311,7 @@ work on the host.
 | POST | `/heartbeat` | token | Body `{map, state?}`, every 20 seconds. Marks the player online for 90 seconds and keeps them in their party. Answers the text `20000`. A game server's heartbeat without a player token records nothing. Through the gateway, a 2xx answer to a request with a bearer token opens the game ports for the player's address, so a missing or bogus token must get 401 (a test guards this). |
 | POST | `/event` | none | Telemetry sink. Answers `{}`. |
 | POST | `/account/migrate` | token | Answers `{migration_failed: false, migration_finished: true}`. |
-| POST | `/profile/update` | token | Empty 200 (leaderboard profile). |
+| POST | `/profile/update` | token | Stores the player's leaderboard identity (`dauntlessid`, Epic/platform ids, current platform and display name) and answers 200. `dauntlessid` must be the authenticated account. Leaderboard reads use the latest stored platform/display name. |
 | GET | `/vivox/login` | token | 404 on purpose: the voice chat service is gone. |
 | POST | `/motd/` | token | 204: no message of the day. |
 | GET | `/motd/trigger` | none | 204: no after-hunt news. 404 with `MISC_ROUTES=0`. |
@@ -343,13 +346,35 @@ game-server key alone 403. Refusals are `{"code": "<status>", "message": ...}`.
 
 | Method | Path | Access | What it does |
 |:-------|:-----|:-------|:-------------|
-| GET | `/product/skus/public?requiredTags=<tag>` | player | The offers of one tag, as a bare array, each with `remaining` (0 when every item it grants is held by the active character and every entitlement it grants is active). The store screen asks for `webstore` (200 offers; the Elite pass is under `season09b_pass`). An unknown tag is `[]` and a warning; no tag is 400. |
-| GET | `/product/sku/:skuId` | player | One offer, from any tag; 404 for an unknown one (or the bounty-token bundle while `STORE_REPEATABLE_TOKENS` is off). |
-| GET | `/token/:currency/:skuId` | player | `{purchaseToken}`: 64 hex characters, valid 10 minutes, bound to the account's active character and to the offer as it is now (a row in `storepurchases`, which stores only the token's SHA-256). `currency` must be `platinum` (400); only free offers of allowed items are sold (409); 404 for an unknown offer; 409 when the account has no character, already owns everything the offer grants, or has had 60 tokens in the last 10 minutes. |
+| GET | `/product/skus/public?requiredTags=<tag>` | player | The offers of one tag, as a bare array, each with `remaining`. Besides the free `webstore`, the restored service also knows Lady Luck (`ladyluckstore`), the two Middleman slot tags (`exchange_vendor_slot_2`, `exchange_vendor_slot_3`) and the deterministic weekly Aetherdust tag (`weekly_cell_offering`). Lady Luck requires `TRIALS_STORE=1`; Champion-tagged offers require Trials placement. An unknown tag is `[]`. |
+| GET | `/product/sku/:skuId` | player | One currently listed/access-allowed offer from any tag; 404 for an unknown, hidden or out-of-rotation offer. |
+| GET | `/token/:currency/:skuId` | player | `{purchaseToken}`: 64 hex characters, valid 10 minutes, bound to the active character and current offer hash. The currency must match the offer: Platinum, Aetherdust, Steel Marks, Gilded Marks or Prestige, using either the service spelling (for example `id_currency_marks_steel`) or canonical inventory id (`CURRENCY_MARKS_STEEL`). Priced offers check the held stack before issuing the token. 404 for an unavailable offer; 409 for no character, owned one-time grants, insufficient balance or the token rate limit. |
 | POST | `/notification/:currency?token=<token>` | player | Redeems the token and answers 204 with no body. In one transaction: the items through the inventory core (caller `store`, source `store:<sku>`, transaction id `store:<token hash>`; items the character already holds are skipped), the entitlements through the entitlement grant (source `store:<sku>`), then the token is marked redeemed. 403 for another account's or an unknown token, or one whose character is no longer the account's; 410 when it expired; 409 when the offer changed or is no longer sold; 400 for a malformed token or another currency. A token redeemed before answers 204 again and grants nothing. |
 
 The purchase token is removed from every log line (the request log never logs the query string, the
-gateway blanks `token=`, and the body log blanks it too).
+gateway blanks `token=`, and the body log blanks it too). Prices and grants commit in the same
+inventory transaction, so a successful Lady Luck or Middleman purchase cannot spend without granting
+or grant without spending.
+
+### Trials leaderboards {#trials-leaderboards}
+
+These are the five endpoint slots named by the 1.4.4 client. They answer only with
+`TRIALS_LEADERBOARDS=1`; otherwise they fall through to 404. The later-service
+`/trials/leaderboards/all` path is deliberately not used by 1.4.4.
+
+| Method | Path | Access | What it does |
+|:-------|:-----|:-------|:-------------|
+| POST | `/trials/leaderboards` | token | A leaderboard query returns the aggregate world group + solo envelope. A body carrying `completion_time` is the private-server result-ingestion form and is accepted only from a local game server (204); a player submission is 403. |
+| POST | `/trials/leaderboards/solo` | token | Solo board for `difficulty`, `trial_id`, page/page size and optional target platforms. Ranks are assigned before pagination. |
+| POST | `/trials/leaderboards/solo/individual` | token | Best solo entry for `phx_account_id`; an absent entry returns an empty payload. |
+| POST | `/trials/leaderboards/group` | token | Group board, keeping the best run for each exact player set. |
+| POST | `/trials/leaderboards/group/individual` | token | Best group entry containing `phx_account_id`; an absent entry returns an empty payload. |
+
+A submitted run must name the active deterministic Trial and matching difficulty. Runs are separated
+by absolute Trial week as well as row id, so a row repeated after the 67-week rotation cannot inherit
+an old score. Completed Dauntless weeks are finalized idempotently: top-100 solo/group finishers
+unlock Champion store access and the Trials Champion title; top five also get The Dauntless title.
+Those grants are automated-backend behavior and still need a real 1.4.4 client check.
 
 ### Progression, Hunt Pass, entitlements, cooldowns and bounties
 
