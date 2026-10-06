@@ -8,6 +8,7 @@ import { GetDb } from "../src/db";
 import { cooldowns, entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
 import { MakePlayer, StackQuantity } from "./helpers";
 import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialRewardRank, TrialWeekAt, TrialsWindowForWeek, TRIAL_ROTATION_LENGTH, TRIAL_ROTATION_START, TRIAL_ROTATION_SUFFIXES, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
+import { GetSeasonalEventSchedule } from "../src/routes/tuning";
 
 const Trial = (Difficulty = 1) => TrialIdForWeek(Difficulty, TrialWeekAt());
 
@@ -22,6 +23,7 @@ after(async () => {
 
 beforeEach(() => {
     process.env.TRIALS_LEADERBOARDS = "1";
+    process.env.TRIALS_SCHEDULE = "0";
     process.env.STORE = "off";
     process.env.TRIALS_STORE = "1";
     process.env.MIDDLEMAN_STORE = "0";
@@ -52,6 +54,29 @@ function Query(Extra = {}){
 }
 
 describe("Trials leaderboards", () => {
+    it("serves an opt-in current Trials schedule without changing the default stub", () => {
+        const At = new Date("2026-10-06T12:00:00.000Z");
+
+        const Stub = GetSeasonalEventSchedule(At);
+        assert.deepEqual(Stub.payload.ScheduledItems, []);
+
+        process.env.TRIALS_SCHEDULE = "1";
+        const Active = GetSeasonalEventSchedule(At);
+        const Rows = Active.payload.ScheduledItems;
+
+        assert.equal(Rows.length, 5);
+        assert.deepEqual(Rows.map((Row: any) => Row.ScheduledItems[0].ID), [
+            "event_ladyluck_repeatable",
+            "CR19_PlayerHunt_Arena_Hard",
+            "CR19_PlayerHunt_Arena_Elite",
+            TrialIdForWeek(0, TrialWeekAt(At)),
+            TrialIdForWeek(1, TrialWeekAt(At))
+        ]);
+        assert.ok(Rows.every((Row: any) => Row.StartTime === "2026.10.01-18.00.00"));
+        assert.ok(Rows.every((Row: any) => Row.EndTime === "2026.10.08-18.00.00"));
+        assert.ok(Rows.every((Row: any) => Row.ScheduledItems[0].MaxCompletionPerInterval === -1));
+    });
+
     it("uses the exact cooked Hard/Elite rotation captured from the deploy tables", () => {
         assert.equal(TRIAL_ROTATION_LENGTH, 88);
         assert.equal(TRIAL_ROTATION_SUFFIXES[0], "001");

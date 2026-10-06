@@ -210,6 +210,18 @@ export const TrialsLeaderboards = DefineSwitch({
     Show: ShowOnOff
 });
 
+// Experimental replacement for the expired client-side Trials schedule. When enabled the tuning
+// endpoint advertises the Normal/Dauntless player hunts and this week's exact cooked matchmaker rows
+// as active for the current Thursday-to-Thursday window. Off by default until a real 1.4.4 client
+// proves this is sufficient to remove the Arena branch of the DLL's IsHuntUnlocked bypass.
+export const TrialsSchedule = DefineSwitch({
+    Env: "TRIALS_SCHEDULE",
+    Label: "trialsSchedule",
+    Default: false,
+    Parse: ParseOnOff,
+    Show: ShowOnOff
+});
+
 // Slayer Links (controllers/slayerlinks.ts): two friends link up for a week. On by default: the routes
 // only answer what 404'd before. 0 puts the 404s back (the stored invites and links stay).
 export const SlayerLinks = DefineSwitch({
