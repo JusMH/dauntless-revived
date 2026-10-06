@@ -185,7 +185,27 @@ local function Pulse()
     if not ok then logOnce("upd", "Update error: " .. tostring(err)) end
 end
 
-local okH = pcall(function() RegisterHook(TICK_FN, function() Pulse() end) end)
-log((okH and "tick hooked: " or "could not hook ") .. TICK_FN)
+-- On a fresh game start the player character's blueprint isn't loaded yet when mods start,
+-- so the hook is retried every time the player pawn spawns (ClientRestart, a native function
+-- that always exists) until it sticks.
+local tickHooked = false
+local function TryHookTick()
+    if tickHooked then return end
+    if not valid(StaticFindObject(TICK_FN)) then return end
+    tickHooked = pcall(function() RegisterHook(TICK_FN, function() Pulse() end) end)
+    log((tickHooked and "tick hooked: " or "could not hook ") .. TICK_FN)
+end
+
+TryHookTick()
+if not tickHooked then
+    log("player character not loaded yet - hooking when it spawns")
+    pcall(function()
+        RegisterHook("/Script/Engine.PlayerController:ClientRestart", function()
+            ExecuteWithDelay(500, function()
+                ExecuteInGameThread(function() pcall(TryHookTick) end)
+            end)
+        end)
+    end)
+end
 
 log("CraftStar loaded")
