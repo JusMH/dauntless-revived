@@ -34,7 +34,8 @@ local HIDDEN = {
     jsbLuaProfilerMod = true,
 }
 -- Friendlier names for known mods (anything else shows its folder name).
-local DISPLAY = {BehemothHealthBars = "Behemoth Health Bars", BehemothTracker = "Behemoth Tracker"}
+local DISPLAY = {BehemothHealthBars = "Behemoth Health Bars", BehemothTracker = "Behemoth Tracker",
+                  CraftStar = "Uncrafted Weapons"}
 
 -- The SETTINGS section. Keys and defaults must match the mods that read them.
 local SETTINGS = {
@@ -42,6 +43,12 @@ local SETTINGS = {
     {key = "bhb_text",   label = "Health bars: HP numbers", default = true},
     {key = "bhb_dual",   label = "Health bars: two bars in escalations", default = true},
     {key = "trk_always", label = "Tracker: show at any distance", default = false},
+    -- choice setting: End cycles through the choices; stored as their number (1, 2, 3)
+    {key = "cst_color", label = "Uncrafted weapons: name colour", default = 2, choices = {
+        {name = "Red",    color = {R = 1.00, G = 0.25, B = 0.25, A = 1}},
+        {name = "Gold",   color = {R = 1.00, G = 0.78, B = 0.20, A = 1}},
+        {name = "Purple", color = {R = 0.72, G = 0.42, B = 1.00, A = 1}},
+    }},
 }
 
 local MENU_X, MENU_Y = 40, 300          -- top-left of the panel (UI units)
@@ -334,9 +341,22 @@ end
 
 -- The switch at the right end of row i: a track (green on / grey off / amber = mod change not
 -- applied yet) with a knob on the right (on) or left (off). Drawn again whenever it changes.
+-- A choice setting shows its current choice (in its own colour) where the switch would be.
+local function DrawChoice(i, s)
+    local n = ModSettings.GetNum(s.key, s.default)
+    if not s.choices[n] then n = s.default end
+    local ch = s.choices[n]
+    local cur = ui.switches[i]
+    if cur and cur.look == ch.name then return end
+    if cur and cur.label then Untrack(cur.label) end
+    local label = MakeLabelRight(ch.name, TEXT_SIZE, ch.color, MENU_X + PANEL_W - PAD_X, ui.rowY[i], 1003)
+    ui.switches[i] = {label = label, look = ch.name}
+end
+
 local function DrawSwitch(i)
     local it = items[i]
     if not (ui and it and ui.rowY[i]) then return end
+    if it.kind == "setting" and it.setting.choices then DrawChoice(i, it.setting) return end
     local on, pending = ItemState(it)
     local look = (on and "1" or "0") .. (pending and "p" or "")
     local cur = ui.switches[i]
@@ -515,6 +535,15 @@ end
 
 local function SwitchSetting(s)
     ModSettings.Load()
+    if s.choices then
+        local n = ModSettings.GetNum(s.key, s.default) % #s.choices + 1
+        if ModSettings.SetNum(s.key, n) then
+            log("setting " .. s.key .. " -> " .. s.choices[n].name)
+        else
+            log("cannot write " .. ModSettings.FILE)
+        end
+        return
+    end
     local on = not ModSettings.Get(s.key, s.default)
     if ModSettings.Set(s.key, on) then
         log("setting " .. s.key .. " -> " .. (on and "ON" or "OFF"))

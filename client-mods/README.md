@@ -7,8 +7,11 @@ Optional client-side mods, installed automatically next to the game exe (`Archon
 - **Behemoth Tracker**: an arrow and distance to the behemoth in the top right.
 - **Mod Menu**: Home opens it, Up/Down (or PgUp/PgDn) choose, End flips the chosen switch. MODS turns
   whole mods on or off (applied on Ctrl+R); SETTINGS changes the mods live (shield bar, HP numbers,
-  two bars in escalations, tracker at any distance). Settings are saved in
+  two bars in escalations, tracker at any distance, uncrafted weapon colour). Settings are saved in
   `ue4ss/Mods/shared/ModSettings/settings.txt` on each PC and never shipped or overwritten.
+- **Uncrafted Weapons** (`CraftStar`): in the weapon crafting list, weapons you have never crafted get
+  `>> ` in front of their name, in red, gold or purple (picked in the Mod Menu).
+
 
 They only change what you see on your own screen. The game works without them.
 
