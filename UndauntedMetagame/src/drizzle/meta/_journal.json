@@ -134,6 +134,13 @@
       "when": 1791266400000,
       "tag": "0018_trials_leaderboards",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1791309600000,
+      "tag": "0019_trials_profiles",
+      "breakpoints": true
     }
   ]
 }

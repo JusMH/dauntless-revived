@@ -327,6 +327,17 @@ export const storepurchases = sqliteTable("storepurchases", {
 // Trials leaderboard runs (roadmap 3.8). One row is one completed run; entries is the
 // one-to-four player records the leaderboard needs. runKey makes a retried game-server
 // submission idempotent, while groupKey lets reads keep only each solo player or party's best run.
+// Current public identity used by the Trials leaderboard. The real service receives this
+// from POST /profile/update; it is deliberately separate from the account's canonical name.
+export const leaderboardprofiles = sqliteTable("leaderboardprofiles", {
+    accountId: text("accountId").notNull().primaryKey(),
+    epicId: text("epicId").notNull(),
+    platformId: text("platformId").notNull(),
+    platform: text("platform").notNull(),
+    displayName: text("displayName").notNull(),
+    updatedDate: text("updatedDate").notNull()
+});
+
 export const trialruns = sqliteTable("trialruns", {
     id: integer("id").notNull().primaryKey({autoIncrement: true}),
     trialId: text("trialId").notNull(),

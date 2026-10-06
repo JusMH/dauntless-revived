@@ -231,8 +231,8 @@ describe("the switch reader (src/features.ts)", () => {
     });
 
     it("describes every switch in one boot line", () => {
-        assert.equal(DescribeFeatures(), "features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=on verifyStubAccount=off");
+        assert.equal(DescribeFeatures(), "features: bodyLogPerPath=no-cap escalation=stub escalationStrict=off store=off storeRepeatableTokens=off trialsStore=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on middlemanFusionGuards=off trialsLeaderboards=off slayerLinks=on chatPresence=on verifyStubAccount=off");
         process.env.BODY_LOG_PER_PATH = "5";
-        assert.equal(DescribeFeatures(), "features: bodyLogPerPath=5 escalation=stub escalationStrict=off store=off storeRepeatableTokens=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on slayerLinks=on chatPresence=on verifyStubAccount=off");
+        assert.equal(DescribeFeatures(), "features: bodyLogPerPath=5 escalation=stub escalationStrict=off store=off storeRepeatableTokens=off trialsStore=off replayWindow=5s confirmEntitlements=off balanceFromInventory=on middlemanFusionGuards=off trialsLeaderboards=off slayerLinks=on chatPresence=on verifyStubAccount=off");
     });
 });

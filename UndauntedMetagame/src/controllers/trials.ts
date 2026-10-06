@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { GetDb } from "../db";
-import { trialruns } from "../db/schema";
+import { leaderboardprofiles, trialruns } from "../db/schema";
 
 export type TrialMode = "solo" | "group";
 
@@ -36,6 +36,71 @@ export class TrialsError extends Error {
 }
 
 const TrialIdPattern = /^Arena_MatchmakerHunt_(Hard|Elite)_\d{3}$/;
+
+// UPlayerArenaComponent and the 1.4.4 leaderboard response view-model both carry the
+// current Trial window. Keep this epoch identical to the deploy server's rotation epoch.
+export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
+const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function TrialsWindow(At: Date = new Date()){
+    const Epoch = Date.parse(process.env.TRIAL_ROTATION_START ?? TRIAL_ROTATION_START);
+
+    if(Number.isNaN(Epoch)){
+        throw new TrialsError(500, "TRIAL_ROTATION_START is invalid");
+    }
+
+    const Week = Math.floor((At.getTime() - Epoch) / TRIAL_WEEK_MS);
+    const Start = Epoch + Week * TRIAL_WEEK_MS;
+    const End = Start + TRIAL_WEEK_MS;
+
+    return {
+        trial_start: Math.floor(Start / 1000),
+        trial_end: Math.floor(End / 1000),
+        time_to_refresh: Math.max(0, Math.ceil((End - At.getTime()) / 1000))
+    };
+}
+
+function ProfileText(Value: unknown, Name: string, Required = false){
+    if(typeof Value !== "string" || Value.length > 128 || (Required && Value.length === 0)){
+        throw new TrialsError(400, `${Name} is invalid`);
+    }
+
+    return Value;
+}
+
+// The 1.4.4 client reports its public leaderboard identity at login. Do not rewrite the
+// private-server account name when the player changes a platform display name.
+export function UpdateLeaderboardProfile(AccountId: string, Body: unknown){
+    const Raw: any = Body;
+
+    if(Raw == null || typeof Raw !== "object" || Array.isArray(Raw)){
+        throw new TrialsError(400, "profile is invalid");
+    }
+
+    const DauntlessId = ProfileText(Raw.dauntlessid, "dauntlessid", true);
+
+    if(DauntlessId !== AccountId){
+        throw new TrialsError(403, "profile account does not match the authenticated account");
+    }
+
+    const EpicId = ProfileText(Raw.epicid ?? "", "epicid");
+    const PlatformId = ProfileText(Raw.platformid ?? "", "platformid");
+    const Platform = ProfileText(Raw.currentplatform ?? "", "currentplatform");
+    const DisplayName = ProfileText(Raw.currentdisplayname, "currentdisplayname", true);
+    const UpdatedDate = new Date().toISOString();
+
+    GetDb().insert(leaderboardprofiles).values({
+        accountId: AccountId,
+        epicId: EpicId,
+        platformId: PlatformId,
+        platform: Platform,
+        displayName: DisplayName,
+        updatedDate: UpdatedDate
+    }).onConflictDoUpdate({
+        target: leaderboardprofiles.accountId,
+        set: {epicId: EpicId, platformId: PlatformId, platform: Platform, displayName: DisplayName, updatedDate: UpdatedDate}
+    }).run();
+}
 
 function Integer(Value: unknown, Name: string, Min: number, Max: number){
     const Parsed = typeof Value === "string" && /^\d+$/.test(Value) ? Number(Value) : Value;
@@ -103,7 +168,19 @@ function RunKey(Body: any, Players: TrialPlayer[], CompletionTime: number, Objec
 }
 
 function ParseEntries(Run: StoredTrialRun): TrialPlayer[] {
-    return JSON.parse(Run.entries);
+    return (JSON.parse(Run.entries) as TrialPlayer[]).map((Entry) => {
+        const Profile = GetDb().select().from(leaderboardprofiles).where(eq(leaderboardprofiles.accountId, Entry.phx_account_id)).get();
+
+        if(Profile == undefined){
+            return Entry;
+        }
+
+        return {
+            ...Entry,
+            platform: Profile.platform || Entry.platform,
+            platform_name: Profile.displayName || Entry.platform_name
+        };
+    });
 }
 
 export function SaveTrialRun(Body: unknown){
@@ -239,7 +316,8 @@ export function SoloLeaderboard(Body: unknown){
             entries: Page(Entries, Query),
             page: Query.Page,
             page_size: Query.PageSize,
-            trial_id: Query.TrialId
+            trial_id: Query.TrialId,
+            ...TrialsWindow()
         }
     };
 }
@@ -256,7 +334,8 @@ export function GroupLeaderboard(Body: unknown){
             entries: Page(Entries, Query),
             page: Query.Page,
             page_size: Query.PageSize,
-            trial_id: Query.TrialId
+            trial_id: Query.TrialId,
+            ...TrialsWindow()
         }
     };
 }
@@ -275,6 +354,7 @@ export function AllLeaderboards(Body: unknown){
             page: Query.Page,
             page_size: Query.PageSize,
             trial_id: Query.TrialId,
+            ...TrialsWindow(),
             world: {
                 group: {
                     difficulty: Query.Difficulty,

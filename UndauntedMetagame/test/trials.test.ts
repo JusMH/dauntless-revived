@@ -4,7 +4,7 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
-import { trialruns } from "../src/db/schema";
+import { leaderboardprofiles, trialruns } from "../src/db/schema";
 import { MakePlayer } from "./helpers";
 
 const TRIAL = "Arena_MatchmakerHunt_Elite_001";
@@ -21,6 +21,7 @@ after(async () => {
 beforeEach(() => {
     process.env.TRIALS_LEADERBOARDS = "1";
     GetDb().delete(trialruns).run();
+    GetDb().delete(leaderboardprofiles).run();
 });
 
 function Solo(UserId: string, Time: number, Session: string){
@@ -53,6 +54,9 @@ describe("Trials leaderboards", () => {
 
         const SoloBoard = await Call("POST", "/trials/leaderboards/solo", {as: A.UserId, body: Query()});
         assert.equal(SoloBoard.status, 200);
+        assert.ok(Number.isInteger(SoloBoard.json.payload.trial_start));
+        assert.equal(SoloBoard.json.payload.trial_end - SoloBoard.json.payload.trial_start, 7 * 24 * 60 * 60);
+        assert.ok(SoloBoard.json.payload.time_to_refresh > 0 && SoloBoard.json.payload.time_to_refresh <= 7 * 24 * 60 * 60);
         assert.deepEqual(SoloBoard.json.payload.entries.map((Entry: any) => [Entry.phx_account_id, Entry.completion_time, Entry.rank]), [
             [A.UserId, 37000, 1],
             [B.UserId, 39000, 2]
@@ -98,6 +102,35 @@ describe("Trials leaderboards", () => {
         assert.equal(Individual.status, 200);
         assert.equal(Individual.json.payload.rank, 1);
         assert.equal(Individual.json.payload.session_id, "group-session");
+    });
+
+    it("persists the 1.4.4 profile update and uses its latest public identity on leaderboard reads", async () => {
+        const A = await MakePlayer();
+
+        const Updated = await Call("POST", "/profile/update", {as: A.UserId, body: {
+            dauntlessid: A.UserId,
+            epicid: "epic-a",
+            platformid: "platform-a",
+            currentplatform: "PSN",
+            currentdisplayname: "Current Slayer"
+        }});
+        assert.equal(Updated.status, 200);
+        assert.equal(GetDb().select().from(leaderboardprofiles).all().length, 1);
+
+        await Call("POST", "/trials/leaderboards", {gs: true, body: {...Solo(A.UserId, 32000, "profile-run"), platform: "WIN", platform_name: "Old Name"}});
+        const Board = await Call("POST", "/trials/leaderboards/solo", {as: A.UserId, body: Query()});
+
+        assert.equal(Board.json.payload.entries[0].platform, "PSN");
+        assert.equal(Board.json.payload.entries[0].platform_name, "Current Slayer");
+
+        const Spoof = await Call("POST", "/profile/update", {as: A.UserId, body: {
+            dauntlessid: "UID-someone-else",
+            epicid: "",
+            platformid: "",
+            currentplatform: "WIN",
+            currentdisplayname: "Nope"
+        }});
+        assert.equal(Spoof.status, 403);
     });
 
     it("refuses player-submitted scores and malformed results", async () => {
