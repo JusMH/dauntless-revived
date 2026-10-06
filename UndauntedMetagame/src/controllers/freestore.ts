@@ -5,10 +5,11 @@ import { and, count, eq, gt, isNotNull, isNull, lt } from "drizzle-orm";
 import { GetDb } from "../db";
 import { characters, inventory, storepurchases } from "../db/schema";
 import { logger } from "../logger";
-import { StoreRepeatableTokens } from "../features";
+import { StoreRepeatableTokens, TrialsStore } from "../features";
 import catalog from "../vendor/store_catalog.json";
 import curated30 from "../vendor/store_curated_30.json";
 import itemKinds from "../vendor/store_item_kinds.json";
+import ladyLuck from "../vendor/store_ladyluck.json";
 import { GetActiveCharacter } from "./activecharacter";
 import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
 import { ApplyInventoryTransactionInTx, InventoryErrorOf } from "./inventory";
@@ -39,7 +40,7 @@ export class StoreError extends Error {
 
 type StoreItem = { catalogId: string, quantity: number };
 type StoreGrant = { name: string, duration?: number };
-export type StoreOffer = { id: string, tags: string[], platinumPrice: number, items: StoreItem[] | null, entitlements: StoreGrant[] | null, remaining: number, [Field: string]: unknown };
+export type StoreOffer = { id: string, tags: string[], platinumPrice?: number | null, items: StoreItem[] | null, entitlements: StoreGrant[] | null, remaining: number | null, maxAllowed?: number | null, [Field: string]: unknown };
 
 const PURCHASE_TOKEN_MINUTES = 10;
 
@@ -62,11 +63,20 @@ export function SetStoreTokenLimitForTests(Limit?: number){
     TokenLimit = Limit ?? MAX_TOKENS_PER_WINDOW;
 }
 
-const Catalog = catalog as unknown as Record<string, unknown>;
+type LadyLuckCatalog = { offers: StoreOffer[], itemKinds: Record<string, string>, repeatable: string[] };
+const LadyLuck = ladyLuck as unknown as LadyLuckCatalog;
+const LADY_LUCK_IDS = new Set(LadyLuck.offers.map((Offer) => Offer.id));
+const LADY_LUCK_ITEM_KINDS = LadyLuck.itemKinds;
+const LADY_LUCK_REPEATABLE = new Set(LadyLuck.repeatable);
+
+const Catalog = {
+    ...(catalog as unknown as Record<string, unknown>),
+    ladyluckstore: LadyLuck.offers
+};
 
 // Every offer under every tag (keys starting with _ are notes)
-const CatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key]));
-const AllOffers = CatalogTags.flatMap((Tag) => Catalog[Tag] as StoreOffer[]);
+const CatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key as keyof typeof Catalog]));
+const AllOffers = CatalogTags.flatMap((Tag) => Catalog[Tag as keyof typeof Catalog] as StoreOffer[]);
 
 let ExtraOffersForTests: StoreOffer[] = [];
 
@@ -80,6 +90,16 @@ const CURRENCY_FIELDS: Record<string, {PriceField: string, CatalogId: string}> =
     markssteel: {PriceField: "steelMarksPrice", CatalogId: "CURRENCY_MARKS_STEEL"},
     marksgilded: {PriceField: "gildedMarksPrice", CatalogId: "CURRENCY_MARKS_GILDED"},
     prestige: {PriceField: "prestigePrice", CatalogId: "CURRENCY_PRESTIGE"}
+};
+
+const CURRENCY_ALIASES: Record<string, string> = {
+    id_currency_celldust: "celldust",
+    id_currency_marks_steel: "markssteel",
+    id_currency_marks_gilded: "marksgilded",
+    marks_steel: "markssteel",
+    marks_gilded: "marksgilded",
+    steelmarks: "markssteel",
+    gildedmarks: "marksgilded"
 };
 
 // Which items the store may hand out at all: cosmetics, and the repeatable consumable. Anything else
@@ -99,6 +119,12 @@ const Hash = (Value: string) => createHash("sha256").update(Value).digest("hex")
 const OfferHash = (Offer: StoreOffer) => Hash(JSON.stringify(Offer));
 
 export function GrantKind(CatalogId: string): "stacked" | "instanced" | undefined {
+    const SpecialKind = LADY_LUCK_ITEM_KINDS[CatalogId];
+
+    if(SpecialKind === "stacked" || SpecialKind === "instanced"){
+        return SpecialKind;
+    }
+
     if(!REPEATABLE_ITEMS.has(CatalogId) && !COSMETIC_PREFIXES.some((Prefix) => CatalogId.startsWith(Prefix))){
         return undefined;
     }
@@ -110,14 +136,18 @@ export function GrantKind(CatalogId: string): "stacked" | "instanced" | undefine
 
 // A repeatable offer sells consumables only; it is never "owned", and each purchase grants its full quantity
 function IsRepeatable(Offer: StoreOffer){
-    const Items = Offer.items ?? [];
+    if(LADY_LUCK_REPEATABLE.has(Offer.id)){
+        return true;
+    }
 
+    const Items = Offer.items ?? [];
     return Items.length > 0 && Items.every((Item) => REPEATABLE_ITEMS.has(Item.catalogId));
 }
 
 function IsListed(Offer: StoreOffer){
+    if(LADY_LUCK_IDS.has(Offer.id) && !TrialsStore()) return false;
     if (process.env.STORE_CATALOG_PROFILE === "curated30" && Offer.tags.includes("webstore") && !curated30.includes(Offer.id)) return false;
-    return !IsRepeatable(Offer) || StoreRepeatableTokens();
+    return !IsRepeatable(Offer) || LADY_LUCK_REPEATABLE.has(Offer.id) || StoreRepeatableTokens();
 }
 
 function FindOffer(SkuId: string){
@@ -168,7 +198,6 @@ function CheckOffer(Offer: StoreOffer){
     }
 
     const Unsupported = Items.some((Item) => GrantKind(Item.catalogId) === undefined ||
-        REPEATABLE_ITEMS.has(Item.catalogId) !== Repeatable ||
         (Repeatable ? GrantKind(Item.catalogId) !== "stacked" || !Number.isSafeInteger(Item.quantity) || Item.quantity <= 0 : Item.quantity !== 1));
 
     if(Unsupported){
@@ -181,9 +210,14 @@ function CheckOffer(Offer: StoreOffer){
 }
 
 function CheckCurrency(Currency: string){
-    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Currency)){
+    const Lower = Currency.toLowerCase();
+    const Canonical = CURRENCY_ALIASES[Lower] ?? Lower;
+
+    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Canonical)){
         throw new StoreError(400, "Unsupported store currency");
     }
+
+    return Canonical;
 }
 
 // Every catalogue id the character holds, stacked (quantity above 0) or instanced
@@ -280,7 +314,7 @@ export function PruneExpiredStorePurchases(){
 // the offer as it is now; valid for 10 minutes. Refused (409) for an offer the account already owns (the
 // repeatable bundle is never owned) and past MAX_TOKENS_PER_WINDOW tokens in TOKEN_WINDOW_MS.
 export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: string){
-    CheckCurrency(Currency);
+    Currency = CheckCurrency(Currency);
 
     const Offer = FindOffer(SkuId);
 
@@ -352,7 +386,14 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
 // POST /notification/<currency>?token=<token>: the grant and the receipt in one transaction. A token
 // that was already redeemed answers again and grants nothing (a retry after a lost answer).
 export function RedeemStorePurchase(AccountId: string, Currency: string, Token: unknown){
-    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Currency) || typeof Token !== "string" || !/^[a-f0-9]{64}$/.test(Token)){
+    try{
+        Currency = CheckCurrency(Currency);
+    }
+    catch{
+        throw new StoreError(400, "Invalid purchase token or currency");
+    }
+
+    if(typeof Token !== "string" || !/^[a-f0-9]{64}$/.test(Token)){
         throw new StoreError(400, "Invalid purchase token or currency");
     }
 
