@@ -427,10 +427,10 @@ const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 function TrialSuffixes(){
     const Hard = new Set(Object.keys((TrialsHardHuntTable[0].Rows as any))
-        .map((Id) => Id.match(/_(\\d{3})$/)?.[1])
+        .map((Id) => Id.match(/_(\d{3})$/)?.[1])
         .filter((Id): Id is string => Id !== undefined));
     const Elite = new Set(Object.keys((TrialsEliteHuntTable[0].Rows as any))
-        .map((Id) => Id.match(/_(\\d{3})$/)?.[1])
+        .map((Id) => Id.match(/_(\d{3})$/)?.[1])
         .filter((Id): Id is string => Id !== undefined));
 
     return [...Hard].filter((Id) => Elite.has(Id)).sort((A, B) => Number(A) - Number(B));
