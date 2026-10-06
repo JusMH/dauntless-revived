@@ -365,8 +365,30 @@ export function SaveTrialRun(Body: unknown, At: Date = new Date()){
             submittedDate
         }).onConflictDoNothing().run();
 
-        const Rewards = AwardTrialMarksInTx(tx, AccountIds, difficulty, trialWeek, completionTime, At);
-        return {trialId, trialWeek, difficulty, mode: Mode, accountIds: AccountIds, rewards: Rewards};
+        // A game server retry may reuse its session id. The unique run key makes the score insert
+        // idempotent; bind rewards to that same persisted row too. If a caller reuses the session id
+        // with changed timing/players, reject it instead of letting the altered retry unlock a faster
+        // reward tier while the leaderboard correctly keeps the original run.
+        const Stored = tx.select().from(trialruns).where(and(
+            eq(trialruns.trialWeek, trialWeek),
+            eq(trialruns.trialId, trialId),
+            eq(trialruns.difficulty, difficulty),
+            eq(trialruns.runKey, runKey)
+        )).get() as StoredTrialRun | undefined;
+
+        if(Stored == undefined){
+            throw new TrialsError(500, "Trial result was not persisted");
+        }
+
+        const EntriesJson = JSON.stringify(Players);
+        if(Stored.mode !== Mode || Stored.groupKey !== groupKey || Stored.completionTime !== completionTime ||
+            Stored.objectivesCompleted !== objectivesCompleted || Stored.sessionId !== sessionId || Stored.entries !== EntriesJson){
+            throw new TrialsError(409, "Trial session id was already used for a different result");
+        }
+
+        const StoredAccountIds = (JSON.parse(Stored.entries) as TrialPlayer[]).map((Entry) => Entry.phx_account_id);
+        const Rewards = AwardTrialMarksInTx(tx, StoredAccountIds, Stored.difficulty, Stored.trialWeek, Stored.completionTime, At);
+        return {trialId, trialWeek, difficulty, mode: Mode, accountIds: StoredAccountIds, rewards: Rewards};
     });
 }
 

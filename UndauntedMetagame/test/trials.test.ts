@@ -111,6 +111,25 @@ describe("Trials leaderboards", () => {
             .filter((Row) => Row.cooldownId.startsWith("revived_trials_marks:")).length, 6);
     });
 
+    it("rejects a reused result session with changed timing instead of escalating its reward", async () => {
+        const A = await MakePlayer();
+        const Session = "immutable-result-session";
+
+        assert.equal((await Call("POST", "/trials/leaderboards", {
+            gs: true,
+            body: Solo(A.UserId, 5 * 60 * 1000 - 1, Session, 0)
+        })).status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 200);
+
+        const Changed = await Call("POST", "/trials/leaderboards", {
+            gs: true,
+            body: Solo(A.UserId, 3 * 60 * 1000 - 1, Session, 0)
+        });
+        assert.equal(Changed.status, 409);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 200);
+        assert.equal(GetDb().select().from(trialruns).all().length, 1);
+    });
+
     it("completes the Trial -> Marks -> Lady Luck purchase loop without refilling on retry", async () => {
         const A = await MakePlayer();
         const Run = Solo(A.UserId, 3 * 60 * 1000 - 1, "purchase-loop", 0);
