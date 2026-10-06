@@ -2,6 +2,7 @@ import { RemoveTestDb } from "./setup";
 import "./authenv";
 import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { eq } from "drizzle-orm";
 import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
 import { entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
