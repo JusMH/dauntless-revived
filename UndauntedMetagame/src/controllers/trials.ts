@@ -76,13 +76,13 @@ function Player(Raw: any): TrialPlayer {
     };
 }
 
-function SubmissionPlayers(Body: any){
+function SubmissionPlayers(Body: any): TrialPlayer[]{
     if(Array.isArray(Body?.entries)){
         if(Body.entries.length < 1 || Body.entries.length > 4){
             throw new TrialsError(400, "entries must contain one to four players");
         }
 
-        return Body.entries.map(Player);
+        return Body.entries.map((Entry: unknown) => Player(Entry));
     }
 
     return [Player(Body)];
