@@ -4,10 +4,11 @@ import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
-import { leaderboardprofiles, trialruns } from "../src/db/schema";
+import { entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
 import { MakePlayer } from "./helpers";
+import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialWeekAt, TRIALS_CHAMPION_ENTITLEMENT } from "../src/controllers/trials";
 
-const TRIAL = "Arena_MatchmakerHunt_Elite_001";
+const Trial = () => TrialIdForWeek(1, TrialWeekAt());
 
 before(async () => {
     await StartApp();
@@ -21,13 +22,14 @@ after(async () => {
 beforeEach(() => {
     process.env.TRIALS_LEADERBOARDS = "1";
     GetDb().delete(trialruns).run();
+    GetDb().delete(trialweeks).run();
     GetDb().delete(leaderboardprofiles).run();
 });
 
 function Solo(UserId: string, Time: number, Session: string){
     return {
         difficulty: 1,
-        trial_id: TRIAL,
+        trial_id: Trial(),
         completion_time: Time,
         objectives_completed: 3,
         phx_account_id: UserId,
@@ -41,7 +43,7 @@ function Solo(UserId: string, Time: number, Session: string){
 }
 
 function Query(Extra = {}){
-    return {difficulty: 1, page: 0, page_size: 100, trial_id: TRIAL, target_platforms: [], ...Extra};
+    return {difficulty: 1, page: 0, page_size: 100, trial_id: Trial(), target_platforms: [], ...Extra};
 }
 
 describe("Trials leaderboards", () => {
@@ -66,7 +68,7 @@ describe("Trials leaderboards", () => {
         assert.equal(Individual.status, 200);
         assert.equal(Individual.json.payload.phx_account_id, B.UserId);
         assert.equal(Individual.json.payload.rank, 2);
-        assert.equal(Individual.json.payload.trial_id, TRIAL);
+        assert.equal(Individual.json.payload.trial_id, Trial());
         assert.equal(Individual.json.payload.difficulty, "1");
 
         const All = await Call("POST", "/trials/leaderboards", {as: A.UserId, body: Query()});
@@ -79,7 +81,7 @@ describe("Trials leaderboards", () => {
         const A = await MakePlayer(), B = await MakePlayer();
         const Body = {
             difficulty: 1,
-            trial_id: TRIAL,
+            trial_id: Trial(),
             completion_time: 51000,
             objectives_completed: 3,
             session_id: "group-session",
@@ -152,6 +154,83 @@ describe("Trials leaderboards", () => {
         const PageTwo = await Call("POST", "/trials/leaderboards/solo", {as: A.UserId, body: Query({page: 1, page_size: 1})});
         assert.equal(PageTwo.json.payload.entries[0].phx_account_id, B.UserId);
         assert.equal(PageTwo.json.payload.entries[0].rank, 2);
+    });
+
+    it("keeps a repeated Trial row isolated by week and rejects stale game-server submissions", async () => {
+        const A = await MakePlayer();
+        const CurrentWeek = TrialWeekAt();
+        const CurrentTrial = TrialIdForWeek(1, CurrentWeek);
+        const OldWeek = CurrentWeek - 67;
+
+        GetDb().insert(trialruns).values({
+            trialId: CurrentTrial,
+            trialWeek: OldWeek,
+            difficulty: 1,
+            mode: "solo",
+            runKey: "old-cycle",
+            groupKey: A.UserId,
+            completionTime: 1000,
+            objectivesCompleted: 3,
+            sessionId: "old-cycle",
+            entries: JSON.stringify([{phx_account_id: A.UserId, platform: "WIN", platform_name: "Old", player_role_id: "PR_FRANK", weapon: 2}]),
+            submittedDate: "2025-01-01T00:00:00.000Z"
+        }).run();
+
+        assert.equal((await Call("POST", "/trials/leaderboards", {gs: true, body: Solo(A.UserId, 30000, "current-cycle")})).status, 204);
+        const Current = await Call("POST", "/trials/leaderboards/solo", {as: A.UserId, body: Query()});
+        assert.deepEqual(Current.json.payload.entries.map((Entry: any) => Entry.completion_time), [30000]);
+
+        const PreviousTrial = TrialIdForWeek(1, CurrentWeek - 1);
+        assert.equal((await Call("POST", "/trials/leaderboards", {
+            gs: true,
+            body: {...Solo(A.UserId, 25000, "stale"), trial_id: PreviousTrial}
+        })).status, 409);
+    });
+
+    it("finalizes a completed Dauntless week once and permanently unlocks Champion access", () => {
+        const CurrentWeek = TrialWeekAt();
+        const PreviousWeek = CurrentWeek - 1;
+        const TrialId = TrialIdForWeek(1, PreviousWeek);
+        const SoloId = "UID-trials-champion-solo";
+        const GroupIds = ["UID-trials-champion-g1", "UID-trials-champion-g2"];
+
+        GetDb().insert(trialruns).values([
+            {
+                trialId: TrialId,
+                trialWeek: PreviousWeek,
+                difficulty: 1,
+                mode: "solo",
+                runKey: "champion-solo",
+                groupKey: SoloId,
+                completionTime: 30000,
+                objectivesCompleted: 3,
+                sessionId: "champion-solo",
+                entries: JSON.stringify([{phx_account_id: SoloId, platform: "WIN", platform_name: "Solo", player_role_id: "PR_FRANK", weapon: 2}]),
+                submittedDate: "2026-01-01T00:00:00.000Z"
+            },
+            {
+                trialId: TrialId,
+                trialWeek: PreviousWeek,
+                difficulty: 1,
+                mode: "group",
+                runKey: "champion-group",
+                groupKey: GroupIds.join(":"),
+                completionTime: 31000,
+                objectivesCompleted: 3,
+                sessionId: "champion-group",
+                entries: JSON.stringify(GroupIds.map((Id) => ({phx_account_id: Id, platform: "WIN", platform_name: Id, player_role_id: "PR_FRANK", weapon: 2}))),
+                submittedDate: "2026-01-01T00:00:01.000Z"
+            }
+        ]).run();
+
+        assert.deepEqual(FinalizeCompletedTrialWeeks(), {FinalizedWeeks: 1, AwardedAccounts: 3});
+        assert.deepEqual(FinalizeCompletedTrialWeeks(), {FinalizedWeeks: 0, AwardedAccounts: 0});
+        assert.equal(GetDb().select().from(trialweeks).all().length, 1);
+
+        for(const AccountId of [SoloId, ...GroupIds]){
+            assert.equal(GetDb().select().from(entitlements).where(eq(entitlements.accountId, AccountId)).all()
+                .some((Row) => Row.name === TRIALS_CHAMPION_ENTITLEMENT && Row.duration === 0 && Row.revokedDate == null), true);
+        }
     });
 
     it("returns 404 while the feature switch is off", async () => {

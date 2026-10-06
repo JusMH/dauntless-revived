@@ -341,6 +341,7 @@ export const leaderboardprofiles = sqliteTable("leaderboardprofiles", {
 export const trialruns = sqliteTable("trialruns", {
     id: integer("id").notNull().primaryKey({autoIncrement: true}),
     trialId: text("trialId").notNull(),
+    trialWeek: integer("trialWeek").notNull(),
     difficulty: integer("difficulty").notNull(),
     mode: text("mode").notNull(),
     runKey: text("runKey").notNull(),
@@ -351,10 +352,18 @@ export const trialruns = sqliteTable("trialruns", {
     entries: text("entries").notNull(),
     submittedDate: text("submittedDate").notNull()
 }, (table) => [
-    uniqueIndex("trialruns_trial_difficulty_run").on(table.trialId, table.difficulty, table.runKey),
-    index("trialruns_board").on(table.trialId, table.difficulty, table.mode, table.completionTime),
-    index("trialruns_group").on(table.trialId, table.difficulty, table.mode, table.groupKey)
+    uniqueIndex("trialruns_week_trial_difficulty_run").on(table.trialWeek, table.trialId, table.difficulty, table.runKey),
+    index("trialruns_board").on(table.trialWeek, table.trialId, table.difficulty, table.mode, table.completionTime),
+    index("trialruns_group").on(table.trialWeek, table.trialId, table.difficulty, table.mode, table.groupKey)
 ]);
+
+// A completed week is finalized once. The count is diagnostic; Champion access itself is
+// the permanent trials_leaderboard_placement entitlement granted to every Top-100 player.
+export const trialweeks = sqliteTable("trialweeks", {
+    week: integer("week").notNull().primaryKey(),
+    finalizedDate: text("finalizedDate").notNull(),
+    awardedAccounts: integer("awardedAccounts").notNull()
+});
 
 // Guilds (roadmap 3.11, the 1.4.4 client's v2 guild API; docs/findings/social.md). guildId is a
 // random UUID (it also names the chat room Guild-<guildId>). nameKey and nameplateKey are lowercase

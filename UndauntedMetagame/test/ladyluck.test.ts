@@ -8,6 +8,8 @@ import { GetDb } from "../src/db";
 import { inventory } from "../src/db/schema";
 import { CreateStorePurchase, GetStoreOffer, GrantKind, ListStoreOffers, RedeemStorePurchase } from "../src/controllers/freestore";
 import { MakePlayer, StackQuantity } from "./helpers";
+import { GrantEntitlementInTx } from "../src/controllers/entitlements";
+import { TRIALS_CHAMPION_ENTITLEMENT } from "../src/controllers/trials";
 
 before(async () => {
     await StartApp();
@@ -45,15 +47,21 @@ function Buy(UserId: string, Currency: string, Sku: string){
 }
 
 describe("Lady Luck Trials store", () => {
-    it("serves the captured 43 offers in the 1.4.4 flat-price shape", async () => {
+    it("uses the 1.4.4 flat-price shape and hides Champion gear until leaderboard placement is earned", async () => {
         const A = await MakePlayer();
         const Offers = ListStoreOffers(A.UserId, "ladyluckstore");
 
-        assert.equal(Offers.length, 43);
+        assert.equal(Offers.length, 29);
         assert.ok(Offers.every((Offer) => !Object.prototype.hasOwnProperty.call(Offer, "prices")));
         assert.ok(Offers.every((Offer) => Number.isInteger(Offer.steelMarksPrice) !== Number.isInteger(Offer.gildedMarksPrice)));
         assert.equal(GetStoreOffer(A.UserId, "ladyluck_weapon_strikers_normal").gildedMarksPrice, 500);
         assert.equal(GetStoreOffer(A.UserId, "ladyluck_cb_passive_trials_02").steelMarksPrice, 250);
+        assert.throws(() => GetStoreOffer(A.UserId, "ladyluck_weapon_strikers_prestige"), {Status: 404});
+        assert.throws(() => CreateStorePurchase(A.UserId, "marksgilded", "ladyluck_weapon_strikers_prestige"), {Status: 404});
+
+        GetDb().transaction((tx) => GrantEntitlementInTx(tx, A.UserId, TRIALS_CHAMPION_ENTITLEMENT, 0, "test"));
+        assert.equal(ListStoreOffers(A.UserId, "ladyluckstore").length, 43);
+        assert.equal(GetStoreOffer(A.UserId, "ladyluck_weapon_strikers_prestige").gildedMarksPrice, 1000);
     });
 
     it("uses captured instanced-vs-stacked grant kinds instead of guessing from prefixes", () => {

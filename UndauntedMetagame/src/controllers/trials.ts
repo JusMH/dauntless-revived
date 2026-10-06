@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, lt } from "drizzle-orm";
 import { GetDb } from "../db";
-import { leaderboardprofiles, trialruns } from "../db/schema";
+import { leaderboardprofiles, trialruns, trialweeks } from "../db/schema";
+import { GrantEntitlementInTx } from "./entitlements";
 
 export type TrialMode = "solo" | "group";
 
@@ -17,6 +18,7 @@ export type TrialPlayer = {
 type StoredTrialRun = {
     id: number,
     trialId: string,
+    trialWeek: number,
     difficulty: number,
     mode: string,
     runKey: string,
@@ -40,16 +42,67 @@ const TrialIdPattern = /^Arena_MatchmakerHunt_(Hard|Elite)_\d{3}$/;
 // UPlayerArenaComponent and the 1.4.4 leaderboard response view-model both carry the
 // current Trial window. Keep this epoch identical to the deploy server's rotation epoch.
 export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
+export const TRIAL_ROTATION_LENGTH = 67;
+export const TRIALS_CHAMPION_ENTITLEMENT = "trials_leaderboard_placement";
 const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function TrialsWindow(At: Date = new Date()){
+function Mod(Value: number, Divisor: number){
+    return ((Value % Divisor) + Divisor) % Divisor;
+}
+
+function TrialEpoch(){
     const Epoch = Date.parse(process.env.TRIAL_ROTATION_START ?? TRIAL_ROTATION_START);
 
     if(Number.isNaN(Epoch)){
         throw new TrialsError(500, "TRIAL_ROTATION_START is invalid");
     }
 
-    const Week = Math.floor((At.getTime() - Epoch) / TRIAL_WEEK_MS);
+    return Epoch;
+}
+
+export function TrialWeekAt(At: Date = new Date()){
+    return Math.floor((At.getTime() - TrialEpoch()) / TRIAL_WEEK_MS);
+}
+
+export function TrialIdForWeek(DifficultyValue: number, Week: number){
+    if(DifficultyValue !== 0 && DifficultyValue !== 1){
+        throw new TrialsError(400, "difficulty is invalid");
+    }
+
+    const Prefix = DifficultyValue === 1 ? "Elite" : "Hard";
+    const Suffix = String(Mod(Week, TRIAL_ROTATION_LENGTH) + 1).padStart(3, "0");
+    return `Arena_MatchmakerHunt_${Prefix}_${Suffix}`;
+}
+
+function TrialWeekForId(TrialIdValue: string, DifficultyValue: number, At: Date = new Date()){
+    const Match = TrialIdPattern.exec(TrialIdValue);
+
+    if(Match == null){
+        throw new TrialsError(400, "trial_id is invalid");
+    }
+
+    const ExpectedPrefix = DifficultyValue === 1 ? "Elite" : "Hard";
+    if(Match[1] !== ExpectedPrefix){
+        throw new TrialsError(400, "trial_id does not match difficulty");
+    }
+
+    const Suffix = Number(TrialIdValue.slice(-3));
+    if(!Number.isSafeInteger(Suffix) || Suffix < 1 || Suffix > TRIAL_ROTATION_LENGTH){
+        throw new TrialsError(400, "trial_id is outside the restored rotation");
+    }
+
+    // The client has Current/Previous date tabs, while the HTTP body identifies the actual
+    // trial row. Map a row to its most recent occurrence so the 67-week wrap never leaks a
+    // score from the previous cycle into the current board.
+    const CurrentWeek = TrialWeekAt(At);
+    const CurrentIndex = Mod(CurrentWeek, TRIAL_ROTATION_LENGTH);
+    const TargetIndex = Suffix - 1;
+    return CurrentWeek - Mod(CurrentIndex - TargetIndex, TRIAL_ROTATION_LENGTH);
+}
+
+export function TrialsWindow(At: Date = new Date()){
+    const Epoch = TrialEpoch();
+    const Week = TrialWeekAt(At);
     const Start = Epoch + Week * TRIAL_WEEK_MS;
     const End = Start + TRIAL_WEEK_MS;
 
@@ -183,10 +236,15 @@ function ParseEntries(Run: StoredTrialRun): TrialPlayer[] {
     });
 }
 
-export function SaveTrialRun(Body: unknown){
+export function SaveTrialRun(Body: unknown, At: Date = new Date()){
     const Raw: any = Body;
     const trialId = TrialId(Raw);
     const difficulty = Difficulty(Raw);
+    const trialWeek = TrialWeekAt(At);
+
+    if(trialId !== TrialIdForWeek(difficulty, trialWeek)){
+        throw new TrialsError(409, "trial_id is not the active Trial");
+    }
     const completionTime = Integer(Raw?.completion_time, "completion_time", 0, 24 * 60 * 60 * 1000);
     const objectivesCompleted = Integer(Raw?.objectives_completed ?? 0, "objectives_completed", 0, 99);
     const Players = SubmissionPlayers(Raw);
@@ -204,6 +262,7 @@ export function SaveTrialRun(Body: unknown){
 
     GetDb().insert(trialruns).values({
         trialId,
+        trialWeek,
         difficulty,
         mode: Mode,
         runKey,
@@ -215,18 +274,19 @@ export function SaveTrialRun(Body: unknown){
         submittedDate
     }).onConflictDoNothing().run();
 
-    return {trialId, difficulty, mode: Mode, accountIds: AccountIds};
+    return {trialId, trialWeek, difficulty, mode: Mode, accountIds: AccountIds};
 }
 
 type Query = {
     TrialId: string,
+    TrialWeek: number,
     Difficulty: number,
     Page: number,
     PageSize: number,
     Platforms: Set<string>
 };
 
-function QueryFrom(Body: any): Query {
+function QueryFrom(Body: any, At: Date = new Date()): Query {
     const Platforms = new Set<string>();
 
     if(Body?.target_platforms !== undefined){
@@ -237,31 +297,23 @@ function QueryFrom(Body: any): Query {
         for(const Platform of Body.target_platforms) Platforms.add(Platform);
     }
 
+    const Id = TrialId(Body);
+    const DifficultyValue = Difficulty(Body);
+
     return {
-        TrialId: TrialId(Body),
-        Difficulty: Difficulty(Body),
+        TrialId: Id,
+        TrialWeek: TrialWeekForId(Id, DifficultyValue, At),
+        Difficulty: DifficultyValue,
         Page: Integer(Body?.page ?? 0, "page", 0, 1000000),
         PageSize: Integer(Body?.page_size ?? 100, "page_size", 1, 100),
         Platforms
     };
 }
 
-function Runs(Query: Query, Mode: TrialMode){
-    const Rows = GetDb().select().from(trialruns).where(and(
-        eq(trialruns.trialId, Query.TrialId),
-        eq(trialruns.difficulty, Query.Difficulty),
-        eq(trialruns.mode, Mode)
-    )).all() as StoredTrialRun[];
-
-    const Filtered = Rows.filter((Run) => {
-        if(Query.Platforms.size === 0) return true;
-        const Entries = ParseEntries(Run);
-        return Entries.every((Entry) => Query.Platforms.has(Entry.platform));
-    });
-
+function BestRuns(Rows: StoredTrialRun[]){
     const Best = new Map<string, StoredTrialRun>();
 
-    for(const Run of Filtered){
+    for(const Run of Rows){
         const Current = Best.get(Run.groupKey);
 
         if(Current === undefined || Run.completionTime < Current.completionTime ||
@@ -276,6 +328,65 @@ function Runs(Query: Query, Mode: TrialMode){
         A.submittedDate.localeCompare(B.submittedDate) ||
         A.groupKey.localeCompare(B.groupKey)
     );
+}
+
+function Runs(Query: Query, Mode: TrialMode){
+    const Rows = GetDb().select().from(trialruns).where(and(
+        eq(trialruns.trialId, Query.TrialId),
+        eq(trialruns.trialWeek, Query.TrialWeek),
+        eq(trialruns.difficulty, Query.Difficulty),
+        eq(trialruns.mode, Mode)
+    )).all() as StoredTrialRun[];
+
+    const Filtered = Rows.filter((Run) => {
+        if(Query.Platforms.size === 0) return true;
+        const Entries = ParseEntries(Run);
+        return Entries.every((Entry) => Query.Platforms.has(Entry.platform));
+    });
+
+    return BestRuns(Filtered);
+}
+
+// Champion gear was a permanent unlock earned by finishing a Dauntless Trial in the
+// Top 100 at the weekly reset. Finalize every completed week that has recorded runs.
+// This is lazy and idempotent: the first leaderboard/Lady Luck request after rollover
+// performs the grant, then trialweeks prevents it from running again.
+export function FinalizeCompletedTrialWeeks(At: Date = new Date()){
+    const CurrentWeek = TrialWeekAt(At);
+
+    return GetDb().transaction((tx) => {
+        const Finalized = new Set(tx.select({week: trialweeks.week}).from(trialweeks).all().map((Row) => Row.week));
+        const OldRows = tx.select().from(trialruns).where(lt(trialruns.trialWeek, CurrentWeek)).all() as StoredTrialRun[];
+        const Weeks = [...new Set(OldRows.map((Run) => Run.trialWeek))].filter((Week) => !Finalized.has(Week)).sort((A, B) => A - B);
+        let AwardedAccounts = 0;
+
+        for(const Week of Weeks){
+            const Winners = new Set<string>();
+            const Dauntless = OldRows.filter((Run) => Run.trialWeek === Week && Run.difficulty === 1);
+
+            for(const Mode of ["solo", "group"] as const){
+                for(const Run of BestRuns(Dauntless.filter((Entry) => Entry.mode === Mode)).slice(0, 100)){
+                    for(const PlayerEntry of JSON.parse(Run.entries) as TrialPlayer[]){
+                        Winners.add(PlayerEntry.phx_account_id);
+                    }
+                }
+            }
+
+            for(const AccountId of Winners){
+                GrantEntitlementInTx(tx, AccountId, TRIALS_CHAMPION_ENTITLEMENT, 0, `trials:week:${Week}`);
+            }
+
+            tx.insert(trialweeks).values({
+                week: Week,
+                finalizedDate: At.toISOString(),
+                awardedAccounts: Winners.size
+            }).run();
+
+            AwardedAccounts += Winners.size;
+        }
+
+        return {FinalizedWeeks: Weeks.length, AwardedAccounts};
+    });
 }
 
 function SoloEntry(Run: StoredTrialRun, Rank: number){
