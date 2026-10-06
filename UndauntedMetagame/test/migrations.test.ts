@@ -151,7 +151,7 @@ describe("migrations after the last release (0013_guilds)", () => {
         migrate(Updated, { migrationsFolder: MIGRATIONS });
 
         const NewTables = Tables(Updated).filter((Name) => !OldTables.includes(Name) && !Name.startsWith("__drizzle"));
-        assert.ok(["escalationprogression", "escalationtalents", "escalationunlocks", "storepurchases", "slayerlinkinvites", "slayerlinks"].every((Name) => NewTables.includes(Name)), NewTables.join(", "));
+        assert.ok(["escalationprogression", "escalationtalents", "escalationunlocks", "storepurchases", "slayerlinkinvites", "slayerlinks", "trialruns", "leaderboardprofiles"].every((Name) => NewTables.includes(Name)), NewTables.join(", "));
         assert.deepEqual(Snapshot(Updated, OldTables), Before, "every row of every released table is kept");
         // The social tables the Slayer Links read (0016) are among them; named here so a change to them stands out
         for(const Name of ["friendships", "blocks", "guilds", "guildmembers", "guildinvites"]){

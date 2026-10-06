@@ -5,12 +5,14 @@ import { characters, inventory, inventorylog, inventorytransactions } from "../d
 import { logger } from "../logger";
 import { DoesCharacterBelongToUserId } from "./character";
 import type { Tx } from "./savehistory";
+import { FindFusionItemIndex, IsValidFusionRemoval, IsValidFusionSave, MiddlemanConflictError, MiddlemanValidationError, NormaliseFusionItem, ValidateFusionCompletions } from "./middleman";
+import { MiddlemanFusionGuards } from "../features";
 
 export type InventoryError = "forbidden" | "not_found" | "conflict" | "insufficient_quantity" | "invalid_inventory_item" | "invalid_inventory_data" | "db_error";
 export type InventoryResult<T = void> = { success: true, data?: T } | { success: false, error: InventoryError };
 
 // "store": grants of the storefront (roadmap 3.7), made inside its own purchase transaction
-export type InventoryCaller = "client" | "gameserver" | "admin" | "store";
+export type InventoryCaller = "client" | "gameserver" | "admin" | "store" | "trials";
 export type InventoryContext = { Caller: InventoryCaller, Source?: unknown };
 export type TransactionResponse = { createdInstancedItems: any, updatedInstancedItems: any[], updatedStackedItems: any[], removedInstancedItems: any };
 
@@ -72,8 +74,9 @@ function MakeEmptyInventoryRow(CharacterId: string): typeof inventory.$inferInse
     };
 }
 
-function FindInstancedItemIndex(InstancedItems: any[], InstanceId: string){
-    return InstancedItems.findIndex((Item) => Item.instanceId === InstanceId);
+function FindInstancedItemIndex(InstancedItems: any[], IncomingItem: any){
+    const Exact = InstancedItems.findIndex((Item) => Item.instanceId === IncomingItem?.instanceId);
+    return Exact >= 0 ? Exact : FindFusionItemIndex(InstancedItems, IncomingItem);
 }
 
 function HasStatelessItemData(Item: any){
@@ -104,6 +107,10 @@ function AssertExistingInstancedItemWrite(CurrentItem: any, IncomingItem: any, O
 
     if(IsAllowedStaleStatelessReplacement(CurrentItem, IncomingItem, Operation)){
         return "skip";
+    }
+
+    if(IsValidFusionSave(CurrentItem, IncomingItem, Operation) || IsValidFusionRemoval(CurrentItem, IncomingItem, Operation)){
+        return "write";
     }
 
     const IsStaleInstancedItem = typeof IncomingItem.updateVersion !== "number" || IncomingItem.updateVersion <= CurrentItem.updateVersion;
@@ -321,20 +328,21 @@ export async function UpdateInstancedItem(CharacterId: string, UserId: string, I
             }
 
             const InstancedItems: any[] = JSON.parse(CurrentInventory.instancedItems);
-            const ItemIndex = InstancedItems.findIndex((Item) => Item.catalogId === CatalogId && Item.instanceId === InstanceId);
+            const IncomingItem = NormaliseFusionItem({catalogId: CatalogId, instanceId: InstanceId, itemData: ItemData, updateVersion: UpdateVersion});
+            const ItemIndex = FindInstancedItemIndex(InstancedItems, IncomingItem);
 
             if(ItemIndex < 0){
                 return {success: false, error: "not_found"} as InventoryResult<any>;
             }
 
             const Item = InstancedItems[ItemIndex];
-            const IncomingItem = {catalogId: CatalogId, instanceId: InstanceId, itemData: ItemData, updateVersion: UpdateVersion};
 
             if(AssertExistingInstancedItemWrite(Item, IncomingItem, "update") === "skip"){
                 logger.info(`Skipping stale stateless Instanced Item ${CatalogId} for CharacterId ${CharacterId} and UserId ${UserId}`);
                 return {success: true, data: Item} as InventoryResult<any>;
             }
 
+            Item.instanceId = IncomingItem.instanceId;
             Item.itemData = ItemData;
             Item.updateVersion = UpdateVersion;
 
@@ -350,12 +358,12 @@ export async function UpdateInstancedItem(CharacterId: string, UserId: string, I
         });
     }
     catch(error){
-        if(error instanceof InventoryConflictError){
+        if(error instanceof InventoryConflictError || error instanceof MiddlemanConflictError){
             logger.warn(error.message);
             return {success: false, error: "conflict"};
         }
 
-        if(error instanceof InventoryValidationError){
+        if(error instanceof InventoryValidationError || error instanceof MiddlemanValidationError){
             logger.warn(error.message);
             return {success: false, error: "invalid_inventory_item"};
         }
@@ -396,6 +404,12 @@ function PrepareInventoryTransaction(Request: InventoryTransactionRequest): Prep
     AssertItemList(InstancedItemsToRemove, "removeInstancedItems");
     AssertItemList(StackedItemsToRemove, "removeStackedItems");
     AssertItemList(InstancedItemsToSave, "saveInstancedItems");
+
+    // Pending Middleman exchanges are inventory items. Give each slot a stable identity before
+    // dedupe/hash checks so three simultaneous slots do not overwrite one another.
+    for(const Item of [...InstancedItemsToAdd, ...InstancedItemsToRemove, ...InstancedItemsToSave]){
+        NormaliseFusionItem(Item);
+    }
 
     return {
         Request,
@@ -478,8 +492,12 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
         const InstancedItems: any[] = JSON.parse(CurrentInventory.instancedItems);
         let DidUpdateInstancedItems = false;
 
+        if(MiddlemanFusionGuards()){
+            ValidateFusionCompletions(InstancedItems, InstancedItemsToRemove, StackedItemsToAdd);
+        }
+
         for(const ItemToRemove of InstancedItemsToRemove){
-            const ItemIndex = FindInstancedItemIndex(InstancedItems, ItemToRemove.instanceId);
+            const ItemIndex = FindInstancedItemIndex(InstancedItems, ItemToRemove);
 
             if(ItemIndex >= 0){
                 AssertExistingInstancedItemWrite(InstancedItems[ItemIndex], ItemToRemove, "remove");
@@ -493,7 +511,7 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
         }
 
         for(const ItemToSave of InstancedItemsToSave){
-            const ItemIndex = FindInstancedItemIndex(InstancedItems, ItemToSave.instanceId);
+            const ItemIndex = FindInstancedItemIndex(InstancedItems, ItemToSave);
 
             if(ItemIndex >= 0){
                 if(AssertExistingInstancedItemWrite(InstancedItems[ItemIndex], ItemToSave, "save") === "skip"){
@@ -513,7 +531,7 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
         }
 
         for(const ItemToAdd of InstancedItemsToAdd){
-            const ItemIndex = FindInstancedItemIndex(InstancedItems, ItemToAdd.instanceId);
+            const ItemIndex = FindInstancedItemIndex(InstancedItems, ItemToAdd);
 
             if(ItemIndex >= 0){
                 if(AssertExistingInstancedItemWrite(InstancedItems[ItemIndex], ItemToAdd, "add") === "skip"){
@@ -601,8 +619,8 @@ export function ApplyInventoryTransactionInTx(tx: Tx, Request: InventoryTransact
 export function InventoryErrorOf(error: unknown): InventoryError | undefined {
     if(error instanceof InventoryForbiddenError) return "forbidden";
     if(error instanceof InventoryInsufficientError) return "insufficient_quantity";
-    if(error instanceof InventoryConflictError) return "conflict";
-    if(error instanceof InventoryValidationError) return "invalid_inventory_item";
+    if(error instanceof InventoryConflictError || error instanceof MiddlemanConflictError) return "conflict";
+    if(error instanceof InventoryValidationError || error instanceof MiddlemanValidationError) return "invalid_inventory_item";
     if(error instanceof SyntaxError) return "invalid_inventory_data";
     return undefined;
 }
@@ -679,12 +697,12 @@ export async function RunInventoryTransaction(UserId: string, CharacterId: strin
             return {success: false, error: "insufficient_quantity"};
         }
 
-        if(error instanceof InventoryConflictError){
+        if(error instanceof InventoryConflictError || error instanceof MiddlemanConflictError){
             logger.warn(error.message);
             return {success: false, error: "conflict"};
         }
 
-        if(error instanceof InventoryValidationError){
+        if(error instanceof InventoryValidationError || error instanceof MiddlemanValidationError){
             logger.warn(error.message);
             return {success: false, error: "invalid_inventory_item"};
         }

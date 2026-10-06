@@ -5,14 +5,18 @@ import { and, count, eq, gt, isNotNull, isNull, lt } from "drizzle-orm";
 import { GetDb } from "../db";
 import { characters, inventory, storepurchases } from "../db/schema";
 import { logger } from "../logger";
-import { StoreRepeatableTokens } from "../features";
+import { MiddlemanStore, StoreMode, StoreRepeatableTokens, TrialsStore } from "../features";
 import catalog from "../vendor/store_catalog.json";
 import curated30 from "../vendor/store_curated_30.json";
 import itemKinds from "../vendor/store_item_kinds.json";
+import ladyLuck from "../vendor/store_ladyluck.json";
+import middlemanStore from "../vendor/store_middleman.json";
+import middlemanCells from "../vendor/store_middleman_cells.json";
 import { GetActiveCharacter } from "./activecharacter";
 import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
 import { ApplyInventoryTransactionInTx, InventoryErrorOf } from "./inventory";
 import { Tx } from "./savehistory";
+import { FinalizeCompletedTrialWeeks, TRIALS_CHAMPION_ENTITLEMENT } from "./trials";
 
 // The free store (roadmap 3.7, STORE=free). The client's flow (0x140b39657, 0x140b55011):
 // - GET /product/skus/public?requiredTags=<tag>: the offers of one tag (the storefront is "webstore"),
@@ -39,7 +43,7 @@ export class StoreError extends Error {
 
 type StoreItem = { catalogId: string, quantity: number };
 type StoreGrant = { name: string, duration?: number };
-export type StoreOffer = { id: string, tags: string[], platinumPrice: number, items: StoreItem[] | null, entitlements: StoreGrant[] | null, remaining: number, [Field: string]: unknown };
+export type StoreOffer = { id: string, tags: string[], platinumPrice?: number | null, items: StoreItem[] | null, entitlements: StoreGrant[] | null, remaining: number | null, maxAllowed?: number | null, [Field: string]: unknown };
 
 const PURCHASE_TOKEN_MINUTES = 10;
 
@@ -62,7 +66,91 @@ export function SetStoreTokenLimitForTests(Limit?: number){
     TokenLimit = Limit ?? MAX_TOKENS_PER_WINDOW;
 }
 
-const Catalog = catalog as unknown as Record<string, unknown>;
+type LadyLuckCatalog = { offers: StoreOffer[], itemKinds: Record<string, string>, repeatable: string[] };
+type MiddlemanCatalog = { exchange_vendor_slot_2: StoreOffer[], exchange_vendor_slot_3: StoreOffer[] };
+type MiddlemanCellsCatalog = { families: {id: string, name: string}[] };
+const LadyLuck = ladyLuck as unknown as LadyLuckCatalog;
+const MiddlemanCatalogData = middlemanStore as unknown as MiddlemanCatalog;
+const MiddlemanCells = middlemanCells as unknown as MiddlemanCellsCatalog;
+const MIDDLEMAN_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const MIDDLEMAN_ROTATION_EPOCH = Date.UTC(1970, 0, 1, 18); // Thursday 18:00 UTC, the retail weekly reset.
+const MIDDLEMAN_WEEKLY_TAG = "weekly_cell_offering";
+
+const MiddlemanCellOffers: StoreOffer[] = MiddlemanCells.families.flatMap((Family) =>
+    ([["UC", 1, 80], ["R", 2, 200]] as const).map(([Suffix, Rank, Price]) => {
+        const CatalogId = `CELL_${Family.id}_${Suffix}`;
+        return {
+            id: `middleman_weekly_${CatalogId.toLowerCase()}`,
+            displayName: `+${Rank} ${Family.name} Cell`,
+            displayDescription: "Purchase one cell with Aetherdust.",
+            displayPriority: 0,
+            tags: [MIDDLEMAN_WEEKLY_TAG],
+            platinumPrice: null,
+            cellDustPrice: Price,
+            prestigePrice: null,
+            event01Price: null,
+            steelMarksPrice: null,
+            gildedMarksPrice: null,
+            items: [{catalogId: CatalogId, quantity: 1}],
+            entitlements: [],
+            maxAllowed: 1,
+            remaining: 1,
+            loadoutSlots: null,
+            availableFrom: null,
+            availableTo: null,
+            timeAvailabilityReason: null,
+            platformOfferId: null,
+            missingEntitlementNames: null
+        } as StoreOffer;
+    })
+);
+const MIDDLEMAN_CELL_IDS = new Set(MiddlemanCellOffers.map((Offer) => (Offer.items ?? [])[0]?.catalogId).filter((Id): Id is string => typeof Id === "string"));
+const MIDDLEMAN_OFFER_IDS = new Set(MiddlemanCellOffers.map((Offer) => Offer.id));
+const MIDDLEMAN_VENDOR_IDS = new Set([
+    ...MiddlemanCatalogData.exchange_vendor_slot_2,
+    ...MiddlemanCatalogData.exchange_vendor_slot_3
+].map((Offer) => Offer.id));
+
+export function MiddlemanWindowStart(At: Date = new Date()){
+    return MIDDLEMAN_ROTATION_EPOCH + Math.floor((At.getTime() - MIDDLEMAN_ROTATION_EPOCH) / MIDDLEMAN_WEEK_MS) * MIDDLEMAN_WEEK_MS;
+}
+
+export function SelectWeeklyMiddlemanOffers(At: Date = new Date()): StoreOffer[]{
+    const Families = MiddlemanCells.families.map((Family) => ({
+        ...Family,
+        score: createHash("sha256").update(`middleman-weekly-v1:${Family.id}`).digest("hex")
+    })).sort((A, B) => A.score.localeCompare(B.score));
+    if(Families.length === 0) return [];
+
+    const Start = MiddlemanWindowStart(At);
+    const Week = Math.floor((Start - MIDDLEMAN_ROTATION_EPOCH) / MIDDLEMAN_WEEK_MS);
+    const Offset = ((Week * 3) % Families.length + Families.length) % Families.length;
+
+    return Array.from({length: Math.min(3, Families.length)}, (_, Index) => {
+        const Family = Families[(Offset + Index) % Families.length];
+        const Suffix = Index === 2 ? "R" : "UC";
+        const CatalogId = `CELL_${Family.id}_${Suffix}`;
+        const Offer = MiddlemanCellOffers.find((Candidate) => Candidate.items?.[0]?.catalogId === CatalogId)!;
+        return {
+            ...Offer,
+            displayPriority: Index,
+            availableFrom: new Date(Start).toISOString(),
+            availableTo: new Date(Start + MIDDLEMAN_WEEK_MS).toISOString()
+        };
+    });
+}
+const LADY_LUCK_IDS = new Set(LadyLuck.offers.map((Offer) => Offer.id));
+const LADY_LUCK_ITEM_KINDS = LadyLuck.itemKinds;
+const LADY_LUCK_REPEATABLE = new Set(LadyLuck.repeatable);
+const LADY_LUCK_CHAMPION_TAG = "store_trials_tab_champion";
+
+const Catalog: Record<string, unknown> = {
+    ...(catalog as unknown as Record<string, unknown>),
+    ladyluckstore: LadyLuck.offers,
+    exchange_vendor_slot_2: MiddlemanCatalogData.exchange_vendor_slot_2,
+    exchange_vendor_slot_3: MiddlemanCatalogData.exchange_vendor_slot_3,
+    [MIDDLEMAN_WEEKLY_TAG]: MiddlemanCellOffers
+};
 
 // Every offer under every tag (keys starting with _ are notes)
 const CatalogTags = Object.keys(Catalog).filter((Key) => !Key.startsWith("_") && Array.isArray(Catalog[Key]));
@@ -82,6 +170,25 @@ const CURRENCY_FIELDS: Record<string, {PriceField: string, CatalogId: string}> =
     prestige: {PriceField: "prestigePrice", CatalogId: "CURRENCY_PRESTIGE"}
 };
 
+const CURRENCY_ALIASES: Record<string, string> = {
+    // The 1.4.4 store can surface either its service-facing id_currency_* name or the
+    // inventory catalogue id that actually holds the balance. Treat both as the same
+    // payment currency so Lady Luck and Middleman purchases do not depend on which name
+    // a particular UI path copied into /token/:currency/:sku.
+    id_currency_celldust: "celldust",
+    currency_celldust: "celldust",
+    id_currency_marks_steel: "markssteel",
+    currency_marks_steel: "markssteel",
+    id_currency_marks_gilded: "marksgilded",
+    currency_marks_gilded: "marksgilded",
+    currency_platinum_univ: "platinum",
+    currency_prestige: "prestige",
+    marks_steel: "markssteel",
+    marks_gilded: "marksgilded",
+    steelmarks: "markssteel",
+    gildedmarks: "marksgilded"
+};
+
 // Which items the store may hand out at all: cosmetics, and the repeatable consumable. Anything else
 // (currencies, boosts, weapons proper) is refused even if an offer lists it.
 const COSMETIC_PREFIXES = ["AR_", "WP_", "EM_", "DYE_", "QI_FLARE_", "BNC_FABRIC_", "BNC_STANDARD_", "BNC_SIGIL_", "LT_"];
@@ -99,6 +206,16 @@ const Hash = (Value: string) => createHash("sha256").update(Value).digest("hex")
 const OfferHash = (Offer: StoreOffer) => Hash(JSON.stringify(Offer));
 
 export function GrantKind(CatalogId: string): "stacked" | "instanced" | undefined {
+    if(MIDDLEMAN_CELL_IDS.has(CatalogId)){
+        return "stacked";
+    }
+
+    const SpecialKind = LADY_LUCK_ITEM_KINDS[CatalogId];
+
+    if(SpecialKind === "stacked" || SpecialKind === "instanced"){
+        return SpecialKind;
+    }
+
     if(!REPEATABLE_ITEMS.has(CatalogId) && !COSMETIC_PREFIXES.some((Prefix) => CatalogId.startsWith(Prefix))){
         return undefined;
     }
@@ -110,17 +227,59 @@ export function GrantKind(CatalogId: string): "stacked" | "instanced" | undefine
 
 // A repeatable offer sells consumables only; it is never "owned", and each purchase grants its full quantity
 function IsRepeatable(Offer: StoreOffer){
-    const Items = Offer.items ?? [];
+    if(MIDDLEMAN_OFFER_IDS.has(Offer.id) || LADY_LUCK_REPEATABLE.has(Offer.id)){
+        return true;
+    }
 
+    const Items = Offer.items ?? [];
     return Items.length > 0 && Items.every((Item) => REPEATABLE_ITEMS.has(Item.catalogId));
 }
 
 function IsListed(Offer: StoreOffer){
+    const LadyLuckOffer = LADY_LUCK_IDS.has(Offer.id);
+    const MiddlemanOffer = MIDDLEMAN_VENDOR_IDS.has(Offer.id) || MIDDLEMAN_OFFER_IDS.has(Offer.id);
+
+    if(LadyLuckOffer && !TrialsStore()) return false;
+    if(MiddlemanOffer && !MiddlemanStore()) return false;
+    if(!LadyLuckOffer && !MiddlemanOffer && StoreMode() !== "free") return false;
     if (process.env.STORE_CATALOG_PROFILE === "curated30" && Offer.tags.includes("webstore") && !curated30.includes(Offer.id)) return false;
-    return !IsRepeatable(Offer) || StoreRepeatableTokens();
+    return !IsRepeatable(Offer) || LADY_LUCK_REPEATABLE.has(Offer.id) || MiddlemanOffer || StoreRepeatableTokens();
+}
+
+export function IsAnyStoreEnabled(){
+    return StoreMode() === "free" || TrialsStore() || MiddlemanStore();
+}
+
+export function IsStoreTagEnabled(Tag: string){
+    if(Tag === "ladyluckstore") return TrialsStore();
+    if(Tag === MIDDLEMAN_WEEKLY_TAG || Tag === "exchange_vendor_slot_2" || Tag === "exchange_vendor_slot_3") return MiddlemanStore();
+    return StoreMode() === "free";
+}
+
+export function IsStoreSkuEnabled(SkuId: string){
+    if(LADY_LUCK_IDS.has(SkuId)) return TrialsStore();
+    if(MIDDLEMAN_VENDOR_IDS.has(SkuId) || MIDDLEMAN_OFFER_IDS.has(SkuId)) return MiddlemanStore();
+    return StoreMode() === "free";
+}
+
+function IsChampionOffer(Offer: StoreOffer){
+    return LADY_LUCK_IDS.has(Offer.id) && Offer.tags.includes(LADY_LUCK_CHAMPION_TAG);
+}
+
+function CanAccessOffer(tx: Tx, AccountId: string, Offer: StoreOffer){
+    return !IsChampionOffer(Offer) || HasActiveEntitlement(tx, AccountId, TRIALS_CHAMPION_ENTITLEMENT);
+}
+
+function FinalizeTrialsForOffer(Offer: StoreOffer | undefined){
+    if(Offer != undefined && LADY_LUCK_IDS.has(Offer.id) && TrialsStore()){
+        FinalizeCompletedTrialWeeks();
+    }
 }
 
 function FindOffer(SkuId: string){
+    const Middleman = MiddlemanStore() ? SelectWeeklyMiddlemanOffers().find((Offer) => Offer.id === SkuId) : undefined;
+    if(Middleman != undefined) return Middleman;
+    if(MIDDLEMAN_OFFER_IDS.has(SkuId)) return undefined;
     return AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer)) ?? ExtraOffersForTests.find((Offer) => Offer.id === SkuId);
 }
 
@@ -168,7 +327,6 @@ function CheckOffer(Offer: StoreOffer){
     }
 
     const Unsupported = Items.some((Item) => GrantKind(Item.catalogId) === undefined ||
-        REPEATABLE_ITEMS.has(Item.catalogId) !== Repeatable ||
         (Repeatable ? GrantKind(Item.catalogId) !== "stacked" || !Number.isSafeInteger(Item.quantity) || Item.quantity <= 0 : Item.quantity !== 1));
 
     if(Unsupported){
@@ -181,9 +339,14 @@ function CheckOffer(Offer: StoreOffer){
 }
 
 function CheckCurrency(Currency: string){
-    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Currency)){
+    const Lower = Currency.toLowerCase();
+    const Canonical = CURRENCY_ALIASES[Lower] ?? Lower;
+
+    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Canonical)){
         throw new StoreError(400, "Unsupported store currency");
     }
+
+    return Canonical;
 }
 
 // Every catalogue id the character holds, stacked (quantity above 0) or instanced
@@ -229,12 +392,19 @@ function WithRemaining(tx: Tx, AccountId: string, Held: Set<string>, Offer: Stor
 
 // GET /product/skus/public?requiredTags=<tag>. An unknown tag is an empty list.
 export function ListStoreOffers(AccountId: string, Tag: string): StoreOffer[] {
-    const ForTag = CatalogTags.includes(Tag) ? (Catalog[Tag] as StoreOffer[]).filter(IsListed) : [];
+    const ForTag = Tag === MIDDLEMAN_WEEKLY_TAG
+        ? (MiddlemanStore() ? SelectWeeklyMiddlemanOffers() : [])
+        : CatalogTags.includes(Tag) ? (Catalog[Tag] as StoreOffer[]).filter(IsListed) : [];
+
+    if(Tag === "ladyluckstore" && TrialsStore()){
+        FinalizeCompletedTrialWeeks();
+    }
 
     return GetDb().transaction((tx) => {
         const Held = HeldCatalogIds(tx, GetActiveCharacter(tx, AccountId)?.characterId);
 
-        return ForTag.map((Offer) => WithRemaining(tx, AccountId, Held, Offer));
+        return ForTag.filter((Offer) => CanAccessOffer(tx, AccountId, Offer))
+            .map((Offer) => WithRemaining(tx, AccountId, Held, Offer));
     });
 }
 
@@ -250,7 +420,15 @@ export function GetStoreOffer(AccountId: string, SkuId: string): StoreOffer {
         throw new StoreError(404, "Unknown store offer");
     }
 
-    return GetDb().transaction((tx) => WithRemaining(tx, AccountId, HeldCatalogIds(tx, GetActiveCharacter(tx, AccountId)?.characterId), Offer));
+    FinalizeTrialsForOffer(Offer);
+
+    return GetDb().transaction((tx) => {
+        if(!CanAccessOffer(tx, AccountId, Offer)){
+            throw new StoreError(404, "Unknown store offer");
+        }
+
+        return WithRemaining(tx, AccountId, HeldCatalogIds(tx, GetActiveCharacter(tx, AccountId)?.characterId), Offer);
+    });
 }
 
 // The whole table: tokens past their expiry that were never redeemed, and receipts redeemed more than
@@ -280,7 +458,7 @@ export function PruneExpiredStorePurchases(){
 // the offer as it is now; valid for 10 minutes. Refused (409) for an offer the account already owns (the
 // repeatable bundle is never owned) and past MAX_TOKENS_PER_WINDOW tokens in TOKEN_WINDOW_MS.
 export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: string){
-    CheckCurrency(Currency);
+    Currency = CheckCurrency(Currency);
 
     const Offer = FindOffer(SkuId);
 
@@ -288,6 +466,7 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
         throw new StoreError(404, "Unknown store offer");
     }
 
+    FinalizeTrialsForOffer(Offer);
     CheckOffer(Offer);
 
     const Pricing = ResolveOfferPricing(Offer);
@@ -308,6 +487,10 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
         // This account's own expired tokens, through the account index
         tx.delete(storepurchases)
             .where(and(eq(storepurchases.accountId, AccountId), isNull(storepurchases.redeemedDate), lt(storepurchases.expiresDate, Now.toISOString()))).run();
+
+        if(!CanAccessOffer(tx, AccountId, Offer)){
+            throw new StoreError(404, "Unknown store offer");
+        }
 
         const Character = GetActiveCharacter(tx, AccountId);
 
@@ -352,7 +535,14 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
 // POST /notification/<currency>?token=<token>: the grant and the receipt in one transaction. A token
 // that was already redeemed answers again and grants nothing (a retry after a lost answer).
 export function RedeemStorePurchase(AccountId: string, Currency: string, Token: unknown){
-    if(!Object.prototype.hasOwnProperty.call(CURRENCY_FIELDS, Currency) || typeof Token !== "string" || !/^[a-f0-9]{64}$/.test(Token)){
+    try{
+        Currency = CheckCurrency(Currency);
+    }
+    catch{
+        throw new StoreError(400, "Invalid purchase token or currency");
+    }
+
+    if(typeof Token !== "string" || !/^[a-f0-9]{64}$/.test(Token)){
         throw new StoreError(400, "Invalid purchase token or currency");
     }
 
@@ -383,6 +573,10 @@ export function RedeemStorePurchase(AccountId: string, Currency: string, Token: 
 
         if(Offer == undefined){
             throw new StoreError(409, "Offer is no longer sold; request a new token");
+        }
+
+        if(!CanAccessOffer(tx, AccountId, Offer)){
+            throw new StoreError(409, "Offer is no longer available to this account");
         }
 
         CheckOffer(Offer);

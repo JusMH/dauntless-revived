@@ -14,6 +14,7 @@ import { RealProgressionOnly, RefuseForeignPlayer, SendRealReply } from "../midd
 import { GetDb } from "../db";
 import { TouchPlayer } from "../controllers/party";
 import { RefuseUnlessGameserver } from "../middleware/GameServerOnly";
+import { TrialsError, UpdateLeaderboardProfile } from "../controllers/trials";
 
 export const systemRouter = Router();
 
@@ -73,11 +74,24 @@ systemRouter.post("/account/migrate", HasUndauntedMetagameAuth, (req, res) => {
 	});
 });
 
-systemRouter.post("/profile/update", HasUndauntedMetagameAuth, (req, res) => {
-	logger.info("Leaderboard update profile (stubbed)");
+systemRouter.post("/profile/update", HasUndauntedMetagameAuth, (req: any, res) => {
+    try{
+        UpdateLeaderboardProfile(req.AuthData.userId, req.body);
+        logger.info(`Updated leaderboard profile for ${req.AuthData.userId}`);
+        res.status(200);
+        res.send();
+    }
+    catch(error){
+        if(error instanceof TrialsError){
+            res.status(error.Status);
+            res.json({code: String(error.Status), message: error.message});
+            return;
+        }
 
-	res.status(200);
-	res.send();
+        logger.error(error, "Leaderboard profile update failed");
+        res.status(500);
+        res.json({code: "500", message: "Leaderboard profile update failed"});
+    }
 });
 
 systemRouter.get("/vivox/login", HasUndauntedMetagameAuth, (req, res) => {
