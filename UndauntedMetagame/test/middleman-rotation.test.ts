@@ -13,7 +13,9 @@ after(() => {
 });
 
 beforeEach(() => {
-    process.env.STORE = "free";
+    process.env.STORE = "off";
+    process.env.TRIALS_STORE = "0";
+    process.env.MIDDLEMAN_STORE = "1";
 });
 
 function Credit(CharacterId: string, Quantity: number){
