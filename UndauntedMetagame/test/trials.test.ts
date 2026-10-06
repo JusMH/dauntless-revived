@@ -5,11 +5,11 @@ import assert from "node:assert/strict";
 import { eq } from "drizzle-orm";
 import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
-import { entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
+import { cooldowns, entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
 import { MakePlayer, StackQuantity } from "./helpers";
-import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialWeekAt, TrialsWindowForWeek, TRIAL_ROTATION_START, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
+import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialRewardRank, TrialWeekAt, TrialsWindowForWeek, TRIAL_ROTATION_START, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
 
-const Trial = () => TrialIdForWeek(1, TrialWeekAt());
+const Trial = (Difficulty = 1) => TrialIdForWeek(Difficulty, TrialWeekAt());
 
 before(async () => {
     await StartApp();
@@ -22,15 +22,19 @@ after(async () => {
 
 beforeEach(() => {
     process.env.TRIALS_LEADERBOARDS = "1";
+    process.env.STORE = "off";
+    process.env.TRIALS_STORE = "1";
+    process.env.MIDDLEMAN_STORE = "0";
     GetDb().delete(trialruns).run();
     GetDb().delete(trialweeks).run();
     GetDb().delete(leaderboardprofiles).run();
+    GetDb().delete(cooldowns).run();
 });
 
-function Solo(UserId: string, Time: number, Session: string){
+function Solo(UserId: string, Time: number, Session: string, Difficulty = 1){
     return {
-        difficulty: 1,
-        trial_id: Trial(),
+        difficulty: Difficulty,
+        trial_id: Trial(Difficulty),
         completion_time: Time,
         objectives_completed: 3,
         phx_account_id: UserId,
@@ -48,6 +52,77 @@ function Query(Extra = {}){
 }
 
 describe("Trials leaderboards", () => {
+    it("uses the retail Bronze/Silver/Gold time boundaries for reward rank", () => {
+        assert.equal(TrialRewardRank(30 * 60 * 1000), -1);
+        assert.equal(TrialRewardRank(30 * 60 * 1000 - 1), 0);
+        assert.equal(TrialRewardRank(5 * 60 * 1000), 0);
+        assert.equal(TrialRewardRank(5 * 60 * 1000 - 1), 1);
+        assert.equal(TrialRewardRank(3 * 60 * 1000), 1);
+        assert.equal(TrialRewardRank(3 * 60 * 1000 - 1), 2);
+    });
+
+    it("awards weekly Steel/Gilded tiers once and exposes them through balance", async () => {
+        const A = await MakePlayer();
+
+        // Normal sub-5: Bronze + Silver = 200 Steel.
+        const Normal = Solo(A.UserId, 5 * 60 * 1000 - 1, "normal-silver", 0);
+        assert.equal((await Call("POST", "/trials/leaderboards", {gs: true, body: Normal})).status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 200);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_GILDED"), 0);
+
+        // Exact retry pays nothing, then a faster Normal run pays only the newly reached Gold tier.
+        assert.equal((await Call("POST", "/trials/leaderboards", {gs: true, body: Normal})).status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 200);
+        assert.equal((await Call("POST", "/trials/leaderboards", {
+            gs: true,
+            body: Solo(A.UserId, 3 * 60 * 1000 - 1, "normal-gold", 0)
+        })).status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 300);
+
+        // Dauntless sub-5 pays two Gilded tiers; Steel is already claimed and is not duplicated.
+        const Dauntless = Solo(A.UserId, 5 * 60 * 1000 - 1, "dauntless-silver", 1);
+        assert.equal((await Call("POST", "/trials/leaderboards", {gs: true, body: Dauntless})).status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 300);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_GILDED"), 200);
+
+        // A later sub-3 run pays only the final Gilded tier.
+        assert.equal((await Call("POST", "/trials/leaderboards", {
+            gs: true,
+            body: Solo(A.UserId, 3 * 60 * 1000 - 1, "dauntless-gold", 1)
+        })).status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_GILDED"), 300);
+
+        const Balance = await Call("GET", "/balance", {as: A.UserId});
+        assert.equal(Balance.status, 200);
+        assert.equal(Balance.json.CURRENCY_MARKS_STEEL, 300);
+        assert.equal(Balance.json.id_currency_marks_steel, 300);
+        assert.equal(Balance.json.CURRENCY_MARKS_GILDED, 300);
+        assert.equal(Balance.json.id_currency_marks_gilded, 300);
+
+        assert.equal(GetDb().select().from(cooldowns).where(eq(cooldowns.accountId, A.UserId)).all()
+            .filter((Row) => Row.cooldownId.startsWith("revived_trials_marks:")).length, 6);
+    });
+
+    it("completes the Trial -> Marks -> Lady Luck purchase loop without refilling on retry", async () => {
+        const A = await MakePlayer();
+        const Run = Solo(A.UserId, 3 * 60 * 1000 - 1, "purchase-loop", 0);
+
+        assert.equal((await Call("POST", "/trials/leaderboards", {gs: true, body: Run})).status, 204);
+        assert.equal((await Call("GET", "/balance", {as: A.UserId})).json.CURRENCY_MARKS_STEEL, 300);
+
+        const Token = await Call("GET", "/token/CURRENCY_MARKS_STEEL/ladyluck_cb_passive_trials_02", {as: A.UserId});
+        assert.equal(Token.status, 200);
+        const Bought = await Call("POST", `/notification/CURRENCY_MARKS_STEEL?token=${Token.json.purchaseToken}`, {as: A.UserId});
+        assert.equal(Bought.status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 50);
+        assert.equal(StackQuantity(A.CharacterId, "PART_CB_PASSIVE_TRIALS_02"), 1);
+
+        // A retried result is still idempotent after the player has spent the Marks.
+        assert.equal((await Call("POST", "/trials/leaderboards", {gs: true, body: Run})).status, 204);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 50);
+        assert.equal(StackQuantity(A.CharacterId, "PART_CB_PASSIVE_TRIALS_02"), 1);
+    });
+
     it("reports timing for the Trial week being queried, not always the current week", () => {
         const At = new Date(Date.parse(TRIAL_ROTATION_START) + 10 * 7 * 24 * 60 * 60 * 1000 + 2 * 24 * 60 * 60 * 1000);
         const CurrentWeek = TrialWeekAt(At);

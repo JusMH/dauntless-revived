@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { and, eq, lt } from "drizzle-orm";
 import { GetDb } from "../db";
-import { inventory, leaderboardprofiles, trialruns, trialweeks } from "../db/schema";
+import { cooldowns, inventory, leaderboardprofiles, trialruns, trialweeks } from "../db/schema";
 import { GrantEntitlementInTx } from "./entitlements";
 import { GetActiveCharacter } from "./activecharacter";
 import { ApplyInventoryTransactionInTx } from "./inventory";
@@ -49,6 +49,20 @@ export const TRIALS_CHAMPION_ENTITLEMENT = "trials_leaderboard_placement";
 export const TRIALS_CHAMPION_TITLE = "TITLE_TRIALS_00";
 export const TRIALS_DAUNTLESS_TITLE = "TITLE_TRIALS_01";
 const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+const TRIAL_MARK_REWARD = 100;
+const TRIAL_BRONZE_TIME_MS = 30 * 60 * 1000;
+const TRIAL_SILVER_TIME_MS = 5 * 60 * 1000;
+const TRIAL_GOLD_TIME_MS = 3 * 60 * 1000;
+
+// The 1.4.4 PlayerArenaComponent exposes Bronze/Silver/Gold reward ranks. Retail Trials in this
+// client generation awarded one 100-Mark tier for a completion under 30 minutes, another under
+// 5 minutes, and the third under 3 minutes. Boundaries are strictly "under".
+export function TrialRewardRank(CompletionTime: number){
+    if(CompletionTime < TRIAL_GOLD_TIME_MS) return 2;
+    if(CompletionTime < TRIAL_SILVER_TIME_MS) return 1;
+    if(CompletionTime < TRIAL_BRONZE_TIME_MS) return 0;
+    return -1;
+}
 
 function Mod(Value: number, Divisor: number){
     return ((Value % Divisor) + Divisor) % Divisor;
@@ -242,6 +256,68 @@ function ParseEntries(Run: StoredTrialRun): TrialPlayer[] {
     });
 }
 
+function RewardCooldownId(Week: number, Currency: "steel" | "gilded", Rank: number){
+    // These are backend receipts, not a replacement for the opaque retail cooldown ids that the
+    // game server may also send through /cooldown. Keeping them separate avoids pretending we know
+    // the asset-authored UniqueCooldownId strings while still making server-side grants idempotent.
+    return `revived_trials_marks:${Week}:${Currency}:${Rank}`;
+}
+
+function GrantTrialMarkTierInTx(tx: any, AccountId: string, Week: number, Currency: "steel" | "gilded", Rank: number, At: Date){
+    const CooldownId = RewardCooldownId(Week, Currency, Rank);
+    const Existing = tx.select().from(cooldowns).where(and(
+        eq(cooldowns.accountId, AccountId),
+        eq(cooldowns.cooldownId, CooldownId)
+    )).get();
+
+    if(Existing != undefined) return false;
+
+    const Character = GetActiveCharacter(tx, AccountId);
+    if(Character == undefined){
+        throw new TrialsError(409, `no active character for Trial reward account ${AccountId}`);
+    }
+
+    const CatalogId = Currency === "steel" ? "CURRENCY_MARKS_STEEL" : "CURRENCY_MARKS_GILDED";
+    ApplyInventoryTransactionInTx(tx, {
+        UserId: AccountId,
+        CharacterId: Character.characterId,
+        TransactionId: `trials-marks:${Week}:${Currency}:${Rank}:${AccountId}`,
+        StackedItemsToAdd: [{catalogId: CatalogId, quantity: TRIAL_MARK_REWARD}]
+    }, {Caller: "trials", Source: `trials:week:${Week}`});
+
+    const Stamp = At.toISOString();
+    tx.insert(cooldowns).values({
+        accountId: AccountId,
+        cooldownId: CooldownId,
+        startedDate: Stamp,
+        updatedDate: Stamp
+    }).run();
+
+    return true;
+}
+
+function AwardTrialMarksInTx(tx: any, AccountIds: string[], DifficultyValue: number, Week: number, CompletionTime: number, At: Date){
+    const Rank = TrialRewardRank(CompletionTime);
+    if(Rank < 0) return {Steel: 0, Gilded: 0};
+
+    let Steel = 0;
+    let Gilded = 0;
+
+    for(const AccountId of AccountIds){
+        for(let Tier = 0; Tier <= Rank; Tier++){
+            // Dauntless difficulty also pays any still-unclaimed Normal/Steel tier for the week.
+            // The shared Steel receipt makes a later Normal run (or a retry) unable to pay it twice.
+            if(GrantTrialMarkTierInTx(tx, AccountId, Week, "steel", Tier, At)) Steel += TRIAL_MARK_REWARD;
+
+            if(DifficultyValue === 1 && GrantTrialMarkTierInTx(tx, AccountId, Week, "gilded", Tier, At)){
+                Gilded += TRIAL_MARK_REWARD;
+            }
+        }
+    }
+
+    return {Steel, Gilded};
+}
+
 export function SaveTrialRun(Body: unknown, At: Date = new Date()){
     const Raw: any = Body;
     const trialId = TrialId(Raw);
@@ -266,21 +342,24 @@ export function SaveTrialRun(Body: unknown, At: Date = new Date()){
     const sessionId = typeof Raw?.session_id === "string" ? Raw.session_id.slice(0, 256) : runKey;
     const submittedDate = new Date().toISOString();
 
-    GetDb().insert(trialruns).values({
-        trialId,
-        trialWeek,
-        difficulty,
-        mode: Mode,
-        runKey,
-        groupKey,
-        completionTime,
-        objectivesCompleted,
-        sessionId,
-        entries: JSON.stringify(Players),
-        submittedDate
-    }).onConflictDoNothing().run();
+    return GetDb().transaction((tx) => {
+        tx.insert(trialruns).values({
+            trialId,
+            trialWeek,
+            difficulty,
+            mode: Mode,
+            runKey,
+            groupKey,
+            completionTime,
+            objectivesCompleted,
+            sessionId,
+            entries: JSON.stringify(Players),
+            submittedDate
+        }).onConflictDoNothing().run();
 
-    return {trialId, trialWeek, difficulty, mode: Mode, accountIds: AccountIds};
+        const Rewards = AwardTrialMarksInTx(tx, AccountIds, difficulty, trialWeek, completionTime, At);
+        return {trialId, trialWeek, difficulty, mode: Mode, accountIds: AccountIds, rewards: Rewards};
+    });
 }
 
 type Query = {
