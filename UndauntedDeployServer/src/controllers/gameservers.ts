@@ -414,30 +414,60 @@ function GetGameModeOverrideFromMatchmakerHuntId(MatchmakerHuntId: string): stri
     return MatchmakerHuntObject.GameModeOverride.replaceAll("Archon/Content", "/Game");
 }
 
-type TrialsData = {
+export type TrialsData = {
     Behemoth: string;
     TrialsHuntId: string;
 }
 
-function RandomlyGenTrialsData(IsElite: boolean): TrialsData{
-    const RandomTrialNum = String(crypto.randomInt(1, 89)).padStart(3, "0");
+// Trials rotate on Thursdays. 2020-11-05 is the 1.4.4 release Thursday; it is only a
+// deterministic epoch, not a claim that our sorted row order reproduces Phoenix Labs' historic order.
+// Both tables contain holes, so only suffixes cooked in both Normal and Dauntless are eligible.
+export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
+const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
+function TrialSuffixes(){
+    const Hard = new Set(Object.keys((TrialsHardHuntTable[0].Rows as any))
+        .map((Id) => Id.match(/_(\\d{3})$/)?.[1])
+        .filter((Id): Id is string => Id !== undefined));
+    const Elite = new Set(Object.keys((TrialsEliteHuntTable[0].Rows as any))
+        .map((Id) => Id.match(/_(\\d{3})$/)?.[1])
+        .filter((Id): Id is string => Id !== undefined));
+
+    return [...Hard].filter((Id) => Elite.has(Id)).sort((A, B) => Number(A) - Number(B));
+}
+
+export const TRIAL_ROTATION_SUFFIXES = TrialSuffixes();
+
+export function GetTrialsData(IsElite: boolean, At: Date = new Date()): TrialsData{
+    if(TRIAL_ROTATION_SUFFIXES.length === 0){
+        throw new Error("Trials rotation has no hunt rows shared by Hard and Elite tables");
+    }
+
+    const Epoch = Date.parse(process.env.TRIAL_ROTATION_START ?? TRIAL_ROTATION_START);
+
+    if(Number.isNaN(Epoch)){
+        throw new Error("Invalid TRIAL_ROTATION_START");
+    }
+
+    const Week = Math.floor((At.getTime() - Epoch) / TRIAL_WEEK_MS);
+    const Index = ((Week % TRIAL_ROTATION_SUFFIXES.length) + TRIAL_ROTATION_SUFFIXES.length) % TRIAL_ROTATION_SUFFIXES.length;
     const Difficulty = IsElite ? "Elite" : "Hard";
+    const TrialsHuntId = `Arena_MatchmakerHunt_${Difficulty}_${TRIAL_ROTATION_SUFFIXES[Index]}`;
+    const Rows = IsElite ? (TrialsEliteHuntTable[0].Rows as any) : (TrialsHardHuntTable[0].Rows as any);
+    const Row = Rows[TrialsHuntId];
 
-    const TrialsHuntId = `Arena_MatchmakerHunt_${Difficulty}_${RandomTrialNum}`;
-
-    const Row = IsElite ? (TrialsEliteHuntTable[0].Rows as any)[TrialsHuntId] : (TrialsHardHuntTable[0].Rows as any)[TrialsHuntId];
-
-    const Behemoth = Row.SpecificBehemoth.BehemothAsset.AssetPathName;
+    if(Row == undefined){
+        throw new Error(`Trials rotation row ${TrialsHuntId} is missing`);
+    }
 
     return {
-        Behemoth: Behemoth,
-        TrialsHuntId: TrialsHuntId
+        Behemoth: Row.SpecificBehemoth.BehemothAsset.AssetPathName,
+        TrialsHuntId
     };
 }
 
 export async function StartupGameserverWithHuntIdAndPlayers(HuntId: string, ExpectedPlayers: string[]){
-    const TrialsData = HuntId.includes("Arena") ? RandomlyGenTrialsData(HuntId.includes("Elite")) : undefined;
+    const TrialsData = HuntId.includes("Arena") ? GetTrialsData(HuntId.includes("Elite")) : undefined;
     const MatchmakerHuntId = TrialsData == undefined ? GetMatchmakerHuntIdFromPlayerHuntId(HuntId) : TrialsData.TrialsHuntId;
     let BehemothPath = TrialsData == undefined ? GetBehemothPathFromMatchmakerHuntId(MatchmakerHuntId!) : TrialsData.Behemoth;
     let MapPath = TrialsData == undefined ? GetMapPathFromMatchmakerHuntId(MatchmakerHuntId!) : TRIALS_MAP_PATH;
