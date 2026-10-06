@@ -125,7 +125,7 @@ export function ValidateFusionCompletions(CurrentItems: any[], Removing: any[], 
         const Index = FindFusionItemIndex(CurrentItems, Incoming);
 
         if(Index < 0){
-            continue;
+            throw new MiddlemanConflictError("Middleman fusion token is no longer pending");
         }
 
         const Current = CurrentItems[Index];
