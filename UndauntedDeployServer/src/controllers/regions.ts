@@ -35,7 +35,8 @@ export class RegionalRouter {
         }) {}
     async launch<T>(body: Request, choice: RegionChoice, main: () => Promise<T>): Promise<T | NonNullable<Awaited<ReturnType<typeof RemoteLaunch>>>> {
         const url = AusUrl();
-        if (!url || body.GameMode !== 'ISLAND') return main();
+        if (!['ISLAND','CITY'].includes(body.GameMode)) return main();
+        if (!url) { if (choice === 'aus') throw new CapacityUnavailable('hunts'); return main(); }
         let ausFirst = choice === 'aus';
         if (choice === 'mixed') {
             try {
@@ -46,6 +47,7 @@ export class RegionalRouter {
         if (ausFirst) {
             const connection = await this.remote(url, body);
             if (connection) return connection;
+            if (choice === 'aus') throw new CapacityUnavailable('hunts');
             return main();
         }
         try { return await main(); }

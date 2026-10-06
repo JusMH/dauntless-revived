@@ -3,6 +3,8 @@
   const el = id => document.getElementById(id);
   const number = (n, suffix = '') => Number.isFinite(n) ? `${n.toFixed(1)}${suffix}` : '—';
   const duration = seconds => Number.isFinite(seconds) && seconds >= 0 ? `${Math.floor(seconds / 86400)}d ${Math.floor(seconds / 3600) % 24}h ${Math.floor(seconds / 60) % 60}m` : '—';
+  const fleetHistory=[];
+  const fleetCharts=['fleetCpuChart','fleetRamChart','fleetHuntChart'];
   const charts = ['cpu', 'ramUsedMB', 'players', 'backendMs', 'requestsPerSecond', 'errorPercent', 'eventLoopP95Ms', 'backendRssMB', 'backendHeapMB'];
   function table(id, rows) { el(id).replaceChildren(...rows.map(cells => { const tr = document.createElement('tr'); for (const text of cells) { const td = document.createElement('td'); td.textContent = text; tr.append(td); } return tr; })); }
   async function get(path) {
@@ -33,6 +35,10 @@
     if (!fleet) return;
     table('fleetRows',fleet.rows.map(s=>[s.name,s.online?'Online':'Unavailable / stale',s.hunts ?? '—',number(s.cpu,'%'),`${number(s.ramUsedMB===null?null:s.ramUsedMB/1024)} / ${number(s.ramTotalMB===null?null:s.ramTotalMB/1024)} GB`,s.huntSampleAt ? new Date(s.huntSampleAt).toLocaleTimeString() : '—']));
     const t=fleet.totals;
+    fleetHistory.push({fleetCpuChart:t.meanCpu,fleetRamChart:t.ramUsedMB,fleetHuntChart:t.hunts});
+    if(fleetHistory.length>720)fleetHistory.shift();
+    for(const id of fleetCharts)graph(id,fleetHistory);
+    el('fleetOnline').textContent=`${t.online} / ${t.servers}`;
     el('fleetMeanCpu').textContent=number(t.meanCpu,'%');
     el('fleetHunts').textContent=t.hunts ?? '—';
     el('fleetRam').textContent=`${number(t.ramUsedMB===null?null:t.ramUsedMB/1024)} / ${number(t.ramTotalMB===null?null:t.ramTotalMB/1024)} GB`;
@@ -85,6 +91,9 @@
       if (s) {
         lastSample = s;
         el('serverName').textContent = s.name || 'Owner dashboard';
+        el('fleetPlayers').textContent=s.players.length;
+        el('fleetAccounts').textContent=s.accounts ?? '—';
+        el('fleetLocations').textContent=`Ramsgate ${s.locations.city ?? 0} · Hunts ${s.locations.hunt ?? 0} · Menu ${s.locations.menu ?? 0}`;
         el('onlineValue').textContent = s.players.length;
         el('cityValue').textContent = `Ramsgate ${s.locations.city} · Hunts ${s.locations.hunt}`;
         el('cpuValue').textContent = number(s.cpu, '%'); el('coresValue').textContent = `${s.logicalCpus} logical processors`;
@@ -117,6 +126,7 @@
     for (const panel of document.querySelectorAll('.view')) panel.hidden = panel.id !== button.dataset.view;
     for (const tab of document.querySelectorAll('[data-view]')) tab.setAttribute('aria-pressed', String(tab === button));
     if (lastSample) for (const id of charts) graph(id, lastSample.history);
+    if (button.dataset.view === 'overview')for(const id of fleetCharts)graph(id,fleetHistory);
     if (button.dataset.view === 'people') loadAccounts();
     if (button.dataset.view === 'worker' && lastWorker) renderWorker(lastWorker);
     if (button.dataset.view === 'aus' && lastAus) renderWorker(lastAus,'aus');

@@ -1,4 +1,4 @@
-import { PlayerRegion, PartyRegion, RegionQueueKey, HuntRegion, RegionChoice } from './huntregion';
+import { PlayerRegion, RegionQueueKey, HuntRegion, RegionChoice } from './huntregion';
 import { logger } from "../logger";
 import crypto from "node:crypto";
 import {
@@ -127,7 +127,7 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
                 GameArgs: GameArgs,
                 HuntId: HuntId,
                 ExpectedPlayers: ExpectedPlayers!,
-                ...(GameMode === 'ISLAND' && Region !== 'main' ? {Region} : {})
+                ...(['ISLAND','CITY'].includes(GameMode) && Region !== 'main' ? {Region} : {})
             })
         });
     }
@@ -606,7 +606,7 @@ async function FinishPartyCandidate(TheParty: Party, CandidateId: string, Member
 }
 
 async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: string, Members: string[], LeaderId: string){
-    const Region = PartyRegion(Members);
+    const Region = PlayerRegion(LeaderId); // The inviter/leader chooses the region for the entire party.
     const CandidateId = crypto.randomUUID();
 
     for(const Member of Members){

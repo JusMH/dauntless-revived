@@ -51,3 +51,15 @@ test('existing message recovers after rejection without replacement',async()=>{
   let calls=0;const methods=[];const p=new Publisher(url,{id:'1'},async()=>{},async(u,o)=>{methods.push(o.method);return new Response('',{status:++calls===1?403:200});});
   await p.send({},1000);await p.send({},999999);assert.equal(p.failures,0);assert.equal(p.state.id,'1');assert.deepEqual(methods,['PATCH','PATCH']);
 });
+
+test('fleet status projects metrics and public embed never includes host labels, addresses or secrets',async()=>{
+ const {sampleFleet}=await import('./discord-status.mjs');
+ const row={name:'SECRET_NAME',host:'192.0.2.44',online:true,cpu:25,ramUsedMB:1024,ramTotalMB:8192,hunts:2,token:'SECRET_TOKEN'};
+ const fleet=await sampleFleet('http://127.0.0.1:61110','test',async()=>Response.json({fleet:{rows:[row,row,row]}}));
+ assert.equal(fleet.hunts,6);assert.equal(fleet.online,3);
+ const message=JSON.stringify(payload({players:4,uptime:30,ms:1},Date.now(),fleet));
+ assert.ok(message.includes('Australia (OCE)'));assert.ok(message.includes('25.0%'));
+ assert.ok(!message.includes('SECRET'));assert.ok(!message.includes('192.0.2.44'));
+ assert.equal(await sampleFleet('http://127.0.0.1:61110','test',async()=>new Response('',{status:503})),null);
+ await assert.rejects(sampleFleet('https://example.com','test'));
+});

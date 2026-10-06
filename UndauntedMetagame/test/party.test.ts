@@ -671,3 +671,19 @@ describe("one queued join per player", () => {
         assert.deepEqual(Deploy.Calls[1], { GameMode: "ISLAND", GameArgs: "", HuntId: HUNT, ExpectedPlayers: [V] });
     });
 });
+
+it('OCE party leader retains region when inviting Main players and city requests carry the selection', async () => {
+    const {SetRegionReader}=await import('../src/controllers/huntregion');
+    SetRegionReader(id=>id===B?'aus':'main');
+    try {
+        await HandlePlayerMatchmaking('CITY','','',B);
+        assert.equal(Deploy.Calls.at(-1).Region,'aus');
+        await FormParty(B,A);
+        await HandlePlayerMatchmaking('ISLAND','',HUNT,B);
+        await WaitForDeployCalls(2);
+        assert.equal(Deploy.Calls[1].Region,'aus');
+        assert.deepEqual(new Set(Deploy.Calls[1].ExpectedPlayers),new Set([B,A]));
+        await WaitForCandidateKind(B,'travel');
+        await WaitForCandidateKind(A,'travel');
+    } finally {SetRegionReader(()=>'main');}
+});

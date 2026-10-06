@@ -41,16 +41,18 @@ const Router = new HuntRouter(() => Gameservers.filter(server => ['hunt', 'tutor
 
 export async function HandleMatchmakingRequest(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined, Region: RegionChoice = 'main'){
     if (process.env.HUNT_WORKER === '1' && GameMode !== 'ISLAND' && !(GameMode === 'CITY' && process.env.WORKER_RAMSGATE === '1')) throw new Error('Hunt worker does not accept this world');
-    if (GameMode === 'CITY' && process.env.CITY_OVERFLOW === '1') {
-        const url = OverflowUrl();
-        if (!url) throw new Error('City overflow needs the worker tunnel');
-        return Cities.launch(ExpectedPlayers?.length ?? 1,
-            () => GetRamsgateConnectionDetails(),
-            () => RemoteLaunch(url, {GameMode, GameArgs, HuntId, ExpectedPlayers}),
-            Number(process.env.RAMSGATE_PLAYER_LIMIT ?? 28));
-    }
     const body = {GameMode, GameArgs, HuntId, ExpectedPlayers};
-    return Regions.launch(body, Region, () => Router.launch(body, () => HandleLocalMatchmaking(GameMode, GameArgs, HuntId, ExpectedPlayers)));
+    return Regions.launch(body, Region, async () => {
+        if (GameMode === 'CITY' && process.env.CITY_OVERFLOW === '1') {
+            const url = OverflowUrl();
+            if (!url) throw new Error('City overflow needs the worker tunnel');
+            return Cities.launch(ExpectedPlayers?.length ?? 1,
+                () => GetRamsgateConnectionDetails(),
+                () => RemoteLaunch(url, body),
+                Number(process.env.RAMSGATE_PLAYER_LIMIT ?? 28));
+        }
+        return Router.launch(body, () => HandleLocalMatchmaking(GameMode, GameArgs, HuntId, ExpectedPlayers));
+    });
 }
 
 async function HandleLocalMatchmaking(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined){

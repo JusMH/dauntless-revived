@@ -1170,8 +1170,8 @@ function renderSettings(): void {
       "settings-section",
       h("h2", { class: "card-title" }, t("set_game")),
       h('div',{class:'settings-row'},h('div',{class:'settings-row-text'},
-        h('label',{class:'settings-row-title',for:'hunt-region'},'Hunt region'),
-        h('span',{class:'settings-row-sub'},'Applies when you next press Play. Ramsgate stays shared. Full regions may use overflow; mixed-region parties stay together in the less busy region.')),huntRegion),
+        h('label',{class:'settings-row-title',for:'hunt-region'},'World region'),
+        h('span',{class:'settings-row-sub'},'Applies when you next press Play. Australia uses OCE Ramsgate and hunts. A party follows its leader’s region; invites work across regions. If OCE is full, matchmaking waits instead of moving you to Main.')),huntRegion),
       settingsRow(
         t("set_folder"),
         snap.install.dir,

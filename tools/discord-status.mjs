@@ -9,22 +9,30 @@ export function webhookUrl(value) {
 }
 
 // A deliberate allowlist: never forward backend names, addresses, players or errors.
-export function payload(sample, now = Date.now()) {
-  const at = Math.floor(now / 1000);
-  const online = sample !== null;
-  const fields = [
-    {name: 'Status', value: online ? 'Online' : 'Unavailable', inline: true},
-    {name: 'Players', value: online ? String(sample.players) : 'Unknown', inline: true},
-    {name: 'Backend response (local)', value: online ? `${Math.round(sample.ms)} ms` : 'Unavailable', inline: true},
+export function payload(sample, now = Date.now(), fleet = null) {
+  const at=Math.floor(now/1000), online=sample!==null;
+  const num=(v,suffix='')=>Number.isFinite(v)&&v>=0?v.toFixed(1)+suffix:'Unknown';
+  const fields=[
+    {name:'👥 Slayers online',value:online?String(sample.players):'Unknown',inline:true},
+    {name:'🌐 Fleet availability',value:fleet?`${fleet.online} / ${fleet.servers} hosts reporting`:'Monitoring unavailable',inline:true},
+    {name:'⚔️ Active hunts',value:Number.isInteger(fleet?.hunts)?String(fleet.hunts):'Unknown',inline:true}
   ];
-  if (online) {
-    const seconds = Math.floor(sample.uptime);
-    fields.push({name: 'Backend uptime', value: `${Math.floor(seconds / 86400)}d ${Math.floor(seconds % 86400 / 3600)}h ${Math.floor(seconds % 3600 / 60)}m`});
-    fields.push({name: 'Backend started', value: `<t:${at - seconds}:F> (<t:${at - seconds}:R>)`});
+  for(const [i,name] of ['Server #1 · Main','Server #2 · Main overflow','Server #3 · Australia (OCE)'].entries()){
+    const r=fleet?.rows?.[i];
+    fields.push({name,inline:true,value:r?.online
+      ? `🟢 Online\nHunts: ${Number.isInteger(r.hunts)?r.hunts:'Unknown'}\nCPU: ${num(r.cpu,'%')}\nRAM: ${num(r.ramUsedMB===null?null:r.ramUsedMB/1024)} / ${num(r.ramTotalMB===null?null:r.ramTotalMB/1024)} GB`
+      : '🟠 Unavailable / stale'});
   }
-  fields.push({name: 'Last checked', value: `<t:${at}:F> (<t:${at}:R>)`});
-  return {allowed_mentions: {parse: []}, embeds: [{title: 'Dauntless server status', color: online ? 0x35bc84 : 0xe1a349, fields,
-    footer: {text: 'Local backend check, not player ping. A stale timestamp means monitoring may be offline.'}}]};
+  if(online){
+    const seconds=Math.floor(sample.uptime);
+    fields.push({name:'Shared backend',value:`🟢 Online · ${Math.round(sample.ms)} ms local check\nUptime: ${Math.floor(seconds/86400)}d ${Math.floor(seconds%86400/3600)}h ${Math.floor(seconds%3600/60)}m\nStarted <t:${at-seconds}:R>`});
+  }
+  fields.push({name:'Region guide',value:'Choose Main or Australia in launcher Settings, then relaunch. Ramsgate and hunts follow that selection. Parties follow their leader; invitations work across regions.'});
+  fields.push({name:'Last checked',value:`<t:${at}:F> (<t:${at}:R>)`});
+  return {allowed_mentions:{parse:[]},embeds:[{title:'Dauntless Revived · Live realm status',
+    description:online?'**Clear skies, Slayers.** Shared accounts and progression across Main and OCE.':'The shared backend is currently unavailable. Please check again shortly.',
+    color:online&&fleet?.online===3?0x35bc84:0xe1a349,fields,
+    footer:{text:'Host health and backend activity, not player ping or proof of hunt completion. Stale readings are unknown.'}}]};
 }
 
 export async function sampleBackend(backend, key, fetcher = fetch) {
@@ -114,7 +122,8 @@ async function main() {
   while (true) {
     try {
       const sample = await sampleBackend(process.env.STATUS_BACKEND || 'http://127.0.0.1:61000', key);
-      await publisher.send(payload(sample));
+      const fleet = await sampleFleet(process.env.STATUS_DASHBOARD || 'http://127.0.0.1:61110', key);
+      await publisher.send(payload(sample, Date.now(), fleet));
     } catch { console.error('Status cycle failed; retrying without creating another message.'); }
     await new Promise(resolve => setTimeout(resolve, 5000));
   }
@@ -122,4 +131,19 @@ async function main() {
 let logChain = Promise.resolve();
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch(() => { console.error('Status worker stopped: check private configuration and file permissions.'); process.exitCode = 1; });
+}
+
+// Project only numeric fleet telemetry; no addresses, player names, keys or raw errors leave the host.
+export async function sampleFleet(dashboard, key, fetcher=fetch) {
+  const url=new URL(dashboard);
+  if(url.protocol!=='http:' || url.hostname!=='127.0.0.1' || url.username || url.password)throw new Error('Dashboard must use loopback HTTP');
+  try {
+    const r=await fetcher(new URL('/api/status',url),{headers:{'x-dashboard-key':key},signal:AbortSignal.timeout(3000),redirect:'error'});
+    if(!r.ok)return null;
+    const data=await r.json(), f=data.fleet;
+    if(!Array.isArray(f?.rows) || f.rows.length!==3)return null;
+    const n=v=>Number.isFinite(v)&&v>=0?v:null;
+    const rows=f.rows.map(row=>({online:row.online===true,cpu:n(row.cpu),ramUsedMB:n(row.ramUsedMB),ramTotalMB:n(row.ramTotalMB),hunts:Number.isInteger(row.hunts)&&row.hunts>=0?row.hunts:null}));
+    return {rows,online:rows.filter(r=>r.online).length,servers:rows.length,hunts:rows.every(r=>r.online&&r.hunts!==null)?rows.reduce((v,r)=>v+r.hunts,0):null};
+  }catch{return null;}
 }

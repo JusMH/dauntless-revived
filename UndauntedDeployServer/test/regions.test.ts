@@ -7,16 +7,16 @@ after(()=>delete process.env.AUS_DEPLOYSERVER_URL);
 const body={GameMode:'ISLAND',GameArgs:'',HuntId:'hunt',ExpectedPlayers:['one','two']};
 const main={host:'main',port:8762}, aus={host:'aus',port:8700};
 const load=async()=>({running:10,pending:1,limit:22});
-test('AUS keeps the whole party and all hunt arguments; shared worlds remain in the main pool',async()=>{
+test('AUS keeps the whole party and all hunt arguments; CITY respects OCE while Training stays in Main',async()=>{
     let calls=0;
-    const router=new RegionalRouter(load,async(_url,request)=>{calls++;assert.deepEqual(request,body);return aus;});
+    const router=new RegionalRouter(load,async(_url,request)=>{calls++;assert.deepEqual(request.ExpectedPlayers,body.ExpectedPlayers);return aus;});
     assert.deepEqual(await router.launch(body,'aus',async()=>main),aus);
-    assert.deepEqual(await router.launch({...body,GameMode:'CITY'},'aus',async()=>main),main);
+    assert.deepEqual(await router.launch({...body,GameMode:'CITY'},'aus',async()=>main),aus);
     assert.deepEqual(await router.launch({...body,GameMode:'SHARED'},'aus',async()=>main),main);
-    assert.equal(calls,1);
+    assert.equal(calls,2);
 });
 test('explicit capacity fallback works in both directions; ambiguous failures do not duplicate hunts',async()=>{
-    assert.deepEqual(await new RegionalRouter(load,async()=>undefined).launch(body,'aus',async()=>main),main);
+    await assert.rejects(new RegionalRouter(load,async()=>undefined).launch(body,'aus',async()=>{throw Error('Must not fall back');}),CapacityUnavailable);
     assert.deepEqual(await new RegionalRouter(load,async()=>aus).launch(body,'main',async()=>{throw new CapacityUnavailable('hunts');}),aus);
     let calls=0;
     await assert.rejects(new RegionalRouter(load,async()=>{throw new Error('timeout');}).launch(body,'aus',async()=>{calls++;return main;}),/timeout/);
