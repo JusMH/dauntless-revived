@@ -62,6 +62,10 @@ export function GetSeasonalEventSchedule(At: Date = new Date()){
     const StartTime = ServiceDate(Window.trial_start);
     const EndTime = ServiceDate(Window.trial_end);
     const Ids = [
+        // Captured Phoenix tuning keeps this exact service key active for Lady Luck/Trials.
+        // The four hunt ids below remain alongside it for the 1.4.4 A/B test because the
+        // native GetCurrentNormalHuntScheduleDetails implementation is not symbolized.
+        "event_ladyluck_repeatable",
         "CR19_PlayerHunt_Arena_Hard",
         "CR19_PlayerHunt_Arena_Elite",
         TrialIdForWeek(0, Week),
@@ -72,10 +76,9 @@ export function GetSeasonalEventSchedule(At: Date = new Date()){
         code: null,
         message: "OK",
         payload: {
-            // FServiceSchedule -> FScheduleData -> FScheduledItem in the 1.4.4 SDK. Advertising both
-            // player-hunt and matchmaker ids is deliberate: the native IsHuntUnlocked implementation
-            // is opaque, and this lets the live A/B test tell us which id it queries without broadening
-            // the schedule to unrelated hunts.
+            // FServiceSchedule -> FScheduleData -> FScheduledItem in the 1.4.4 SDK. The captured
+            // event_ladyluck_repeatable key is the strongest known scheduler identifier; the player-hunt
+            // and matchmaker ids make the experiment tolerant of whichever key the native arena code asks for.
             ScheduledItems: Ids.map((Id) => OneTimeSchedule(Id, StartTime, EndTime))
         }
     };

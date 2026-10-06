@@ -64,8 +64,9 @@ describe("Trials leaderboards", () => {
         const Active = GetSeasonalEventSchedule(At);
         const Rows = Active.payload.ScheduledItems;
 
-        assert.equal(Rows.length, 4);
+        assert.equal(Rows.length, 5);
         assert.deepEqual(Rows.map((Row: any) => Row.ScheduledItems[0].ID), [
+            "event_ladyluck_repeatable",
             "CR19_PlayerHunt_Arena_Hard",
             "CR19_PlayerHunt_Arena_Elite",
             TrialIdForWeek(0, TrialWeekAt(At)),
