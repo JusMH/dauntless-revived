@@ -86,6 +86,52 @@ describe("Middleman fusion persistence", () => {
         assert.equal(JSON.parse(ReadInventory(A.CharacterId).instanced[0].itemData).ResultCell, "CELL_TEST_A_R");
     });
 
+    it("persists cell dusting as one inventory transaction", async () => {
+        const A = await MakePlayer();
+
+        await Run(A.UserId, A.CharacterId, "middleman-dust-seed", {
+            addStacked: [{catalogId: "CELL_TEST_DUST_R", quantity: 2}]
+        });
+
+        const Dusted = await Run(A.UserId, A.CharacterId, "middleman-dust", {
+            removeStacked: [{catalogId: "CELL_TEST_DUST_R", quantity: 1}],
+            addStacked: [{catalogId: "CURRENCY_CELLDUST", quantity: 80}]
+        });
+
+        assert.equal(Dusted.success, true);
+        assert.equal(StackQuantity(A.CharacterId, "CELL_TEST_DUST_R"), 1);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 80);
+
+        const Retry = await Run(A.UserId, A.CharacterId, "middleman-dust", {
+            removeStacked: [{catalogId: "CELL_TEST_DUST_R", quantity: 1}],
+            addStacked: [{catalogId: "CURRENCY_CELLDUST", quantity: 80}]
+        });
+
+        assert.ok(Retry.success && Retry.data!.replayed);
+        assert.equal(StackQuantity(A.CharacterId, "CELL_TEST_DUST_R"), 1);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 80);
+    });
+
+    it("persists an Ace Chip speed-up with the fusion timer change atomically", async () => {
+        const A = await MakePlayer();
+        const Original = Fusion(2, "fusion-chip", "2099-01-01T00:00:00.000Z", "CELL_TEST_SPEED_R");
+
+        await Run(A.UserId, A.CharacterId, "middleman-chip-seed", {
+            addInstanced: [Original],
+            addStacked: [{catalogId: "CURRENCY_TOKEN_EXCHANGE_SPEED_UP", quantity: 5}]
+        });
+
+        const SpedUp = Fusion(2, "fusion-chip", "2020-01-01T00:00:00.000Z", "CELL_TEST_SPEED_R");
+        const Speed = await Run(A.UserId, A.CharacterId, "middleman-chip-speed", {
+            saveInstanced: [SpedUp],
+            removeStacked: [{catalogId: "CURRENCY_TOKEN_EXCHANGE_SPEED_UP", quantity: 2}]
+        });
+
+        assert.equal(Speed.success, true);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_TOKEN_EXCHANGE_SPEED_UP"), 3);
+        assert.equal(JSON.parse(ReadInventory(A.CharacterId).instanced[0].itemData).EndTime, "2020-01-01T00:00:00.000Z");
+    });
+
     it("allows the completed version-zero fusion token to be removed", async () => {
         const A = await MakePlayer();
         const Token = Fusion(1, "fusion-remove", "2020-01-01T00:00:00.000Z", "CELL_TEST_A_UC");
