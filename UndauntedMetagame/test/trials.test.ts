@@ -7,7 +7,7 @@ import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
 import { cooldowns, entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
 import { MakePlayer, StackQuantity } from "./helpers";
-import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialRewardRank, TrialWeekAt, TrialsWindowForWeek, TRIAL_ROTATION_START, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
+import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialRewardRank, TrialWeekAt, TrialsWindowForWeek, TRIAL_ROTATION_LENGTH, TRIAL_ROTATION_START, TRIAL_ROTATION_SUFFIXES, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
 
 const Trial = (Difficulty = 1) => TrialIdForWeek(Difficulty, TrialWeekAt());
 
@@ -52,6 +52,14 @@ function Query(Extra = {}){
 }
 
 describe("Trials leaderboards", () => {
+    it("uses the exact cooked Hard/Elite rotation captured from the deploy tables", () => {
+        assert.equal(TRIAL_ROTATION_LENGTH, 88);
+        assert.equal(TRIAL_ROTATION_SUFFIXES[0], "001");
+        assert.equal(TRIAL_ROTATION_SUFFIXES.at(-1), "088");
+        assert.ok(TrialIdForWeek(0, 87).endsWith("_088"));
+        assert.ok(TrialIdForWeek(1, 88).endsWith("_001"));
+    });
+
     it("uses the retail Bronze/Silver/Gold time boundaries for reward rank", () => {
         assert.equal(TrialRewardRank(30 * 60 * 1000), -1);
         assert.equal(TrialRewardRank(30 * 60 * 1000 - 1), 0);
@@ -248,7 +256,7 @@ describe("Trials leaderboards", () => {
         const A = await MakePlayer();
         const CurrentWeek = TrialWeekAt();
         const CurrentTrial = TrialIdForWeek(1, CurrentWeek);
-        const OldWeek = CurrentWeek - 67;
+        const OldWeek = CurrentWeek - TRIAL_ROTATION_LENGTH;
 
         GetDb().insert(trialruns).values({
             trialId: CurrentTrial,

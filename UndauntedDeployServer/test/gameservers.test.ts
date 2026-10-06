@@ -2,7 +2,7 @@ import "./setup";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
-import { DescribeGameservers, Gameserver, Gameservers, GetTrialsData, KindOfGameserver, TRIAL_ROTATION_START, TRIAL_ROTATION_SUFFIXES } from "../src/controllers/gameservers";
+import { BuildTrialSuffixes, DescribeGameservers, Gameserver, Gameservers, GetTrialsData, KindOfGameserver, TRIAL_ROTATION_START, TRIAL_ROTATION_SUFFIXES } from "../src/controllers/gameservers";
 import { IsLoopbackAddress } from "../src/routes/gameservers";
 import { app } from "../src/app";
 
@@ -45,8 +45,27 @@ const Hunt = Fake({
 
 describe("Trials weekly rotation", () => {
     it("uses exactly the rows cooked in both Hard and Elite tables", () => {
-        assert.equal(TRIAL_ROTATION_SUFFIXES.length, 67);
-        assert.equal(new Set(TRIAL_ROTATION_SUFFIXES).size, 67);
+        assert.equal(TRIAL_ROTATION_SUFFIXES.length, 88);
+        assert.equal(new Set(TRIAL_ROTATION_SUFFIXES).size, 88);
+        assert.equal(TRIAL_ROTATION_SUFFIXES[0], "001");
+        assert.equal(TRIAL_ROTATION_SUFFIXES.at(-1), "088");
+    });
+
+    it("intersects actual row ids and does not crash or renumber gaps", () => {
+        const Hard = {
+            Arena_MatchmakerHunt_Hard_001: {},
+            Arena_MatchmakerHunt_Hard_003: {},
+            Arena_MatchmakerHunt_Hard_099: {},
+            Arena_MatchmakerHunt_Hard_Test: {}
+        };
+        const Elite = {
+            Arena_MatchmakerHunt_Elite_001: {},
+            Arena_MatchmakerHunt_Elite_003: {},
+            Arena_MatchmakerHunt_Elite_004: {},
+            Arena_MatchmakerHunt_Elite_Test: {}
+        };
+
+        assert.deepEqual(BuildTrialSuffixes(Hard, Elite), ["001", "003"]);
     });
 
     it("keeps every player on one trial for the week and advances on Thursday", () => {

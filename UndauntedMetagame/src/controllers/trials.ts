@@ -5,6 +5,7 @@ import { cooldowns, inventory, leaderboardprofiles, trialruns, trialweeks } from
 import { GrantEntitlementInTx } from "./entitlements";
 import { GetActiveCharacter } from "./activecharacter";
 import { ApplyInventoryTransactionInTx } from "./inventory";
+import trialRotation from "../vendor/trials_rotation.json";
 
 export type TrialMode = "solo" | "group";
 
@@ -44,7 +45,8 @@ const TrialIdPattern = /^Arena_MatchmakerHunt_(Hard|Elite)_\d{3}$/;
 // UPlayerArenaComponent and the 1.4.4 leaderboard response view-model both carry the
 // current Trial window. Keep this epoch identical to the deploy server's rotation epoch.
 export const TRIAL_ROTATION_START = "2020-11-05T00:00:00.000Z";
-export const TRIAL_ROTATION_LENGTH = 67;
+export const TRIAL_ROTATION_SUFFIXES = (trialRotation as {suffixes: string[]}).suffixes;
+export const TRIAL_ROTATION_LENGTH = TRIAL_ROTATION_SUFFIXES.length;
 export const TRIALS_CHAMPION_ENTITLEMENT = "trials_leaderboard_placement";
 export const TRIALS_CHAMPION_TITLE = "TITLE_TRIALS_00";
 export const TRIALS_DAUNTLESS_TITLE = "TITLE_TRIALS_01";
@@ -88,7 +90,12 @@ export function TrialIdForWeek(DifficultyValue: number, Week: number){
     }
 
     const Prefix = DifficultyValue === 1 ? "Elite" : "Hard";
-    const Suffix = String(Mod(Week, TRIAL_ROTATION_LENGTH) + 1).padStart(3, "0");
+    const Suffix = TRIAL_ROTATION_SUFFIXES[Mod(Week, TRIAL_ROTATION_LENGTH)];
+
+    if(Suffix == undefined){
+        throw new TrialsError(500, "Trials rotation is empty");
+    }
+
     return `Arena_MatchmakerHunt_${Prefix}_${Suffix}`;
 }
 
@@ -104,17 +111,18 @@ function TrialWeekForId(TrialIdValue: string, DifficultyValue: number, At: Date 
         throw new TrialsError(400, "trial_id does not match difficulty");
     }
 
-    const Suffix = Number(TrialIdValue.slice(-3));
-    if(!Number.isSafeInteger(Suffix) || Suffix < 1 || Suffix > TRIAL_ROTATION_LENGTH){
+    const Suffix = TrialIdValue.slice(-3);
+    const TargetIndex = TRIAL_ROTATION_SUFFIXES.indexOf(Suffix);
+
+    if(TargetIndex < 0){
         throw new TrialsError(400, "trial_id is outside the restored rotation");
     }
 
     // The client has Current/Previous date tabs, while the HTTP body identifies the actual
-    // trial row. Map a row to its most recent occurrence so the 67-week wrap never leaks a
+    // trial row. Map a row to its most recent occurrence so a wrapped rotation never leaks a
     // score from the previous cycle into the current board.
     const CurrentWeek = TrialWeekAt(At);
     const CurrentIndex = Mod(CurrentWeek, TRIAL_ROTATION_LENGTH);
-    const TargetIndex = Suffix - 1;
     return CurrentWeek - Mod(CurrentIndex - TargetIndex, TRIAL_ROTATION_LENGTH);
 }
 
