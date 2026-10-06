@@ -76,9 +76,9 @@ describe("Lady Luck Trials store", () => {
         const A = await MakePlayer();
         Credit(A.CharacterId, "CURRENCY_MARKS_GILDED", 700);
 
-        const Token = CreateStorePurchase(A.UserId, "id_currency_marks_gilded", "ladyluck_weapon_strikers_normal").purchaseToken;
-        const First = RedeemStorePurchase(A.UserId, "id_currency_marks_gilded", Token);
-        const Retry = RedeemStorePurchase(A.UserId, "id_currency_marks_gilded", Token);
+        const Token = CreateStorePurchase(A.UserId, "CURRENCY_MARKS_GILDED", "ladyluck_weapon_strikers_normal").purchaseToken;
+        const First = RedeemStorePurchase(A.UserId, "CURRENCY_MARKS_GILDED", Token);
+        const Retry = RedeemStorePurchase(A.UserId, "CURRENCY_MARKS_GILDED", Token);
 
         assert.equal(First.Replayed, false);
         assert.equal(Retry.Replayed, true);
@@ -105,7 +105,7 @@ describe("Lady Luck Trials store", () => {
         const A = await MakePlayer();
         Credit(A.CharacterId, "CURRENCY_MARKS_STEEL", 300);
 
-        Buy(A.UserId, "id_currency_marks_steel", "ladyluck_cb_passive_trials_02");
+        Buy(A.UserId, "CURRENCY_MARKS_STEEL", "ladyluck_cb_passive_trials_02");
 
         assert.equal(StackQuantity(A.CharacterId, "CURRENCY_MARKS_STEEL"), 50);
         assert.equal(StackQuantity(A.CharacterId, "PART_CB_PASSIVE_TRIALS_02"), 1);

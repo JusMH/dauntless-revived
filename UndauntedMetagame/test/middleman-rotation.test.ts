@@ -63,9 +63,9 @@ describe("Middleman weekly Aetherdust offers", () => {
         const Price = Offer.cellDustPrice as number;
 
         for(let i = 0; i < 2; i++){
-            const Token = CreateStorePurchase(A.UserId, "id_currency_celldust", Offer.id).purchaseToken;
-            const First = RedeemStorePurchase(A.UserId, "id_currency_celldust", Token);
-            const Retry = RedeemStorePurchase(A.UserId, "id_currency_celldust", Token);
+            const Token = CreateStorePurchase(A.UserId, "CURRENCY_CELLDUST", Offer.id).purchaseToken;
+            const First = RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", Token);
+            const Retry = RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", Token);
             assert.equal(First.Replayed, false);
             assert.equal(Retry.Replayed, true);
         }

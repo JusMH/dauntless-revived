@@ -167,9 +167,18 @@ const CURRENCY_FIELDS: Record<string, {PriceField: string, CatalogId: string}> =
 };
 
 const CURRENCY_ALIASES: Record<string, string> = {
+    // The 1.4.4 store can surface either its service-facing id_currency_* name or the
+    // inventory catalogue id that actually holds the balance. Treat both as the same
+    // payment currency so Lady Luck and Middleman purchases do not depend on which name
+    // a particular UI path copied into /token/:currency/:sku.
     id_currency_celldust: "celldust",
+    currency_celldust: "celldust",
     id_currency_marks_steel: "markssteel",
+    currency_marks_steel: "markssteel",
     id_currency_marks_gilded: "marksgilded",
+    currency_marks_gilded: "marksgilded",
+    currency_platinum_univ: "platinum",
+    currency_prestige: "prestige",
     marks_steel: "markssteel",
     marks_gilded: "marksgilded",
     steelmarks: "markssteel",
