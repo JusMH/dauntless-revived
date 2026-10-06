@@ -193,6 +193,10 @@ describe("Trials leaderboards", () => {
         assert.equal(All.status, 200);
         assert.deepEqual(All.json.payload.world.solo.all.entries.map((Entry: any) => Entry.phx_account_id), [A.UserId, B.UserId]);
         assert.deepEqual(All.json.payload.world.group.entries, []);
+
+        const CapturedAll = await Call("POST", "/trials/leaderboards/all", {as: A.UserId, body: Query()});
+        assert.equal(CapturedAll.status, 200);
+        assert.deepEqual(CapturedAll.json, All.json);
     });
 
     it("stores one group run once on retry and serves group and member lookup", async () => {
