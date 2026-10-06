@@ -15,7 +15,7 @@ The worker prewarms Ramsgate on `PORT_RANGE_END`. Permit that UDP port through i
 allowlist and hosting firewall. Keep all advertised game ports distinct across
 hosts because existing status/matchmaking attribution uses ports.
 
-Routing uses the metagame's authenticated occupancy snapshot and short landing
+Routing prefers each game process's bounded, count-only native diagnostic snapshot, falling back to the metagame's authenticated occupancy snapshot, and 45-second landing
 reservations, prefers the less occupied city, and keeps concurrent parties within
 the admission target. Explicit worker unavailability/capacity can fall back to a
 city with space; unknown launch failures are surfaced rather than hidden. Both

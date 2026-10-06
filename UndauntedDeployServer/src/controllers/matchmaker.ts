@@ -3,6 +3,7 @@ import { GetRamsgateConnectionDetails, GetTrainingDojoConnectionDetails, Startup
 import { Gameservers, KindOfGameserver, huntAdmission, DescribeGameservers } from './gameservers';
 import { HuntRouter, RemoteLaunch, OverflowUrl, DescribeOverflow } from './overflow';
 import { CityRouter } from './cityrouter';
+import { NativeOccupancy } from './nativeoccupancy';
 
 const Cities = new CityRouter(async () => {
     const key = process.env.CITY_STATUS_KEY;
@@ -14,11 +15,12 @@ const Cities = new CityRouter(async () => {
     ]);
     const status = await response.json() as any;
     if (!response.ok || status.limited || !Array.isArray(status.instances)) throw new Error('City occupancy unavailable');
-    const count = (servers: {id:string,kind:string}[]) => {
+    const count = (servers: {id:string,kind:string,connectedPlayers?:number}[]) => {
         const city = servers.find(s => s.kind === 'city');
-        return city ? Number(status.instances.find((i:any) => i.id === city.id)?.players ?? 0) : 0;
+        return city ? Number(city.connectedPlayers ?? status.instances.find((i:any) => i.id === city.id)?.players ?? 0) : 0;
     };
-    return {local: count(DescribeGameservers()), remote: count(worker)};
+    const city=Gameservers.find(s=>s.isRamsgate);
+    return {local: (city ? NativeOccupancy(city.processId,city.startTime) : undefined) ?? count(DescribeGameservers()), remote: count(worker)};
 });
 
 const Router = new HuntRouter(() => Gameservers.filter(server => ['hunt', 'tutorial'].includes(KindOfGameserver(server))).length, undefined, () => huntAdmission.status());

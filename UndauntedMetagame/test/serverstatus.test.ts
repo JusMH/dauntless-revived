@@ -308,3 +308,12 @@ describe("SoftAccountAuth", () => {
         assert.equal(await Run({ authorization: `bearer ${SignMetagameJWTForUid("UID-soft-deleted")}` }), false, "the account does not exist");
     });
 });
+
+it("attributes multiple Ramsgates by the player's allocated port", async () => {
+    const {SelectPersistentInstance} = await import('../src/controllers/serverstatus');
+    const main={port:8777}, worker={port:8761};
+    assert.equal(SelectPersistentInstance([main,worker],8761),worker);
+    assert.equal(SelectPersistentInstance([main,worker],8777),main);
+    assert.equal(SelectPersistentInstance([main,worker],undefined),main);
+    assert.equal(SelectPersistentInstance([],8761),undefined);
+});

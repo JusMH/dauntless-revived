@@ -20,7 +20,7 @@ export class CityRouter {
             this.reservations.push(reservation);
             try {
                 const result = await (side === 'local' ? local() : remote());
-                if (result) { reservation.until = this.now() + 15000; return result; }
+                if (result) { reservation.until = this.now() + 45000; return result; }
             } catch (error) {
                 if (!(error instanceof CapacityUnavailable)) throw error;
             } finally {

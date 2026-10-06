@@ -369,7 +369,9 @@ export async function BuildServerStatus(): Promise<ServerStatus> {
         let Instance: DeployGameserver | undefined;
 
         if(Place === "city" || Place === "dojo"){
-            Instance = Newest.find((Server) => Server.kind === Place);
+            const Worlds = Newest.filter((Server) => Server.kind === Place);
+            const LastSent = GetLastMatchmakingResult(Entry.UserId);
+            Instance = SelectPersistentInstance(Worlds, LastSent?.Ready ? LastSent.Port : undefined);
         }
         else if(Place === "hunt" || Place === "tutorial"){
             const Session = Newest.filter((Server) => Server.kind === "hunt" || Server.kind === "tutorial");
@@ -467,4 +469,10 @@ export async function GetServerStatus(Variant: StatusVariant): Promise<ServerSta
 export function ClearServerStatusCache(){
     delete Cached.full;
     delete Cached.limited;
+}
+
+// Preserve legacy attribution for reconnects without an in-memory allocation;
+// a known destination must win when multiple cities share the same map.
+export function SelectPersistentInstance<T extends {port:number}>(worlds:T[], port:number|undefined):T|undefined {
+    return (port === undefined ? undefined : worlds.find(world => world.port === port)) ?? worlds[0];
 }
