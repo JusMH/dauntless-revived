@@ -1074,6 +1074,7 @@ function renderPartners(): void {
 // The optional client mods (client-mods/ in the repository, by ZFXSTATIC): what each one does.
 // Information only; the launcher installs them and the in-game Mod Menu switches them.
 const MODS: readonly { icon: IconName; name: StringKey; text: StringKey; use: StringKey }[] = [
+  { icon: "puzzle", name: "mod_cst_name", text: "mod_cst_text", use: "mod_cst_use" },
   { icon: "heart", name: "mod_bhb_name", text: "mod_bhb_text", use: "mod_bhb_use" },
   { icon: "hunt", name: "mod_trk_name", text: "mod_trk_text", use: "mod_trk_use" },
   { icon: "settings", name: "mod_menu_name", text: "mod_menu_text", use: "mod_menu_use" },

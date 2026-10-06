@@ -124,6 +124,16 @@ export async function installClientMods(resourcesDir: string, installDir: string
       /* missing: copy it */
     }
     if (present && f.keep) {
+      if (f.path === "ue4ss/Mods/mods.txt") {
+        const source = path.join(srcRoot, rel);
+        if ((await hashFile(source)) !== want) throw new ClientModsError(f.path, "the launcher's copy does not match manifest.json");
+        const before = await fsp.readFile(target, "utf8");
+        const after = addMissingModLines(before, await fsp.readFile(source, "utf8"));
+        if (after !== before) {
+          await fsp.writeFile(`${target}.new`, after, "utf8");
+          await fsp.rename(`${target}.new`, target);
+        }
+      }
       result.kept++;
       continue;
     }
@@ -195,4 +205,19 @@ async function disableInModsTxt(file: string, names: readonly unknown[]): Promis
   await fsp.writeFile(tmp, r.text, "utf8");
   await fsp.rename(tmp, file);
   return r.changed;
+}
+
+// Add newly shipped mods without changing a player's existing enabled/disabled choices.
+// Put additions first so the built-in Keybinds entry stays at the end.
+export function addMissingModLines(text: string, defaults: string): string {
+  const names = new Set(Array.from(text.matchAll(/^[ \t]*([A-Za-z0-9_]+)[ \t]*:/gm), m => m[1].toLowerCase()));
+  const missing: string[] = [];
+  for (const m of defaults.matchAll(/^[ \t]*([A-Za-z0-9_]+)[ \t]*:[ \t]*([01])[ \t]*\r?$/gm)) {
+    if (!names.has(m[1].toLowerCase())) {
+      missing.push(`${m[1]} : ${m[2]}`);
+      names.add(m[1].toLowerCase());
+    }
+  }
+  const eol = text.includes("\r\n") ? "\r\n" : "\n";
+  return missing.length ? missing.join(eol) + eol + text : text;
 }

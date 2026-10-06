@@ -21,8 +21,7 @@ They only change what you see on your own screen. The game works without them.
 - **Friend kit**: `friend-kit/setup.ps1` (skip with `-NoMods`).
 
 Both install only files whose SHA-256 matches `manifest.json`, and check them again after copying.
-`ue4ss/Mods/mods.txt` and `ue4ss/UE4SS-settings.ini` are written only when missing, so a player's own
-settings are kept. Mods are Windows only: under Wine/Proton UE4SS is not loaded.
+`ue4ss/UE4SS-settings.ini` is written only when missing. Existing `mods.txt` switches are kept; new bundled mods are added and retired mods are disabled. Mods are Windows only: under Wine/Proton UE4SS is not loaded.
 
 The launcher puts deleted files back before the next launch. To turn a mod off, use the Mod Menu or
 set it to 0 in `ue4ss/Mods/mods.txt` (that file is kept).
@@ -34,3 +33,5 @@ Edit the files here, then rebuild the manifest and commit both:
     powershell -ExecutionPolicy Bypass -File client-mods\update-manifest.ps1
 
 `.gitattributes` keeps every file byte-for-byte, so the hashes stay valid on every checkout.
+
+Updates preserve existing mod switches, add newly shipped mods to `mods.txt`, and remove/disable the retired ZFX Status indicator. CraftStar is added before Keybinds on existing installations; an explicit CraftStar off setting is preserved.

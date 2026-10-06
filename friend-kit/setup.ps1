@@ -110,7 +110,20 @@ if (-not $NoMods) {
       if (-not $dst.StartsWith($winRoot, [StringComparison]::OrdinalIgnoreCase)) { $bad++; continue }
       $want = $f.sha256.ToUpper()
       if (Test-Path -LiteralPath $dst) {
-        if ($f.keep) { $kept++; continue }
+        if ($f.keep) {
+          if ($f.path -eq 'ue4ss/Mods/mods.txt') {
+            if ((Hash $src) -ne $want) { $bad++; continue }
+            $text = [IO.File]::ReadAllText($dst)
+            $defaults = [IO.File]::ReadAllText($src)
+            $names = @([regex]::Matches($text, '(?m)^[ \t]*([A-Za-z0-9_]+)[ \t]*:') | ForEach-Object { $_.Groups[1].Value })
+            $missing = @([regex]::Matches($defaults, '(?m)^[ \t]*([A-Za-z0-9_]+)[ \t]*:[ \t]*([01])[ \t]*\r?$') | Where-Object { $names -notcontains $_.Groups[1].Value } | ForEach-Object { $_.Groups[1].Value + ' : ' + $_.Groups[2].Value })
+            if ($missing.Count) {
+              $eol = "`n"; if ($text.Contains("`r`n")) { $eol = "`r`n" }
+              [IO.File]::WriteAllText($dst, ($missing -join $eol) + $eol + $text, (New-Object Text.UTF8Encoding $false))
+            }
+          }
+          $kept++; continue
+        }
         if ((Hash $dst) -eq $want) { continue }
       }
       if (-not (Test-Path -LiteralPath $src) -or (Hash $src) -ne $want) {

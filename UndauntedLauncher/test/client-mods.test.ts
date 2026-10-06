@@ -129,3 +129,17 @@ test("bundle paths must be plain relative paths with forward slashes", () => {
   assert.equal(insideRoot(root, "a/b.txt"), path.join(path.resolve(root), "a", "b.txt"));
   assert.throws(() => insideRoot(root, "../b.txt"));
 });
+
+test("upgrading adds CraftStar once, preserving disabled mods and Keybinds order", async () => {
+  const mods = "ue4ss/Mods/mods.txt";
+  const t = setup({ [mods]: "CraftStar : 1\nBehemothHealthBars : 1\nKeybinds : 1\n" }, [mods], []);
+  try {
+    t.put(mods, "BehemothHealthBars : 0\r\nKeybinds : 1\r\n");
+    await installClientMods(t.res, t.game);
+    const expected = "CraftStar : 1\r\nBehemothHealthBars : 0\r\nKeybinds : 1\r\n";
+    assert.equal(readFileSync(t.at(mods), "utf8"), expected);
+    t.put(mods, expected.replace("CraftStar : 1", "CraftStar : 0"));
+    await installClientMods(t.res, t.game);
+    assert.equal(readFileSync(t.at(mods), "utf8"), expected.replace("CraftStar : 1", "CraftStar : 0"));
+  } finally { rmSync(t.root, { recursive: true, force: true }); }
+});
