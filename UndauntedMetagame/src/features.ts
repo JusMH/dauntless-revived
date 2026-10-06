@@ -130,6 +130,17 @@ export const StoreRepeatableTokens = DefineSwitch({
     Show: ShowOnOff
 });
 
+// Lady Luck's Trials store. STORE=free still gates the store service itself; this second switch keeps
+// the priced Steel/Gilded Marks catalogue hidden until its later-service capture has been exercised by
+// the 1.4.4 client. Purchases spend the character's inventory currency atomically with the grant.
+export const TrialsStore = DefineSwitch({
+    Env: "TRIALS_STORE",
+    Label: "trialsStore",
+    Default: false,
+    Parse: ParseOnOff,
+    Show: ShowOnOff
+});
+
 // POST /progression/:uid (the game server's XP and objective grant): a body identical to the account's
 // last applied grant, less than this many seconds after it, is a retry of a request that failed (the game
 // server retries up to 5 times). It gets the stored answer and adds nothing. 0 turns the check off. Keep it
