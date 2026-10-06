@@ -1,3 +1,4 @@
+import {cpuAdmission} from '../controllers/cpuadmission';
 import { Router } from "express";
 import { DescribeGameservers, huntAdmission, Gameservers } from "../controllers/gameservers";
 import { NativeOccupancy } from '../controllers/nativeoccupancy';
@@ -39,6 +40,6 @@ gameserversRouter.get("/gameservers", async (req, res) => {
             const process=Gameservers.find(s=>s.id===server.id);
             return {...server, connectedPlayers: server.kind==='city' && process ? NativeOccupancy(process.processId,process.startTime) : undefined};
         }), ...overflow, ...aus],
-        capacity: huntAdmission.status()
+        capacity: {...huntAdmission.status(), cpu:cpuAdmission.status()}
     });
 });

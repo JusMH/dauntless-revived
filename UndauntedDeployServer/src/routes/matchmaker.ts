@@ -39,7 +39,7 @@ matchmakingRouter.post("/handle-matchmaking-for-player", express.json(), async (
     let MatchmakingResult;
 
     try{
-        MatchmakingResult = await HandleMatchmakingRequest(GameMode, GameArgs, HuntId, ExpectedPlayers, Region);
+        MatchmakingResult = await HandleMatchmakingRequest(GameMode, GameArgs, HuntId, ExpectedPlayers, Region, Body.Overflow === true);
     }
     catch(error){
         if (error instanceof CapacityUnavailable) {

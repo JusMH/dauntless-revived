@@ -1,3 +1,4 @@
+import {CheckCpuAdmission} from './cpuadmission';
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { setTimeout } from "node:timers/promises";
 import { mkdir, unlink } from "node:fs/promises";
@@ -205,6 +206,7 @@ let NextServerLaunchAt = 0;
 export const huntAdmission = new HuntAdmission(() => Gameservers.filter(server => !server.isRamsgate && !server.isTrainingDojo && ProcessIsAlive(server.processId)).length);
 
 function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
+    if (!IsRamsgate && !IsTrainingDojo) CheckCpuAdmission();
     const ReleaseHunt = !IsRamsgate && !IsTrainingDojo ? huntAdmission.reserve() : () => {};
     const Previous = ServerLaunchQueue;
     let ReleaseLaunch!: () => void;
@@ -226,6 +228,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     const ReadyDir = process.env.GAMESERVER_READY_DIR ?? path.join(tmpdir(), `dauntless-revived-ready-${process.pid}`);
     await mkdir(ReadyDir, { recursive: true, mode: 0o700 });
     if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
+    if (!IsRamsgate && !IsTrainingDojo) CheckCpuAdmission();
     const ReleaseReservation = memoryAdmission.reserve(!IsRamsgate && !IsTrainingDojo);
     
     let Port;

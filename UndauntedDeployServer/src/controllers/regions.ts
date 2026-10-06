@@ -35,7 +35,7 @@ export class RegionalRouter {
         }) {}
     async launch<T>(body: Request, choice: RegionChoice, main: () => Promise<T>): Promise<T | NonNullable<Awaited<ReturnType<typeof RemoteLaunch>>>> {
         const url = AusUrl();
-        if (!['ISLAND','CITY'].includes(body.GameMode)) return main();
+        if (!['ISLAND','CITY','SHARED'].includes(body.GameMode)) return main();
         if (!url) { if (choice === 'aus') throw new CapacityUnavailable('hunts'); return main(); }
         let ausFirst = choice === 'aus';
         if (choice === 'mixed') {
@@ -46,14 +46,25 @@ export class RegionalRouter {
         }
         if (ausFirst) {
             const connection = await this.remote(url, body);
-            if (connection) return connection;
+            if (connection) {
+                if (choice === 'aus' && process.env.AUS_PUBLIC_HOST && connection.host !== process.env.AUS_PUBLIC_HOST)
+                    throw new Error('AUS worker returned a destination outside the selected region');
+                return connection;
+            }
             if (choice === 'aus') throw new CapacityUnavailable('hunts');
             return main();
         }
         try { return await main(); }
         catch (error) {
             if (!(error instanceof CapacityUnavailable)) throw error;
-            const connection = await this.remote(url, body);
+            // EU overflow must leave slots for players who explicitly selected OCE.
+            const reserve=Number(process.env.AUS_RESERVED_HUNTS??0);
+            if(!Number.isSafeInteger(reserve)||reserve<0)throw new Error('Invalid AUS_RESERVED_HUNTS');
+            if(reserve>0 && body.GameMode==='ISLAND') {
+                try {const load=await this.ausLoad(url);if(load.limit===null||load.limit-load.running-load.pending<=reserve)throw error;}
+                catch {throw error;}
+            }
+            const connection = await this.remote(url, {...body, Overflow:true});
             if (connection) return connection;
             throw error;
         }

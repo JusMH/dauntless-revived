@@ -7,13 +7,13 @@ after(()=>delete process.env.AUS_DEPLOYSERVER_URL);
 const body={GameMode:'ISLAND',GameArgs:'',HuntId:'hunt',ExpectedPlayers:['one','two']};
 const main={host:'main',port:8762}, aus={host:'aus',port:8700};
 const load=async()=>({running:10,pending:1,limit:22});
-test('AUS keeps the whole party and all hunt arguments; CITY respects OCE while Training stays in Main',async()=>{
+test('AUS keeps the whole party and all hunt arguments; CITY respects OCE and Training respect OCE',async()=>{
     let calls=0;
     const router=new RegionalRouter(load,async(_url,request)=>{calls++;assert.deepEqual(request.ExpectedPlayers,body.ExpectedPlayers);return aus;});
     assert.deepEqual(await router.launch(body,'aus',async()=>main),aus);
     assert.deepEqual(await router.launch({...body,GameMode:'CITY'},'aus',async()=>main),aus);
-    assert.deepEqual(await router.launch({...body,GameMode:'SHARED'},'aus',async()=>main),main);
-    assert.equal(calls,2);
+    assert.deepEqual(await router.launch({...body,GameMode:'SHARED'},'aus',async()=>main),aus);
+    assert.equal(calls,3);
 });
 test('explicit capacity fallback works in both directions; ambiguous failures do not duplicate hunts',async()=>{
     await assert.rejects(new RegionalRouter(load,async()=>undefined).launch(body,'aus',async()=>{throw Error('Must not fall back');}),CapacityUnavailable);
@@ -32,4 +32,19 @@ test('regional worker URL must be a private loopback tunnel',()=>{
     process.env.AUS_DEPLOYSERVER_URL='http://example.com';
     assert.throws(AusUrl,/loopback/);
     process.env.AUS_DEPLOYSERVER_URL='http://127.0.0.1:61021';
+});
+
+test('OCE fails closed when worker returns an EU destination',async()=>{
+ process.env.AUS_PUBLIC_HOST='aus';
+ try {await assert.rejects(new RegionalRouter(load,async()=>main).launch(body,'aus',async()=>main),/outside/);}
+ finally {delete process.env.AUS_PUBLIC_HOST;}
+});
+test('EU overflow preserves reserved AU slots, explicit AU still allocates',async()=>{
+ process.env.AUS_RESERVED_HUNTS='8';let calls=0;
+ const router=new RegionalRouter(load,async()=>{calls++;return aus;},async()=>({running:16,pending:0,limit:24}));
+ try {
+  await assert.rejects(router.launch(body,'main',async()=>{throw new CapacityUnavailable('cpu');}),CapacityUnavailable);
+  assert.equal(calls,0);
+  assert.deepEqual(await router.launch(body,'aus',async()=>main),aus);
+ }finally{delete process.env.AUS_RESERVED_HUNTS;}
 });

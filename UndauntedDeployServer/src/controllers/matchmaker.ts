@@ -1,3 +1,4 @@
+import {CapacityUnavailable} from './capacity';
 import { logger } from "../logger";
 import { GetRamsgateConnectionDetails, GetTrainingDojoConnectionDetails, StartupGameserverWithArgs, StartupGameserverWithHuntIdAndPlayers } from "./gameservers";
 import { Gameservers, KindOfGameserver, huntAdmission, DescribeGameservers } from './gameservers';
@@ -39,8 +40,14 @@ const Cities = new CityRouter(async () => {
 
 const Router = new HuntRouter(() => Gameservers.filter(server => ['hunt', 'tutorial'].includes(KindOfGameserver(server))).length, undefined, () => huntAdmission.status());
 
-export async function HandleMatchmakingRequest(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined, Region: RegionChoice = 'main'){
-    if (process.env.HUNT_WORKER === '1' && GameMode !== 'ISLAND' && !(GameMode === 'CITY' && process.env.WORKER_RAMSGATE === '1')) throw new Error('Hunt worker does not accept this world');
+export async function HandleMatchmakingRequest(GameMode: string, GameArgs: string, HuntId: string, ExpectedPlayers: string[] | undefined, Region: RegionChoice = 'main', Overflow = false){
+    if(Overflow && process.env.HUNT_WORKER === '1' && GameMode === 'ISLAND'){
+        const {running,pending,limit}=huntAdmission.status();
+        const reserved=Number(process.env.AUS_RESERVED_HUNTS??0);
+        if(!Number.isSafeInteger(reserved)||reserved<0)throw new Error('Invalid AUS_RESERVED_HUNTS');
+        if(limit!==null && running+pending>=Math.max(0,limit-reserved))throw new CapacityUnavailable('hunts');
+    }
+    if (process.env.HUNT_WORKER === '1' && GameMode !== 'ISLAND' && !(GameMode === 'CITY' && process.env.WORKER_RAMSGATE === '1') && !(GameMode === 'SHARED' && process.env.WORKER_DOJO === '1')) throw new Error('Hunt worker does not accept this world');
     const body = {GameMode, GameArgs, HuntId, ExpectedPlayers};
     return Regions.launch(body, Region, async () => {
         if (GameMode === 'CITY' && process.env.CITY_OVERFLOW === '1') {

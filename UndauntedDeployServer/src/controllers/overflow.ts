@@ -1,7 +1,7 @@
 import { CapacityUnavailable, HuntLimit } from './capacity';
 import { logger } from '../logger';
 
-type Request = { GameMode: string; GameArgs: string; HuntId: string; ExpectedPlayers: string[] | undefined };
+type Request = { GameMode: string; GameArgs: string; HuntId: string; ExpectedPlayers: string[] | undefined; Overflow?: boolean };
 type Connection = { host: string; port: number };
 
 export function OverflowUrl() {

@@ -1,7 +1,7 @@
 import os from 'node:os';
 
 export class CapacityUnavailable extends Error {
-    constructor(public readonly reason: 'memory' | 'ports' | 'hunts') { super(`Game-server capacity unavailable: ${reason}`); }
+    constructor(public readonly reason: 'memory' | 'ports' | 'hunts' | 'cpu') { super(`Game-server capacity unavailable: ${reason}`); }
 }
 
 export function HuntLimit() {

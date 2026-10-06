@@ -38,6 +38,8 @@ type MatchmakingQueueData = {
 };
 
 export type MatchmakingResult = {
+    Region?: HuntRegion,
+
     Ready: boolean,
     HuntId: string,
     CandidateId: string,
@@ -127,7 +129,7 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
                 GameArgs: GameArgs,
                 HuntId: HuntId,
                 ExpectedPlayers: ExpectedPlayers!,
-                ...(['ISLAND','CITY'].includes(GameMode) && Region !== 'main' ? {Region} : {})
+                ...(['ISLAND','CITY','SHARED'].includes(GameMode) && Region !== 'main' ? {Region} : {})
             })
         });
     }
@@ -140,7 +142,7 @@ async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, Hunt
     if (MatchmakingResult.status === 503) {
         try {
             const body = await MatchmakingResult.json();
-            if (body?.error === 'capacity_unavailable' && ['memory', 'ports', 'hunts'].includes(body.reason)) {
+            if (body?.error === 'capacity_unavailable' && ['memory', 'ports', 'hunts', 'cpu'].includes(body.reason)) {
                 logger.warn({reason: body.reason, huntId: HuntId, capacityWaitMs: CAPACITY_WAIT_MS}, 'mm: allocation waiting for capacity');
                 return {...Failed, capacity: true};
             }
@@ -295,7 +297,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
     const CurrentEntry = MatchmakingResultMap.get(PlayerId);
     const CurrentQueue = PlayerQueueMap.get(PlayerId);
 
-    if(CurrentEntry !== undefined && !CurrentEntry.PartyCandidate && !CurrentEntry.Failed && CurrentEntry.HuntId === HuntId && !!CurrentEntry.Private === Private){
+    if(CurrentEntry !== undefined && !CurrentEntry.PartyCandidate && !CurrentEntry.Failed && CurrentEntry.HuntId === HuntId && CurrentEntry.Region === Region && !!CurrentEntry.Private === Private){
         if(!CurrentEntry.Ready && CurrentQueue !== undefined && CurrentQueue.Players.includes(PlayerId) && (CurrentQueue.Resolved || CurrentQueue.RetryAfter !== undefined || PartyNow() - (CurrentEntry.QueuedAt ?? 0) <= SOLO_JOIN_DEDUPE_MS)){
             return true;
         }
@@ -338,6 +340,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
         Host: "",
         Port: 0,
         Private,
+        Region,
         QueuedAt: PartyNow()
     });
 
