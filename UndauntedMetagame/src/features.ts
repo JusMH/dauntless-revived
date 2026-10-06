@@ -177,6 +177,17 @@ export const BalanceFromInventory = DefineSwitch({
     Show: ShowOnOff
 });
 
+// Middleman fusion completion checks. Stable per-slot fusion-token persistence is always enabled because
+// it only disambiguates inventory items the client already sends. The stricter reveal-time/result validation
+// waits for a captured 1.4.4 completion transaction so a guessed request shape cannot block legitimate saves.
+export const MiddlemanFusionGuards = DefineSwitch({
+    Env: "MIDDLEMAN_FUSION_GUARDS",
+    Label: "middlemanFusionGuards",
+    Default: false,
+    Parse: ParseOnOff,
+    Show: ShowOnOff
+});
+
 // Trials leaderboards (roadmap 3.8; controllers/trials.ts). Off by default until the five 1.4.4
 // response shapes have been exercised by the real client. When on, game servers may submit completed
 // runs to the aggregate endpoint and players may read the five leaderboard routes.
