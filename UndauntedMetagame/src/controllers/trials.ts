@@ -416,6 +416,7 @@ function Page<T>(Rows: T[], Query: Query){
 }
 
 export function SoloLeaderboard(Body: unknown){
+    FinalizeCompletedTrialWeeks();
     const Query = QueryFrom(Body);
     const Entries = Runs(Query, "solo").map((Run, Index) => SoloEntry(Run, Index + 1));
 
@@ -434,6 +435,7 @@ export function SoloLeaderboard(Body: unknown){
 }
 
 export function GroupLeaderboard(Body: unknown){
+    FinalizeCompletedTrialWeeks();
     const Query = QueryFrom(Body);
     const Entries = Runs(Query, "group").map((Run, Index) => GroupEntry(Run, Index + 1));
 
@@ -452,6 +454,7 @@ export function GroupLeaderboard(Body: unknown){
 }
 
 export function AllLeaderboards(Body: unknown){
+    FinalizeCompletedTrialWeeks();
     const Query = QueryFrom(Body);
     const Solo = Runs(Query, "solo").map((Run, Index) => SoloEntry(Run, Index + 1));
     const Group = Runs(Query, "group").map((Run, Index) => GroupEntry(Run, Index + 1));
@@ -491,6 +494,7 @@ function AccountId(Body: any){
 }
 
 export function SoloIndividual(Body: unknown){
+    FinalizeCompletedTrialWeeks();
     const Raw: any = Body;
     const Query = QueryFrom({...Raw, page: 0, page_size: 100});
     const Account = AccountId(Raw);
@@ -513,6 +517,7 @@ export function SoloIndividual(Body: unknown){
 }
 
 export function GroupIndividual(Body: unknown){
+    FinalizeCompletedTrialWeeks();
     const Raw: any = Body;
     const Query = QueryFrom({...Raw, page: 0, page_size: 100});
     const Account = AccountId(Raw);
