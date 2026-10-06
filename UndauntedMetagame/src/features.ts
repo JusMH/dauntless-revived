@@ -166,6 +166,17 @@ export const BalanceFromInventory = DefineSwitch({
     Show: ShowOnOff
 });
 
+// Trials leaderboards (roadmap 3.8; controllers/trials.ts). Off by default until the five 1.4.4
+// response shapes have been exercised by the real client. When on, game servers may submit completed
+// runs to the aggregate endpoint and players may read the five leaderboard routes.
+export const TrialsLeaderboards = DefineSwitch({
+    Env: "TRIALS_LEADERBOARDS",
+    Label: "trialsLeaderboards",
+    Default: false,
+    Parse: ParseOnOff,
+    Show: ShowOnOff
+});
+
 // Slayer Links (controllers/slayerlinks.ts): two friends link up for a week. On by default: the routes
 // only answer what 404'd before. 0 puts the 404s back (the stored invites and links stay).
 export const SlayerLinks = DefineSwitch({
