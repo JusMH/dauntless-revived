@@ -45,6 +45,7 @@ export const DECLINE_COOLDOWN_MS = 2 * 60 * 1000;
 export type CandidateState = "MATCHING" | "IN_PROGRESS";
 
 export type PartyCandidate = {
+    Region?: 'main' | 'aus',
     CandidateId: string,
     State: CandidateState,
     GameMode: string,

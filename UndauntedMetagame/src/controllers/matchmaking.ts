@@ -629,6 +629,7 @@ async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: st
     SetPartyCandidate(TheParty, {
         CandidateId: CandidateId,
         State: "MATCHING",
+        Region,
         GameMode: GameMode,
         HuntId: HuntId,
         MemberIds: [...Members],
@@ -658,7 +659,7 @@ async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: st
 
 function FindRejoinCandidate(TheParty: Party, PlayerId: string, GameMode: string, HuntId: string, IsLeader: boolean){
     const Matches = (Candidate: PartyCandidate | null): Candidate is PartyCandidate =>
-        Candidate != null && Candidate.GameMode === GameMode && Candidate.HuntId === HuntId && Candidate.MemberIds.includes(PlayerId);
+        Candidate != null && (Candidate.Region ?? 'main') === PlayerRegion(TheParty.LeaderId) && Candidate.GameMode === GameMode && Candidate.HuntId === HuntId && Candidate.MemberIds.includes(PlayerId);
 
     if(Matches(TheParty.Candidate)){
         return TheParty.Candidate;
@@ -734,7 +735,7 @@ export function JoinPartyCandidateById(PlayerId: string, CandidateId: string): P
         Candidate = Last;
     }
 
-    if(Candidate === undefined || !Candidate.MemberIds.includes(PlayerId)){
+    if(Candidate === undefined || (Candidate.Region ?? 'main') !== PlayerRegion(TheParty.LeaderId) || !Candidate.MemberIds.includes(PlayerId)){
         return undefined;
     }
 
