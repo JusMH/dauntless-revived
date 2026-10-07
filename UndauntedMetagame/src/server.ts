@@ -10,6 +10,7 @@ import { StartChat } from "./realtime/chat";
 import { DescribeFeatures } from "./features";
 import { PruneExpiredStorePurchases } from "./controllers/freestore";
 import { CheckProgressionConfig } from "./controllers/progressionconfig";
+import { SetDailyTokensOnce } from "./controllers/inventory";
 
 const PORT = Number(process.env.PORT);
 // Bind to loopback unless told otherwise. Upstream listened on every
@@ -46,6 +47,17 @@ try {
 }
 
 GetDb(); // This runs migrations TODO make this more explicit
+
+// Daily token stacks set to the daily amounts once (controllers/inventory.ts)
+try {
+  const Changed = SetDailyTokensOnce();
+
+  if (Changed !== undefined) {
+    logger.info(`Daily tokens: set ${Changed} character(s) to the daily amounts (one time)`);
+  }
+} catch (error) {
+  logger.warn(error, "Could not set the daily token stacks");
+}
 
 // Store purchase tokens that expired without being redeemed, and old receipts (also at most once an hour
 // when a token is issued; the lines are logged there)

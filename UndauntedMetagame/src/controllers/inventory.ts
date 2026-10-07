@@ -1,7 +1,7 @@
 import { and, eq, lt } from "drizzle-orm";
 import crypto from "node:crypto";
 import { GetDb } from "../db";
-import { characters, inventory, inventorylog, inventorytransactions } from "../db/schema";
+import { characters, inventory, inventorylog, inventorytransactions, onetimejobs } from "../db/schema";
 import { logger } from "../logger";
 import { DoesCharacterBelongToUserId } from "./character";
 import type { Tx } from "./savehistory";
@@ -184,6 +184,62 @@ function TopUpDailyTokens(StackedItems: any[], StackedItemsToAdd: any[], Source:
             }
         }
     }
+}
+
+// Once, on the first start with the daily tokens: every character's stacks are set to the daily
+// amounts (added where missing), so a deploy is all it takes. Returns the characters changed, or
+// undefined when the job had already run.
+const DAILY_TOKENS_JOB = "daily_tokens_10_6";
+
+export function SetDailyTokensOnce(){
+    return GetDb().transaction((tx) => {
+        if(tx.select().from(onetimejobs).where(eq(onetimejobs.jobId, DAILY_TOKENS_JOB)).get() !== undefined){
+            return undefined;
+        }
+
+        let Changed = 0;
+
+        for(const Row of tx.select({characterId: inventory.characterId, stackedItems: inventory.stackedItems}).from(inventory).all()){
+            let StackedItems: any[];
+
+            try {
+                StackedItems = JSON.parse(Row.stackedItems);
+            } catch {
+                continue;
+            }
+
+            if(!Array.isArray(StackedItems)){
+                continue;
+            }
+
+            let Touched = false;
+
+            for(const Token of DAILY_TOKENS){
+                const Stack = StackedItems.find((Item) => Item?.catalogId === Token.CatalogId);
+
+                if(Stack?.quantity === Token.Amount){
+                    continue;
+                }
+
+                if(Stack){
+                    Stack.quantity = Token.Amount;
+                }
+                else{
+                    StackedItems.push({catalogId: Token.CatalogId, quantity: Token.Amount});
+                }
+
+                Touched = true;
+            }
+
+            if(Touched){
+                tx.update(inventory).set({stackedItems: JSON.stringify(StackedItems)}).where(eq(inventory.characterId, Row.characterId)).run();
+                Changed++;
+            }
+        }
+
+        tx.insert(onetimejobs).values({jobId: DAILY_TOKENS_JOB, doneDate: new Date().toISOString()}).run();
+        return Changed;
+    });
 }
 
 // Applies removals then additions to StackedItems in place, in the order the

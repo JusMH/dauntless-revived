@@ -2,7 +2,7 @@ import { RemoveTestDb } from "./setup";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { GetDb } from "../src/db";
-import { ApplyStackedChanges, GetTransactionDedupeKey, HashTransactionRequest, InventoryInsufficientError, IsOverspendRefused, ParseStackQuantity, RunInventoryTransaction } from "../src/controllers/inventory";
+import { ApplyStackedChanges, GetTransactionDedupeKey, HashTransactionRequest, InventoryInsufficientError, IsOverspendRefused, ParseStackQuantity, RunInventoryTransaction, SetDailyTokensOnce } from "../src/controllers/inventory";
 import { Count, MakePlayer, ReadStacks, StackQuantity } from "./helpers";
 
 after(() => RemoveTestDb(() => GetDb().$client.close()));
@@ -347,5 +347,21 @@ describe("Daily token top-ups", () => {
 
         assert.equal(StackQuantity(CharacterId, "TOKEN_BOUNTY_DRAFT"), 5);
         assert.equal(StackQuantity(CharacterId, "TOKEN_DAILY_PATROL_BONUS"), 1);
+    });
+});
+
+describe("SetDailyTokensOnce", () => {
+    it("sets every character to the daily amounts once, adding missing stacks and keeping the rest", async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+        await Grant(UserId, CharacterId, Guid(), [Stack("TOKEN_DAILY_PATROL_BONUS", 3), Stack("BREAK_HIDE", 7)]);
+
+        assert.ok((SetDailyTokensOnce() ?? 0) >= 1);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_DAILY_PATROL_BONUS"), 10);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_BOUNTY_DRAFT"), 6);
+        assert.equal(StackQuantity(CharacterId, "BREAK_HIDE"), 7);
+
+        await Grant(UserId, CharacterId, Guid(), [], [Stack("TOKEN_BOUNTY_DRAFT", 4)]);
+        assert.equal(SetDailyTokensOnce(), undefined);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_BOUNTY_DRAFT"), 2);
     });
 });

@@ -445,3 +445,10 @@ export const slayerlinks = sqliteTable("slayerlinks", {
     index("slayerlinks_sender").on(table.senderId),
     index("slayerlinks_target").on(table.targetId)
 ]);
+
+// One-time data jobs the metagame ran at startup (migrations may only add tables, so a build can be
+// rolled back); a job whose id is here is never run again
+export const onetimejobs = sqliteTable("onetimejobs", {
+    jobId: text("jobId").notNull().primaryKey(),
+    doneDate: text("doneDate").notNull()
+});
