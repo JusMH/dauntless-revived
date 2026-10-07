@@ -6259,6 +6259,7 @@ work on the host.
 | POST | `/inventory/:characterId/:changeList` | token | Inventory migration stub. Answers `{code: null, message: ""}`. |
 | POST | `/reconcile` | token | `{balances: {id_currency_notes, CURRENCY_NOTES}, refreshInventory: true}`. With `BALANCE_FROM_INVENTORY` (on by default) each key is the quantity of that currency's stack (`CURRENCY_NOTES`, the Rams) in the inventory of the account's active character, the one saved last; a currency the character does not hold keeps the old value (the notes column of `users`). `0`: the old values only. |
 | GET | `/balance` | token | The currency sheet: the same 52 keys as before (both spellings, `CURRENCY_X` and `id_currency_x`). With `BALANCE_FROM_INVENTORY` (on) every key whose `CURRENCY_*` stack the active character holds reports that quantity; the others keep the old values (notes from the database, 25 weapon tokens, the rest 0). No key is added, removed or reordered. `CURRENCY_PLATINUM_UNIV` is not mapped. `0`: the old fixed sheet. |
+| GET | `/store-images/:file` | none | A store offer's icon (`<catalog id>.png` from `UndauntedMetagame/store-images`, the item's 1.4.4 art). The offers' `images.standard` and `images.feature` point here. Other names: 404. |
 | GET | `/creator` | token | A fixed support-a-creator reply. |
 
 ### Store
