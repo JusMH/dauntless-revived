@@ -152,6 +152,40 @@ export function IsOverspendRefused(){
     return process.env.INVENTORY_REFUSE_OVERSPEND === "1";
 }
 
+// Daily token stacks the game server grants, raised to our own daily amount: the grant is
+// rewritten so the stack lands on the amount (nothing when it already holds that many).
+// TOKEN_DAILY_PATROL_BONUS: the PERIODIC_REWARD top-up (the game's own cap is 6), to 10.
+// TOKEN_BOUNTY_DRAFT: the UBountyComponent grants (the first one and the daily one of
+// /bounty/game-data num_tokens_per_day), to 6.
+function DailyAmount(Value: string | undefined, Default: number){
+    const Amount = Number(Value);
+    return Number.isInteger(Amount) && Amount >= 1 ? Amount : Default;
+}
+
+const PATROL_BONUS_DAILY = DailyAmount(process.env.PATROL_BONUS_DAILY, 10);
+export const BOUNTY_TOKENS_DAILY = DailyAmount(process.env.BOUNTY_TOKENS_DAILY, 6);
+
+const DAILY_TOKENS = [
+    {CatalogId: "TOKEN_DAILY_PATROL_BONUS", Amount: PATROL_BONUS_DAILY, IsGrant: (Source: unknown) => Source === "PERIODIC_REWARD"},
+    {CatalogId: "TOKEN_BOUNTY_DRAFT", Amount: BOUNTY_TOKENS_DAILY, IsGrant: (Source: unknown) => typeof Source === "string" && Source.startsWith("UBountyComponent::")}
+];
+
+function TopUpDailyTokens(StackedItems: any[], StackedItemsToAdd: any[], Source: unknown){
+    for(const Token of DAILY_TOKENS){
+        if(!Token.IsGrant(Source)){
+            continue;
+        }
+
+        const Held = StackedItems.find((Item) => Item.catalogId === Token.CatalogId)?.quantity ?? 0;
+
+        for(const Item of StackedItemsToAdd){
+            if(Item?.catalogId === Token.CatalogId){
+                Item.quantity = Math.max(Token.Amount - Held, 0);
+            }
+        }
+    }
+}
+
 // Applies removals then additions to StackedItems in place, in the order the
 // transaction lists them (the order the old code used). A removal may spend what
 // the same transaction adds: the part the stack can't cover is taken after the
@@ -557,6 +591,10 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
 
     if(Prepared.ShouldTouchStackedItems){
         const StackedItems: any[] = JSON.parse(CurrentInventory.stackedItems);
+
+        if(Context.Caller === "gameserver"){
+            TopUpDailyTokens(StackedItems, StackedItemsToAdd, Context.Source);
+        }
 
         const Applied = ApplyStackedChanges(StackedItems, StackedItemsToRemove, StackedItemsToAdd, IsOverspendRefused());
         TouchedStackedItems = Applied.Touched;

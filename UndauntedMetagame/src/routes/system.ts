@@ -15,6 +15,7 @@ import { GetDb } from "../db";
 import { TouchPlayer } from "../controllers/party";
 import { RefuseUnlessGameserver } from "../middleware/GameServerOnly";
 import { TrialsError, UpdateLeaderboardProfile } from "../controllers/trials";
+import { BOUNTY_TOKENS_DAILY } from "../controllers/inventory";
 
 export const systemRouter = Router();
 
@@ -354,8 +355,8 @@ systemRouter.get("/bounty/game-data", HasUndauntedMetagameAuth, (req: any, res) 
       num_spicy_options: 1,
       bounty_token_id: "TOKEN_BOUNTY_DRAFT",
       premium_bounty_token_id: "TOKEN_BOUNTY_DRAFT_PREMIUM",
-      num_tokens_hp_start: 4,
-      num_tokens_per_day: 0,
+      num_tokens_hp_start: BOUNTY_TOKENS_DAILY,
+      num_tokens_per_day: BOUNTY_TOKENS_DAILY,
       bounty_token_grant_hour: 0,
       history_length: 10,
       bronze_count: 9,

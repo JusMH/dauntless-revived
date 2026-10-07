@@ -313,3 +313,39 @@ describe("RunInventoryTransaction", () => {
         assert.throws(() => GetDb().$client.prepare("delete from inventorylog").run(), /append-only/);
     });
 });
+
+describe("Daily token top-ups", () => {
+    const Run = (UserId: string, CharacterId: string, Source: string, StackedToAdd: any[] = [], StackedToRemove: any[] = []) =>
+        RunInventoryTransaction(UserId, CharacterId, Guid(), undefined, StackedToAdd, undefined, StackedToRemove, undefined, {Caller: "gameserver", Source});
+
+    it("lands the daily patrol bonus refill on 10, whatever the game server asks for", async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+
+        await Run(UserId, CharacterId, "PERIODIC_REWARD", [Stack("TOKEN_DAILY_PATROL_BONUS", 6)]);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_DAILY_PATROL_BONUS"), 10);
+
+        await Run(UserId, CharacterId, "UnitTest", [], [Stack("TOKEN_DAILY_PATROL_BONUS", 7)]);
+        await Run(UserId, CharacterId, "PERIODIC_REWARD", [Stack("TOKEN_DAILY_PATROL_BONUS", 3)]);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_DAILY_PATROL_BONUS"), 10);
+    });
+
+    it("lands bounty token grants on 6 and never above it", async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+
+        await Run(UserId, CharacterId, "UBountyComponent::ServerInitializeBounties", [Stack("TOKEN_BOUNTY_DRAFT", 4)]);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_BOUNTY_DRAFT"), 6);
+
+        await Run(UserId, CharacterId, "UBountyComponent::DailyGrant", [Stack("TOKEN_BOUNTY_DRAFT", 6)]);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_BOUNTY_DRAFT"), 6);
+    });
+
+    it("leaves other sources and other callers alone", async () => {
+        const {UserId, CharacterId} = await MakePlayer();
+
+        await Run(UserId, CharacterId, "HuntReward", [Stack("TOKEN_BOUNTY_DRAFT", 2), Stack("TOKEN_DAILY_PATROL_BONUS", 1)]);
+        await RunInventoryTransaction(UserId, CharacterId, Guid(), undefined, [Stack("TOKEN_BOUNTY_DRAFT", 3)], undefined, undefined, undefined, {Caller: "client", Source: "UBountyComponent::ServerInitializeBounties"});
+
+        assert.equal(StackQuantity(CharacterId, "TOKEN_BOUNTY_DRAFT"), 5);
+        assert.equal(StackQuantity(CharacterId, "TOKEN_DAILY_PATROL_BONUS"), 1);
+    });
+});
