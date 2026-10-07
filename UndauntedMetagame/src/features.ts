@@ -132,22 +132,22 @@ export const StoreRepeatableTokens = DefineSwitch({
 
 // Lady Luck's Trials store. Independent of STORE: the normal real-money/free-cosmetic storefront can
 // remain off while Lady Luck uses the same recovered purchase-token service for Steel/Gilded Marks.
-// Kept off by default until the restored catalogue has been exercised by a real 1.4.4 client.
+// On by default: the catalogue has been through a real 1.4.4 client.
 export const TrialsStore = DefineSwitch({
     Env: "TRIALS_STORE",
     Label: "trialsStore",
-    Default: false,
+    Default: true,
     Parse: ParseOnOff,
     Show: ShowOnOff
 });
 
 // Middleman's store-backed offers: the two permanent fusion-slot offers and the weekly Aetherdust
-// cell rotation. Independent of STORE for the same reason as Lady Luck; off until an in-game pass
-// confirms the 1.4.4 vendor request flow.
+// cell rotation. Independent of STORE for the same reason as Lady Luck; on by default since an in-game
+// pass of the 1.4.4 vendor request flow.
 export const MiddlemanStore = DefineSwitch({
     Env: "MIDDLEMAN_STORE",
     Label: "middlemanStore",
-    Default: false,
+    Default: true,
     Parse: ParseOnOff,
     Show: ShowOnOff
 });
@@ -199,13 +199,13 @@ export const MiddlemanFusionGuards = DefineSwitch({
     Show: ShowOnOff
 });
 
-// Trials leaderboards (roadmap 3.8; controllers/trials.ts). Off by default until the five 1.4.4
-// response shapes have been exercised by the real client. When on, game servers may submit completed
-// runs to the aggregate endpoint and players may read the five leaderboard routes.
+// Trials leaderboards (roadmap 3.8; controllers/trials.ts). On by default; TRIALS_LEADERBOARDS=off
+// turns them off. When on, game servers may submit completed runs to the aggregate endpoint and
+// players may read the five leaderboard routes.
 export const TrialsLeaderboards = DefineSwitch({
     Env: "TRIALS_LEADERBOARDS",
     Label: "trialsLeaderboards",
-    Default: false,
+    Default: true,
     Parse: ParseOnOff,
     Show: ShowOnOff
 });

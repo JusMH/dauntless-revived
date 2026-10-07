@@ -43,7 +43,7 @@ describe("Middleman weekly Aetherdust offers", () => {
         assert.ok(Next.every((Offer) => !First.some((Old) => Old.items?.[0]?.catalogId.replace(/_(UC|R)$/, "") === Offer.items?.[0]?.catalogId.replace(/_(UC|R)$/, ""))));
         assert.equal(MiddlemanWindowStart(Before), Date.parse("2026-09-24T18:00:00.000Z"));
         assert.equal(MiddlemanWindowStart(After), Date.parse("2026-10-01T18:00:00.000Z"));
-        assert.deepEqual(First.map((Offer) => Offer.cellDustPrice), [80, 80, 200]);
+        assert.deepEqual(First.map((Offer) => Offer.cellDustPrice), [40, 40, 100]);
     });
 
     it("lists only this week's cells and keeps them repeatable", async () => {
@@ -55,6 +55,11 @@ describe("Middleman weekly Aetherdust offers", () => {
         assert.ok(Offers.every((Offer) => Offer.tags.includes("weekly_cell_offering")));
         assert.ok(Offers.every((Offer) => typeof Offer.availableFrom === "string" && typeof Offer.availableTo === "string"));
         assert.ok(Offers.every((Offer) => GrantKind((Offer.items ?? [])[0].catalogId) === "stacked"));
+        // No other price key at all, or the client offers the cell for Platinum
+        for(const Key of ["platinumPrice", "prestigePrice", "event01Price", "steelMarksPrice", "gildedMarksPrice"]){
+            assert.ok(Offers.every((Offer) => !Object.prototype.hasOwnProperty.call(Offer, Key)), Key);
+        }
+        assert.throws(() => CreateStorePurchase(A.UserId, "platinum", Offers[0].id), {Status: 400});
     });
 
     it("spends Aetherdust atomically and can buy the same weekly cell again", async () => {

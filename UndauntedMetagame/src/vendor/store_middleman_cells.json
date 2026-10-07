@@ -2,7 +2,7 @@
   "_comment": [
     "Conservative 1.4.4-era Middleman weekly Aetherdust pool.",
     "Catalog ids use the classic cell ids retained by the later recovered catalogue; only cell families known from the pre-Reforged perk set are included.",
-    "The service generates +1 (UC, 80 dust) and +2 (R, 200 dust) offers and rotates three families each Thursday at 18:00 UTC."
+    "The service generates +1 (UC, 40 dust) and +2 (R, 100 dust) offers and rotates three families each Thursday at 18:00 UTC."
   ],
   "families": [
     {

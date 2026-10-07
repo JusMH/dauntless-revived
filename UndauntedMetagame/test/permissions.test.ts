@@ -220,6 +220,8 @@ const EXPECTED_ROUTES = [
     "POST /reconcile [HasUndauntedMetagameAuth]",
     "GET /creator [HasUndauntedMetagameAuth]",
     "GET /balance [HasUndauntedMetagameAuth]",
+    // The store offers' icons: public 1.4.4 item art, fetched by the client's image download without a token
+    "GET /store-images/:file []",
     // The free store (roadmap 3.7): only with STORE=free, the token's own account; with STORE=off the storefront
     // falls through to the old 400 below and the other three to the 404
     "GET /product/skus/public [StoreListOn, HasUndauntedMetagameAuth, PlayerTokenOnly]",
