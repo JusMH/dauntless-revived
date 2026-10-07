@@ -17,7 +17,7 @@ print("[BHB] BehemothHealthBars loading...")
 --   The attribute set is a subobject of the behemoth, found by object path.
 -- Gotcha: SetPositionInViewport resets viewport anchors to (0,0) - set anchors AFTER it.
 --
--- Keys: F6 preview (bars held at 50%), F7-F10 move, F11/F12 width -/+ (until the next reload).
+-- Keys: F7-F10 move, F11/F12 width -/+ (until the next reload).
 
 local FrameTick = require("FrameTick")
 -- Live settings from the Mod Menu (shared\ModSettings): bhb_shield, bhb_text, bhb_dual.
@@ -89,7 +89,6 @@ local mainBar, shieldBar = nil, nil    -- {widget, bar, sizeBox, boxSlot, frame,
 local skin = nil
 local label, labelText, lastText, labelShown = nil, nil, nil, nil
 local sLabel, sLabelText, sLastText, sLabelShown = nil, nil, nil, nil
-local previewMode = false
 local lastHealth, targetKey = {}, nil
 local attrCache, shieldPeak, shieldSrcLogged = {}, {}, {}
 local creating = false
@@ -650,13 +649,6 @@ local function SetAlive(s) return s.mainBar and valid(s.mainBar.widget) end
 
 -- Show one behemoth (t = {key, hp, maxhp}) on the CURRENT globals.
 local function ShowTarget(t)
-    if previewMode then
-        SetShown(mainBar, true) SetPct(mainBar, 0.5)
-        SetLabelShown(true) SetLabel("PREVIEW 50%")
-        SetShown(shieldBar, true) SetPct(shieldBar, 0.5)
-        SetShieldLabelShown(true) SetShieldLabel("PREVIEW 50%")
-        return
-    end
     local showText = ModSettings.Get("bhb_text", true)
     SetShown(mainBar, true)
     SetLabelShown(showText)
@@ -728,7 +720,6 @@ local function UpdateSets()
         if not t then for _, d in pairs(seen) do t = d break end end
         if t then targets = {t} end
     end
-    if previewMode and #targets == 0 then targets = {{key = "preview", hp = 1, maxhp = 2}} end
     if targets[1] then targetKey = targets[1].key end
 
     local half = math.floor(SIZE_X / 2 + DUAL_GAP / 2 + 0.5)
@@ -793,14 +784,6 @@ end)
 FrameTick.Start(log, "BehemothHealthBars")
 
 -- Keys act on every bar set (bars are created automatically when a behemoth is present).
-RegisterKeyBind(Key.F6, function()
-    previewMode = not previewMode
-    for _, s in ipairs(sets) do
-        if s.mainBar then s.mainBar.lastPct = -1 end
-        if s.shieldBar then s.shieldBar.lastPct = -1 end
-    end
-    log("preview " .. (previewMode and "ON (bars at 50%)" or "OFF"))
-end)
 RegisterKeyBind(Key.F7, function() POS_X = POS_X - STEP PlaceAll() end)
 RegisterKeyBind(Key.F8, function() POS_X = POS_X + STEP PlaceAll() end)
 RegisterKeyBind(Key.F9, function() POS_Y = POS_Y - STEP PlaceAll() end)

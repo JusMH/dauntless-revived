@@ -1,7 +1,7 @@
 import { and, eq, lt } from "drizzle-orm";
 import crypto from "node:crypto";
 import { GetDb } from "../db";
-import { characters, inventory, inventorylog, inventorytransactions } from "../db/schema";
+import { characters, inventory, inventorylog, inventorytransactions, onetimejobs } from "../db/schema";
 import { logger } from "../logger";
 import { DoesCharacterBelongToUserId } from "./character";
 import type { Tx } from "./savehistory";
@@ -150,6 +150,96 @@ export function ParseStackQuantity(Item: any, Operation: string){
 // always was and logged ("Allowing overspend") so it can be judged.
 export function IsOverspendRefused(){
     return process.env.INVENTORY_REFUSE_OVERSPEND === "1";
+}
+
+// Daily token stacks the game server grants, raised to our own daily amount: the grant is
+// rewritten so the stack lands on the amount (nothing when it already holds that many).
+// TOKEN_DAILY_PATROL_BONUS: the PERIODIC_REWARD top-up (the game's own cap is 6), to 10.
+// TOKEN_BOUNTY_DRAFT: the UBountyComponent grants (the first one and the daily one of
+// /bounty/game-data num_tokens_per_day), to 6.
+function DailyAmount(Value: string | undefined, Default: number){
+    const Amount = Number(Value);
+    return Number.isInteger(Amount) && Amount >= 1 ? Amount : Default;
+}
+
+const PATROL_BONUS_DAILY = DailyAmount(process.env.PATROL_BONUS_DAILY, 10);
+export const BOUNTY_TOKENS_DAILY = DailyAmount(process.env.BOUNTY_TOKENS_DAILY, 6);
+
+const DAILY_TOKENS = [
+    {CatalogId: "TOKEN_DAILY_PATROL_BONUS", Amount: PATROL_BONUS_DAILY, IsGrant: (Source: unknown) => Source === "PERIODIC_REWARD"},
+    {CatalogId: "TOKEN_BOUNTY_DRAFT", Amount: BOUNTY_TOKENS_DAILY, IsGrant: (Source: unknown) => typeof Source === "string" && Source.startsWith("UBountyComponent::")}
+];
+
+function TopUpDailyTokens(StackedItems: any[], StackedItemsToAdd: any[], Source: unknown){
+    for(const Token of DAILY_TOKENS){
+        if(!Token.IsGrant(Source)){
+            continue;
+        }
+
+        const Held = StackedItems.find((Item) => Item.catalogId === Token.CatalogId)?.quantity ?? 0;
+
+        for(const Item of StackedItemsToAdd){
+            if(Item?.catalogId === Token.CatalogId){
+                Item.quantity = Math.max(Token.Amount - Held, 0);
+            }
+        }
+    }
+}
+
+// Once, on the first start with the daily tokens: every character's stacks are set to the daily
+// amounts (added where missing), so a deploy is all it takes. Returns the characters changed, or
+// undefined when the job had already run.
+const DAILY_TOKENS_JOB = "daily_tokens_10_6";
+
+export function SetDailyTokensOnce(){
+    return GetDb().transaction((tx) => {
+        if(tx.select().from(onetimejobs).where(eq(onetimejobs.jobId, DAILY_TOKENS_JOB)).get() !== undefined){
+            return undefined;
+        }
+
+        let Changed = 0;
+
+        for(const Row of tx.select({characterId: inventory.characterId, stackedItems: inventory.stackedItems}).from(inventory).all()){
+            let StackedItems: any[];
+
+            try {
+                StackedItems = JSON.parse(Row.stackedItems);
+            } catch {
+                continue;
+            }
+
+            if(!Array.isArray(StackedItems)){
+                continue;
+            }
+
+            let Touched = false;
+
+            for(const Token of DAILY_TOKENS){
+                const Stack = StackedItems.find((Item) => Item?.catalogId === Token.CatalogId);
+
+                if(Stack?.quantity === Token.Amount){
+                    continue;
+                }
+
+                if(Stack){
+                    Stack.quantity = Token.Amount;
+                }
+                else{
+                    StackedItems.push({catalogId: Token.CatalogId, quantity: Token.Amount});
+                }
+
+                Touched = true;
+            }
+
+            if(Touched){
+                tx.update(inventory).set({stackedItems: JSON.stringify(StackedItems)}).where(eq(inventory.characterId, Row.characterId)).run();
+                Changed++;
+            }
+        }
+
+        tx.insert(onetimejobs).values({jobId: DAILY_TOKENS_JOB, doneDate: new Date().toISOString()}).run();
+        return Changed;
+    });
 }
 
 // Applies removals then additions to StackedItems in place, in the order the
@@ -557,6 +647,10 @@ function ApplyPreparedInventoryTransaction(tx: Tx, Prepared: PreparedInventoryTr
 
     if(Prepared.ShouldTouchStackedItems){
         const StackedItems: any[] = JSON.parse(CurrentInventory.stackedItems);
+
+        if(Context.Caller === "gameserver"){
+            TopUpDailyTokens(StackedItems, StackedItemsToAdd, Context.Source);
+        }
 
         const Applied = ApplyStackedChanges(StackedItems, StackedItemsToRemove, StackedItemsToAdd, IsOverspendRefused());
         TouchedStackedItems = Applied.Touched;
