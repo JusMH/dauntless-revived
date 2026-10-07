@@ -607,8 +607,9 @@ describe("over HTTP", () => {
         assert.equal((await Call("POST", "/notification/platinum", { as: A.UserId })).status, 400);
     });
 
+    // Lady Luck and the Middleman (on by default) share the purchase routes, so they are off here too
     it("with STORE=off (the default) the store answers as it did before", async () => {
-        await WithEnv({ STORE: undefined }, async () => {
+        await WithEnv({ STORE: undefined, TRIALS_STORE: "off", MIDDLEMAN_STORE: "off" }, async () => {
             const A = await MakePlayer();
 
             const Listed = await Call("GET", "/product/skus/public?requiredTags=webstore", { as: A.UserId });
