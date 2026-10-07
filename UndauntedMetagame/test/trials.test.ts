@@ -2,12 +2,14 @@ import { RemoveTestDb } from "./setup";
 import "./authenv";
 import { after, before, beforeEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { eq } from "drizzle-orm";
 import { Call, StartApp, StopApp } from "./appclient";
 import { GetDb } from "../src/db";
 import { cooldowns, entitlements, leaderboardprofiles, trialruns, trialweeks } from "../src/db/schema";
 import { MakePlayer, StackQuantity } from "./helpers";
-import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialRewardRank, TrialWeekAt, TrialsWindowForWeek, TRIAL_ROTATION_LENGTH, TRIAL_ROTATION_START, TRIAL_ROTATION_SUFFIXES, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
+import { FinalizeCompletedTrialWeeks, TrialIdForWeek, TrialRewardRank, TrialWeekAt, TrialsWindowForWeek, TRIAL_POOL, TRIAL_ROTATION_START, TrialBehemothForWeek, TRIALS_CHAMPION_ENTITLEMENT, TRIALS_CHAMPION_TITLE, TRIALS_DAUNTLESS_TITLE } from "../src/controllers/trials";
 import { GetSeasonalEventSchedule } from "../src/routes/tuning";
 
 const Trial = (Difficulty = 1) => TrialIdForWeek(Difficulty, TrialWeekAt());
@@ -77,18 +79,33 @@ describe("Trials leaderboards", () => {
         assert.ok(Rows.every((Row: any) => Row.ScheduledItems[0].MaxCompletionPerInterval === -1));
     });
 
-    it("uses the exact cooked Hard/Elite rotation captured from the deploy tables", () => {
-        assert.equal(TRIAL_ROTATION_LENGTH, 88);
-        assert.equal(TRIAL_ROTATION_SUFFIXES[0], "001");
-        assert.equal(TRIAL_ROTATION_SUFFIXES.at(-1), "088");
+    it("picks the same weekly Trial row as the deploy server", () => {
+        // Pinned from UndauntedDeployServer's GetTrialsData; both servers must pick the same row.
+        const Expected: [number, string][] = [[0, "045"], [1, "075"], [2, "029"], [68, "064"], [377, "039"], [378, "069"], [379, "087"]];
+
+        for(const [Week, Suffix] of Expected){
+            assert.equal(TrialIdForWeek(0, Week), `Arena_MatchmakerHunt_Hard_${Suffix}`);
+            assert.equal(TrialIdForWeek(1, Week), `Arena_MatchmakerHunt_Elite_${Suffix}`);
+        }
+
+        const DeployPool = JSON.parse(readFileSync(path.join(__dirname, "../../../UndauntedDeployServer/src/vendor/trials_pool.json"), "utf8"));
+        assert.deepEqual(DeployPool.behemoths, TRIAL_POOL);
+    });
+
+    it("rotates a variant-only pool weekly without repeating a behemoth back to back", () => {
         assert.equal(new Date(TRIAL_ROTATION_START).toISOString(), "2019-07-18T18:00:00.000Z");
         assert.equal(TrialWeekAt(new Date("2019-07-18T17:59:59.999Z")), -1);
         assert.equal(TrialWeekAt(new Date("2019-07-18T18:00:00.000Z")), 0);
-        assert.equal(TrialWeekAt(new Date("2020-11-05T17:59:59.999Z")), 67);
-        assert.equal(TrialWeekAt(new Date("2020-11-05T18:00:00.000Z")), 68);
-        assert.ok(TrialIdForWeek(1, 68).endsWith("_069"));
-        assert.ok(TrialIdForWeek(0, 87).endsWith("_088"));
-        assert.ok(TrialIdForWeek(1, 88).endsWith("_001"));
+
+        let Previous = "";
+        for(let Week = -30; Week < 400; Week++){
+            const Behemoth = TrialBehemothForWeek(Week);
+
+            assert.ok(Behemoth.endsWith("_alpha"));
+            assert.ok(TRIAL_POOL[Behemoth].includes(TrialIdForWeek(1, Week).slice(-3)));
+            assert.notEqual(Behemoth, Previous);
+            Previous = Behemoth;
+        }
     });
 
     it("uses the retail Bronze/Silver/Gold time boundaries for reward rank", () => {
@@ -317,7 +334,7 @@ describe("Trials leaderboards", () => {
         const A = await MakePlayer();
         const CurrentWeek = TrialWeekAt();
         const CurrentTrial = TrialIdForWeek(1, CurrentWeek);
-        const OldWeek = CurrentWeek - TRIAL_ROTATION_LENGTH;
+        const OldWeek = CurrentWeek - 52;
 
         GetDb().insert(trialruns).values({
             trialId: CurrentTrial,

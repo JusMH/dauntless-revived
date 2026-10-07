@@ -1,8 +1,13 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import "./setup";
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
-import { BuildTrialSuffixes, DescribeGameservers, Gameserver, Gameservers, GetTrialsData, KindOfGameserver, TRIAL_ROTATION_START, TRIAL_ROTATION_SUFFIXES } from "../src/controllers/gameservers";
+import { DescribeGameservers, Gameserver, Gameservers, GetTrialsData, KindOfGameserver, TRIAL_POOL, TRIAL_ROTATION_START, TrialBehemothForWeek, TrialSuffixForWeek, TrialWeekAt, ValidateTrialPool } from "../src/controllers/gameservers";
+import MatchmakerTable from "../src/vendor/matchmaker_hunts_table.json";
+import TrialsHardTable from "../src/vendor/trials_hard_table.json";
+import TrialsEliteTable from "../src/vendor/trials_elite_table.json";
 import { IsLoopbackAddress } from "../src/routes/gameservers";
 import { app } from "../src/app";
 
@@ -44,57 +49,92 @@ const Hunt = Fake({
 });
 
 describe("Trials weekly rotation", () => {
-    it("uses exactly the rows cooked in both Hard and Elite tables", () => {
-        assert.equal(TRIAL_ROTATION_SUFFIXES.length, 88);
-        assert.equal(new Set(TRIAL_ROTATION_SUFFIXES).size, 88);
-        assert.equal(TRIAL_ROTATION_SUFFIXES[0], "001");
-        assert.equal(TRIAL_ROTATION_SUFFIXES.at(-1), "088");
+    const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const Hard = TrialsHardTable[0].Rows as any;
+    const Elite = TrialsEliteTable[0].Rows as any;
+    const Blueprint = (Id: string) => ((Hard[Id] ?? Elite[Id]).SpecificBehemoth.BehemothAsset.AssetPathName as string).split(".").at(-1)!.replace(/_bp_C$/, "");
+
+    it("pools only variants that have a Heroic hunt of the same variant", () => {
+        const Matchmaker = MatchmakerTable[0].Rows as any;
+        const Of = (Suffix: string) => new Set(Object.entries(Matchmaker)
+            .filter(([Id]) => Id.endsWith(Suffix))
+            .map(([, Row]: [string, any]) => (Row.SpecificBehemoth?.BehemothAsset?.AssetPathName ?? "").split(".").at(-1).replace(/_bp_C$/, "")));
+        const Alpha = Of("_Alpha");
+        const Heroic = Of("_Heroic");
+
+        assert.equal(Object.keys(TRIAL_POOL).length, 12);
+        for(const [Behemoth, Suffixes] of Object.entries(TRIAL_POOL)){
+            assert.ok(Behemoth.endsWith("_alpha"), Behemoth);
+            assert.ok(Alpha.has(Behemoth) && Heroic.has(Behemoth), Behemoth);
+            for(const Suffix of Suffixes){
+                assert.equal(Blueprint(`Arena_MatchmakerHunt_Hard_${Suffix}`), Behemoth);
+                assert.equal(Blueprint(`Arena_MatchmakerHunt_Elite_${Suffix}`), Behemoth);
+            }
+        }
     });
 
-    it("intersects actual row ids and does not crash or renumber gaps", () => {
-        const Hard = {
-            Arena_MatchmakerHunt_Hard_001: {},
-            Arena_MatchmakerHunt_Hard_003: {},
-            Arena_MatchmakerHunt_Hard_099: {},
-            Arena_MatchmakerHunt_Hard_Test: {}
-        };
-        const Elite = {
-            Arena_MatchmakerHunt_Elite_001: {},
-            Arena_MatchmakerHunt_Elite_003: {},
-            Arena_MatchmakerHunt_Elite_004: {},
-            Arena_MatchmakerHunt_Elite_Test: {}
-        };
+    it("never launches a base behemoth and never repeats one two weeks running", () => {
+        let Previous = "";
 
-        assert.deepEqual(BuildTrialSuffixes(Hard, Elite), ["001", "003"]);
+        for(let Week = -30; Week < 400; Week++){
+            const Behemoth = TrialBehemothForWeek(Week);
+            const Suffix = TrialSuffixForWeek(Week);
+
+            assert.ok(Behemoth.endsWith("_alpha"));
+            assert.ok(TRIAL_POOL[Behemoth].includes(Suffix));
+            assert.notEqual(Behemoth, Previous, `week ${Week}`);
+            Previous = Behemoth;
+        }
     });
 
-    it("maps the cooked weekly ids to their historical Thursday 18:00 UTC reset", () => {
+    it("uses every pooled behemoth once per cycle", () => {
+        const Count = Object.keys(TRIAL_POOL).length;
+        const Seen = new Set(Array.from({length: Count}, (_, Index) => TrialBehemothForWeek(5 * Count + Index)));
+
+        assert.equal(Seen.size, Count);
+    });
+
+    it("matches the pool compiled into the DLL (UndauntedInternalServer/TrialsRotation.h)", () => {
+        const Header = readFileSync(path.join(__dirname, "../../../UndauntedInternalServer/TrialsRotation.h"), "utf8");
+        const Compiled = Object.fromEntries([...Header.matchAll(/\{"([a-z_]+)", \{([^}]*)\}\}/g)]
+            .map((Match) => [Match[1], [...Match[2].matchAll(/"(\d{3})"/g)].map((Suffix) => Suffix[1])]));
+
+        assert.deepEqual(Compiled, TRIAL_POOL);
+    });
+
+    it("rejects a pool row that does not match its behemoth", () => {
+        const Pool = {lerawr_alpha: [...TRIAL_POOL.lerawr_alpha, TRIAL_POOL.host_alpha[0]]};
+
+        assert.throws(() => ValidateTrialPool(Pool, Hard, Elite), /is not lerawr_alpha/);
+        assert.throws(() => ValidateTrialPool({lerawr_normal: TRIAL_POOL.lerawr_alpha}, Hard, Elite), /not a variant/);
+    });
+
+    it("changes the pick at the Thursday 18:00 UTC reset and holds it all week", () => {
         const Start = new Date(TRIAL_ROTATION_START);
         const OneMsBefore = new Date(Start.getTime() - 1);
         const SameWeek = new Date(Start.getTime() + 6 * 24 * 60 * 60 * 1000 + 23 * 60 * 60 * 1000);
-        const NextWeek = new Date(Start.getTime() + 7 * 24 * 60 * 60 * 1000);
-        const Release144 = new Date("2020-11-05T18:00:00.000Z");
+        const NextWeek = new Date(Start.getTime() + WEEK_MS);
 
         assert.equal(Start.toISOString(), "2019-07-18T18:00:00.000Z");
-        assert.ok(GetTrialsData(false, Start).TrialsHuntId.endsWith("_001"));
-        assert.ok(GetTrialsData(false, Release144).TrialsHuntId.endsWith("_069"));
+        assert.equal(TrialWeekAt(Start), 0);
+        assert.equal(TrialWeekAt(OneMsBefore), -1);
 
         const First = GetTrialsData(false, Start);
-        assert.notEqual(GetTrialsData(false, OneMsBefore).TrialsHuntId, First.TrialsHuntId);
+        assert.notEqual(GetTrialsData(false, OneMsBefore).Behemoth, First.Behemoth);
         assert.deepEqual(GetTrialsData(false, SameWeek), First);
-        assert.notEqual(GetTrialsData(false, NextWeek).TrialsHuntId, First.TrialsHuntId);
+        assert.notEqual(GetTrialsData(false, NextWeek).Behemoth, First.Behemoth);
     });
 
-    it("uses the same row suffix for Normal and Dauntless and wraps after the cooked rotation", () => {
-        const Start = new Date(TRIAL_ROTATION_START);
-        const Normal = GetTrialsData(false, Start);
-        const Dauntless = GetTrialsData(true, Start);
-        const Wrapped = GetTrialsData(false, new Date(Start.getTime() + TRIAL_ROTATION_SUFFIXES.length * 7 * 24 * 60 * 60 * 1000));
+    it("gives Normal and Dauntless the same row and behemoth", () => {
+        for(let Week = 0; Week < 50; Week++){
+            const At = new Date(Date.parse(TRIAL_ROTATION_START) + Week * WEEK_MS);
+            const Normal = GetTrialsData(false, At);
+            const Dauntless = GetTrialsData(true, At);
 
-        assert.equal(Normal.TrialsHuntId.replace("_Hard_", "_"), Dauntless.TrialsHuntId.replace("_Elite_", "_"));
-        assert.equal(Wrapped.TrialsHuntId, Normal.TrialsHuntId);
-        assert.ok(Normal.Behemoth.includes("/Game/Monsters/"));
-        assert.ok(Dauntless.Behemoth.includes("/Game/Monsters/"));
+            assert.equal(Normal.TrialsHuntId.replace("_Hard_", "_"), Dauntless.TrialsHuntId.replace("_Elite_", "_"));
+            assert.equal(Normal.Behemoth, Dauntless.Behemoth);
+            assert.ok(Normal.Behemoth.includes("_alpha_bp."));
+        }
     });
 
     it("accepts a host override for the epoch and rejects a bad one", () => {
@@ -102,7 +142,7 @@ describe("Trials weekly rotation", () => {
 
         try{
             process.env.TRIAL_ROTATION_START = "2026-10-01T00:00:00.000Z";
-            assert.ok(GetTrialsData(false, new Date("2026-10-01T12:00:00.000Z")).TrialsHuntId.endsWith(`_${TRIAL_ROTATION_SUFFIXES[0]}`));
+            assert.ok(GetTrialsData(false, new Date("2026-10-01T12:00:00.000Z")).TrialsHuntId.endsWith(`_${TrialSuffixForWeek(0)}`));
 
             process.env.TRIAL_ROTATION_START = "not-a-date";
             assert.throws(() => GetTrialsData(false, new Date()), /Invalid TRIAL_ROTATION_START/);

@@ -141,6 +141,11 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="Networking.h" />
     <ClInclude Include="FallRecovery.h" />
+    <ClInclude Include="TrialsRotation.h" />
+    <ClInclude Include="TrialsSchedule.h" />
+    <ClInclude Include="AutoPressStart.h" />
+    <ClInclude Include="CellFusionTime.h" />
+    <ClInclude Include="DataTables.h" />
     <ClInclude Include="FallRecoveryPolicy.h" />
   </ItemGroup>
   <ItemGroup>

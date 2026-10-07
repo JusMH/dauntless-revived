@@ -16,7 +16,7 @@ import { GetActiveCharacter } from "./activecharacter";
 import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
 import { ApplyInventoryTransactionInTx, InventoryErrorOf } from "./inventory";
 import { Tx } from "./savehistory";
-import { FinalizeCompletedTrialWeeks, TRIALS_CHAMPION_ENTITLEMENT } from "./trials";
+import { FinalizeCompletedTrialWeeks } from "./trials";
 
 // The free store (roadmap 3.7, STORE=free). The client's flow (0x140b39657, 0x140b55011):
 // - GET /product/skus/public?requiredTags=<tag>: the offers of one tag (the storefront is "webstore"),
@@ -77,7 +77,7 @@ const MIDDLEMAN_ROTATION_EPOCH = Date.UTC(1970, 0, 1, 18); // Thursday 18:00 UTC
 const MIDDLEMAN_WEEKLY_TAG = "weekly_cell_offering";
 
 const MiddlemanCellOffers: StoreOffer[] = MiddlemanCells.families.flatMap((Family) =>
-    ([["UC", 1, 80], ["R", 2, 200]] as const).map(([Suffix, Rank, Price]) => {
+    ([["UC", 1, 40], ["R", 2, 100]] as const).map(([Suffix, Rank, Price]) => {
         const CatalogId = `CELL_${Family.id}_${Suffix}`;
         return {
             id: `middleman_weekly_${CatalogId.toLowerCase()}`,
@@ -85,12 +85,9 @@ const MiddlemanCellOffers: StoreOffer[] = MiddlemanCells.families.flatMap((Famil
             displayDescription: "Purchase one cell with Aetherdust.",
             displayPriority: 0,
             tags: [MIDDLEMAN_WEEKLY_TAG],
-            platinumPrice: null,
+            // Only the Aetherdust price: with a platinumPrice key present (even null) the 1.4.4 Middleman
+            // offers the cell for Platinum instead.
             cellDustPrice: Price,
-            prestigePrice: null,
-            event01Price: null,
-            steelMarksPrice: null,
-            gildedMarksPrice: null,
             items: [{catalogId: CatalogId, quantity: 1}],
             entitlements: [],
             maxAllowed: 1,
@@ -142,7 +139,6 @@ export function SelectWeeklyMiddlemanOffers(At: Date = new Date()): StoreOffer[]
 const LADY_LUCK_IDS = new Set(LadyLuck.offers.map((Offer) => Offer.id));
 const LADY_LUCK_ITEM_KINDS = LadyLuck.itemKinds;
 const LADY_LUCK_REPEATABLE = new Set(LadyLuck.repeatable);
-const LADY_LUCK_CHAMPION_TAG = "store_trials_tab_champion";
 
 const Catalog: Record<string, unknown> = {
     ...(catalog as unknown as Record<string, unknown>),
@@ -260,14 +256,6 @@ export function IsStoreSkuEnabled(SkuId: string){
     if(LADY_LUCK_IDS.has(SkuId)) return TrialsStore();
     if(MIDDLEMAN_VENDOR_IDS.has(SkuId) || MIDDLEMAN_OFFER_IDS.has(SkuId)) return MiddlemanStore();
     return StoreMode() === "free";
-}
-
-function IsChampionOffer(Offer: StoreOffer){
-    return LADY_LUCK_IDS.has(Offer.id) && Offer.tags.includes(LADY_LUCK_CHAMPION_TAG);
-}
-
-function CanAccessOffer(tx: Tx, AccountId: string, Offer: StoreOffer){
-    return !IsChampionOffer(Offer) || HasActiveEntitlement(tx, AccountId, TRIALS_CHAMPION_ENTITLEMENT);
 }
 
 function FinalizeTrialsForOffer(Offer: StoreOffer | undefined){
@@ -403,8 +391,7 @@ export function ListStoreOffers(AccountId: string, Tag: string): StoreOffer[] {
     return GetDb().transaction((tx) => {
         const Held = HeldCatalogIds(tx, GetActiveCharacter(tx, AccountId)?.characterId);
 
-        return ForTag.filter((Offer) => CanAccessOffer(tx, AccountId, Offer))
-            .map((Offer) => WithRemaining(tx, AccountId, Held, Offer));
+        return ForTag.map((Offer) => WithRemaining(tx, AccountId, Held, Offer));
     });
 }
 
@@ -423,10 +410,6 @@ export function GetStoreOffer(AccountId: string, SkuId: string): StoreOffer {
     FinalizeTrialsForOffer(Offer);
 
     return GetDb().transaction((tx) => {
-        if(!CanAccessOffer(tx, AccountId, Offer)){
-            throw new StoreError(404, "Unknown store offer");
-        }
-
         return WithRemaining(tx, AccountId, HeldCatalogIds(tx, GetActiveCharacter(tx, AccountId)?.characterId), Offer);
     });
 }
@@ -487,10 +470,6 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
         // This account's own expired tokens, through the account index
         tx.delete(storepurchases)
             .where(and(eq(storepurchases.accountId, AccountId), isNull(storepurchases.redeemedDate), lt(storepurchases.expiresDate, Now.toISOString()))).run();
-
-        if(!CanAccessOffer(tx, AccountId, Offer)){
-            throw new StoreError(404, "Unknown store offer");
-        }
 
         const Character = GetActiveCharacter(tx, AccountId);
 
@@ -573,10 +552,6 @@ export function RedeemStorePurchase(AccountId: string, Currency: string, Token: 
 
         if(Offer == undefined){
             throw new StoreError(409, "Offer is no longer sold; request a new token");
-        }
-
-        if(!CanAccessOffer(tx, AccountId, Offer)){
-            throw new StoreError(409, "Offer is no longer available to this account");
         }
 
         CheckOffer(Offer);

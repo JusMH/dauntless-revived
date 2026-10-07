@@ -12,6 +12,7 @@ import PlayerHuntTable from "../vendor/player_hunts_table.json";
 import MatchmakerHuntTable from "../vendor/matchmaker_hunts_table.json";
 import TrialsHardHuntTable from "../vendor/trials_hard_table.json";
 import TrialsEliteHuntTable from "../vendor/trials_elite_table.json";
+import TrialsPool from "../vendor/trials_pool.json";
 import { kill } from "node:process";
 import { logger } from "../logger";
 import { CapacityUnavailable, memoryAdmission, HuntAdmission } from './capacity';
@@ -440,50 +441,99 @@ export type TrialsData = {
     TrialsHuntId: string;
 }
 
-// The cooked Trial row suffixes are historical week numbers. Archived leaderboard data maps
-// row 067 to 2020-10-22 18:00 UTC, 068 to 2020-10-29 and 069 to the 1.4.4 release Thursday,
-// 2020-11-05. Counting back puts row 001 at this epoch, so the cooked 001..088 sequence
-// reproduces its original weekly dates before wrapping for private-server continuity.
+// Trials reset every Thursday 18:00 UTC, counted from the historical row 001 week.
 export const TRIAL_ROTATION_START = "2019-07-18T18:00:00.000Z";
 const TRIAL_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function BuildTrialSuffixes(HardRows: Record<string, unknown>, EliteRows: Record<string, unknown>){
-    const StandardRows = (Rows: Record<string, unknown>, Difficulty: "Hard" | "Elite") => {
-        const Prefix = `Arena_MatchmakerHunt_${Difficulty}_`;
+// The weekly pool (vendor/trials_pool.json, mirrored in the metagame): elemental variants that also
+// have a Heroic hunt of that same variant, each with the cooked Trial rows that use it at both
+// difficulties. Base behemoths are never in it.
+export type TrialPool = Record<string, string[]>;
+export const TRIAL_POOL: TrialPool = (TrialsPool as {behemoths: TrialPool}).behemoths;
+const TRIAL_POOL_BEHEMOTHS = Object.keys(TRIAL_POOL).sort();
 
-        return new Set(Object.keys(Rows)
-            .filter((Id) => Id.startsWith(Prefix) && /^\d{3}$/.test(Id.slice(Prefix.length)))
-            .map((Id) => Id.slice(Prefix.length)));
-    };
-
-    const Hard = StandardRows(HardRows, "Hard");
-    const Elite = StandardRows(EliteRows, "Elite");
-
-    // Build the rotation from the cooked tables themselves. A missing number is simply absent;
-    // a row must exist at both difficulties to enter the shared weekly rotation.
-    return [...Hard].filter((Id) => Elite.has(Id)).sort((A, B) => Number(A) - Number(B));
+function TrialBlueprint(Row: any){
+    const Asset: string = Row?.SpecificBehemoth?.BehemothAsset?.AssetPathName ?? "";
+    return Asset.split(".").at(-1)?.replace(/_bp_C$/, "") ?? "";
 }
 
-export const TRIAL_ROTATION_SUFFIXES = BuildTrialSuffixes(
-    (TrialsHardHuntTable[0].Rows as any),
-    (TrialsEliteHuntTable[0].Rows as any)
-);
+// Every pooled row must exist in both cooked tables with the pooled blueprint, so a stale pool file
+// can never send a different behemoth than the one it names.
+export function ValidateTrialPool(Pool: TrialPool, HardRows: Record<string, unknown>, EliteRows: Record<string, unknown>){
+    if(Object.keys(Pool).length === 0) throw new Error("Trials pool is empty");
 
-export function GetTrialsData(IsElite: boolean, At: Date = new Date()): TrialsData{
-    if(TRIAL_ROTATION_SUFFIXES.length === 0){
-        throw new Error("Trials rotation has no hunt rows shared by Hard and Elite tables");
+    for(const [Behemoth, Suffixes] of Object.entries(Pool)){
+        if(!Behemoth.endsWith("_alpha")) throw new Error(`Trials pool behemoth ${Behemoth} is not a variant`);
+        if(Suffixes.length === 0) throw new Error(`Trials pool behemoth ${Behemoth} has no rows`);
+
+        for(const Suffix of Suffixes){
+            const Hard = TrialBlueprint(HardRows[`Arena_MatchmakerHunt_Hard_${Suffix}`]);
+            const Elite = TrialBlueprint(EliteRows[`Arena_MatchmakerHunt_Elite_${Suffix}`]);
+
+            if(Hard !== Behemoth || Elite !== Behemoth){
+                throw new Error(`Trials pool row ${Suffix} is not ${Behemoth} at both difficulties`);
+            }
+        }
+    }
+}
+
+ValidateTrialPool(TRIAL_POOL, TrialsHardHuntTable[0].Rows as any, TrialsEliteHuntTable[0].Rows as any);
+
+function Mod(Value: number, Divisor: number){
+    return ((Value % Divisor) + Divisor) % Divisor;
+}
+
+function TrialScore(Seed: string){
+    return crypto.createHash("sha256").update(Seed).digest("hex");
+}
+
+// Sorted by the hash of Prefix + item, compared byte for byte like the DLL (TrialsRotation.h).
+function SortedByScore(Items: string[], Prefix: string){
+    return Items
+        .map((Item) => ({Item, Score: TrialScore(Prefix + Item)}))
+        .sort((A, B) => A.Score < B.Score ? -1 : A.Score > B.Score ? 1 : 0)
+        .map((Entry) => Entry.Item);
+}
+
+function TrialCycleOrder(Cycle: number){
+    return SortedByScore(TRIAL_POOL_BEHEMOTHS, `trials-weekly-v1:${Cycle}:`);
+}
+
+// A seeded shuffle of the pool per cycle of N weeks: every behemoth once per cycle, in a random
+// order, and never the same behemoth two weeks running (also across a cycle boundary).
+// Deterministic, so the metagame computes the same pick without any shared state.
+export function TrialBehemothForWeek(Week: number){
+    const Count = TRIAL_POOL_BEHEMOTHS.length;
+    const Cycle = Math.floor(Week / Count);
+    const Order = TrialCycleOrder(Cycle);
+
+    if(Count > 1 && Order[0] === TrialCycleOrder(Cycle - 1)[Count - 1]){
+        [Order[0], Order[1]] = [Order[1], Order[0]];
     }
 
+    return Order[Mod(Week, Count)];
+}
+
+// One of the behemoth's authored rows, shared by Normal and Dauntless.
+export function TrialSuffixForWeek(Week: number){
+    const Behemoth = TrialBehemothForWeek(Week);
+
+    return SortedByScore(TRIAL_POOL[Behemoth], `trials-weekly-v1:row:${Week}:`)[0];
+}
+
+export function TrialWeekAt(At: Date = new Date()){
     const Epoch = Date.parse(process.env.TRIAL_ROTATION_START ?? TRIAL_ROTATION_START);
 
     if(Number.isNaN(Epoch)){
         throw new Error("Invalid TRIAL_ROTATION_START");
     }
 
-    const Week = Math.floor((At.getTime() - Epoch) / TRIAL_WEEK_MS);
-    const Index = ((Week % TRIAL_ROTATION_SUFFIXES.length) + TRIAL_ROTATION_SUFFIXES.length) % TRIAL_ROTATION_SUFFIXES.length;
+    return Math.floor((At.getTime() - Epoch) / TRIAL_WEEK_MS);
+}
+
+export function GetTrialsData(IsElite: boolean, At: Date = new Date()): TrialsData{
     const Difficulty = IsElite ? "Elite" : "Hard";
-    const TrialsHuntId = `Arena_MatchmakerHunt_${Difficulty}_${TRIAL_ROTATION_SUFFIXES[Index]}`;
+    const TrialsHuntId = `Arena_MatchmakerHunt_${Difficulty}_${TrialSuffixForWeek(TrialWeekAt(At))}`;
     const Rows = IsElite ? (TrialsEliteHuntTable[0].Rows as any) : (TrialsHardHuntTable[0].Rows as any);
     const Row = Rows[TrialsHuntId];
 

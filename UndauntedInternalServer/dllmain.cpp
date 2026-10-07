@@ -23,6 +23,9 @@
 #include "constants.h"
 #include "Networking.h"
 #include "FallRecovery.h"
+#include "TrialsSchedule.h"
+#include "AutoPressStart.h"
+#include "CellFusionTime.h"
 
 #include "SDK/GameplayAbilities_parameters.hpp"
 #include "SDK/Archon_parameters.hpp"
@@ -363,6 +366,9 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
     reinterpret_cast<void(*)(UGameEngine*, float, char)>(OrigGameEngineTick)(GameEngine, DeltaTime, CanRender);
     DR_EngineMicros += std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - EngineStart).count();
 
+    TrialsSchedule::Tick();
+    CellFusionTime::Tick();
+
     // Recover on the authoritative game thread before replicating this frame.
     FallRecovery::Tick(Globals::Listening ? Networking::NetDriver : nullptr, DeltaTime);
 
@@ -640,6 +646,10 @@ static bool IsPotionPurchaseQuestOpen() {
 void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
     reinterpret_cast<void(*)(UObject*, UFunction*, void*)>(OrigProcessEventClient)(Object, Function, Parms);
 
+    TrialsSchedule::Tick();
+    CellFusionTime::Tick();
+    AutoPressStart::OnProcessEvent(Object, Function);
+
     static UFunction* CanPurchase = nullptr;
     if (Function == CanPurchase || (!CanPurchase && Function && Function->GetFullName().contains("EquipmentItemViewModel.CanPurchase"))) {
         CanPurchase = Function;
@@ -719,6 +729,12 @@ bool ConfigCacheInitGetStringHook(void* a1, const wchar_t* Section, const wchar_
 void* OrigGetEscalationSeason = nullptr;
 
 bool GetEscalationSeason(UHuntCatalog* a1, FString* HuntID, FHunt_UnlockInfo* UnlockInfo, FHunt_UnlockInfo* AltUnlockInfo, AArchonPlayerController* PC) { // TODO: Fixup scheduling & Player leveling so this hack isn't necessary
+    // The Trials screen shows the first unlocked weekly row, so only this week's row may pass.
+    bool IsTrialRow = false;
+    const bool TrialRowUnlocked = TrialsSchedule::IsTrialRowUnlocked(HuntID->ToString(), PC, IsTrialRow);
+    if (IsTrialRow)
+        return TrialRowUnlocked;
+
     if (HuntID->ToString().contains("Arena") || (HuntID->ToString().contains("Esca") && !HuntID->ToString().contains("Mint"))) {
         return true;
     }
@@ -736,10 +752,29 @@ __int64 GetTrackProgress(void* a1, FName* a2, void* a3) {
     return 9999999;
 }
 
+// Set to 0 to drop the EAC client init hook below (and its two lines in InitClientHooks).
+#define DR_SKIP_EAC_CLIENT_INIT 1
+
+#if DR_SKIP_EAC_CLIENT_INIT
+void* OrigEACClientInit = nullptr;
+
+// The EAC client plugin's init (the function that checks -NoEAC). It still ends up in
+// CreateGameClient, which fails and leaves the "Failed to create IGameClient instance!" popup.
+// Doing nothing here is the same as its own -NoEAC exit.
+void EACClientInitHook(void* a1) {
+}
+#endif
+
 //__int64 *__fastcall sub_141428060(__int64 a1, __int64 *a2, unsigned __int8 a3, char a4)
 
 void InitClientHooks() {
     MH_Initialize();
+
+#if DR_SKIP_EAC_CLIENT_INIT
+    MH_CreateHook((void*)(Globals::BaseAddress + 0xEF2440), EACClientInitHook, &OrigEACClientInit);
+
+    MH_EnableHook((void*)(Globals::BaseAddress + 0xEF2440));
+#endif
 
     MH_CreateHook((void*)(Globals::BaseAddress + 0x1528000), HasFinishedLoadingHook, &OrigHasFinishedLoading);
 
@@ -1049,6 +1084,7 @@ void Init() {
             Globals::MetagameAddress = Args[1];
         }
 
+        DR_InitDiagnostics(); // only when GAMESERVER_READY_DIR is set, e.g. a manual debug launch
         InitClientHooks();
     }
 

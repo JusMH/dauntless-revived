@@ -177,35 +177,6 @@
       "steelMarksPrice": 250
     },
     {
-      "id": "ladyluck_core_silver_slayer",
-      "displayName": "Uncommon Cell Core",
-      "displayDescription": "A valuable core containing a few cells.",
-      "displayPriority": 2,
-      "maxAllowed": null,
-      "remaining": 1,
-      "images": {},
-      "tags": [
-        "ladyluckstore",
-        "store_trials_tab_cells"
-      ],
-      "scheduledTags": null,
-      "items": [
-        {
-          "catalogId": "CONTAINER_CORE_SILVER_CELLCORE",
-          "quantity": 1
-        }
-      ],
-      "entitlements": [],
-      "skuProgression": null,
-      "loadoutSlots": null,
-      "availableFrom": null,
-      "availableTo": null,
-      "timeAvailabilityReason": null,
-      "platformOfferId": null,
-      "missingEntitlementNames": null,
-      "steelMarksPrice": 150
-    },
-    {
       "id": "ladyluck_weapon_chainblade_prestige",
       "displayName": "Champion's Chain Blades",
       "displayDescription": "A golden set of chain blades for those who have earned gilded marks on the Island of Trials and won the title \"Trials Champion.\"",
@@ -949,51 +920,6 @@
       "steelMarksPrice": 500
     },
     {
-      "id": "bundle_emoji_ladyluck",
-      "displayName": "Lady Luck Emoji Pack",
-      "displayDescription": "Contains 5 emojis, featuring your favourite serendipitous pirate.",
-      "displayPriority": 15,
-      "maxAllowed": 1,
-      "remaining": 1,
-      "images": {},
-      "tags": [
-        "ladyluckstore",
-        "store_trials_tab_cosmetics"
-      ],
-      "scheduledTags": null,
-      "items": [
-        {
-          "catalogId": "EJ_LADYLUCK_01",
-          "quantity": 1
-        },
-        {
-          "catalogId": "EJ_LADYLUCK_02",
-          "quantity": 1
-        },
-        {
-          "catalogId": "EJ_LADYLUCK_03",
-          "quantity": 1
-        },
-        {
-          "catalogId": "EJ_LADYLUCK_04",
-          "quantity": 1
-        },
-        {
-          "catalogId": "EJ_LADYLUCK_05",
-          "quantity": 1
-        }
-      ],
-      "entitlements": [],
-      "skuProgression": null,
-      "loadoutSlots": null,
-      "availableFrom": null,
-      "availableTo": null,
-      "timeAvailabilityReason": null,
-      "platformOfferId": null,
-      "missingEntitlementNames": null,
-      "steelMarksPrice": 300
-    },
-    {
       "id": "single_dye_white",
       "displayName": "Sunlight Champion",
       "displayDescription": "Set a shining example of what it looks like to be a winner.",
@@ -1050,151 +976,6 @@
       "platformOfferId": null,
       "missingEntitlementNames": null,
       "gildedMarksPrice": 1000
-    },
-    {
-      "id": "trials_cell_core_gold_defence",
-      "displayName": "Rare Defense Cell Core",
-      "displayDescription": "Contains many different rewards, including Defense Cells, Rams, and more.",
-      "displayPriority": 3,
-      "maxAllowed": null,
-      "remaining": 1,
-      "images": {},
-      "tags": [
-        "ladyluckstore",
-        "store_trials_tab_cells"
-      ],
-      "scheduledTags": null,
-      "items": [
-        {
-          "catalogId": "CONTAINER_CORE_GOLD_DEFENCE_CELLCORE",
-          "quantity": 1
-        }
-      ],
-      "entitlements": [],
-      "skuProgression": null,
-      "loadoutSlots": null,
-      "availableFrom": null,
-      "availableTo": null,
-      "timeAvailabilityReason": null,
-      "platformOfferId": null,
-      "missingEntitlementNames": null,
-      "gildedMarksPrice": 150
-    },
-    {
-      "id": "trials_cell_core_gold_power",
-      "displayName": "Rare Power Cell Core",
-      "displayDescription": "Contains many different rewards, including Power Cells, Rams, and more.",
-      "displayPriority": 5,
-      "maxAllowed": null,
-      "remaining": 1,
-      "images": {},
-      "tags": [
-        "ladyluckstore",
-        "store_trials_tab_cells"
-      ],
-      "scheduledTags": null,
-      "items": [
-        {
-          "catalogId": "CONTAINER_CORE_GOLD_POWER_CELLCORE",
-          "quantity": 1
-        }
-      ],
-      "entitlements": [],
-      "skuProgression": null,
-      "loadoutSlots": null,
-      "availableFrom": null,
-      "availableTo": null,
-      "timeAvailabilityReason": null,
-      "platformOfferId": null,
-      "missingEntitlementNames": null,
-      "gildedMarksPrice": 150
-    },
-    {
-      "id": "trials_cell_core_gold_technique",
-      "displayName": "Rare Technique Cell Core",
-      "displayDescription": "Contains many different rewards, including Technique Cells, Rams, and more.",
-      "displayPriority": 6,
-      "maxAllowed": null,
-      "remaining": 1,
-      "images": {},
-      "tags": [
-        "ladyluckstore",
-        "store_trials_tab_cells"
-      ],
-      "scheduledTags": null,
-      "items": [
-        {
-          "catalogId": "CONTAINER_CORE_GOLD_TECHNIQUE_CELLCORE",
-          "quantity": 1
-        }
-      ],
-      "entitlements": [],
-      "skuProgression": null,
-      "loadoutSlots": null,
-      "availableFrom": null,
-      "availableTo": null,
-      "timeAvailabilityReason": null,
-      "platformOfferId": null,
-      "missingEntitlementNames": null,
-      "gildedMarksPrice": 150
-    },
-    {
-      "id": "trials_cell_core_gold_mobility",
-      "displayName": "Rare Mobility Cell Core",
-      "displayDescription": "Contains many different rewards, including Mobility Cells, Rams, and more.",
-      "displayPriority": 4,
-      "maxAllowed": null,
-      "remaining": 1,
-      "images": {},
-      "tags": [
-        "ladyluckstore",
-        "store_trials_tab_cells"
-      ],
-      "scheduledTags": null,
-      "items": [
-        {
-          "catalogId": "CONTAINER_CORE_GOLD_MOBILITY_CELLCORE",
-          "quantity": 1
-        }
-      ],
-      "entitlements": [],
-      "skuProgression": null,
-      "loadoutSlots": null,
-      "availableFrom": null,
-      "availableTo": null,
-      "timeAvailabilityReason": null,
-      "platformOfferId": null,
-      "missingEntitlementNames": null,
-      "gildedMarksPrice": 150
-    },
-    {
-      "id": "trials_cell_core_gold_utility",
-      "displayName": "Rare Utility Cell Core",
-      "displayDescription": "Contains many different rewards, including Utility Cells, Rams, and more.",
-      "displayPriority": 7,
-      "maxAllowed": null,
-      "remaining": 1,
-      "images": {},
-      "tags": [
-        "ladyluckstore",
-        "store_trials_tab_cells"
-      ],
-      "scheduledTags": null,
-      "items": [
-        {
-          "catalogId": "CONTAINER_CORE_GOLD_UTILITY_CELLCORE",
-          "quantity": 1
-        }
-      ],
-      "entitlements": [],
-      "skuProgression": null,
-      "loadoutSlots": null,
-      "availableFrom": null,
-      "availableTo": null,
-      "timeAvailabilityReason": null,
-      "platformOfferId": null,
-      "missingEntitlementNames": null,
-      "gildedMarksPrice": 150
     },
     {
       "id": "trials_dye_hp08b_punk_02",
@@ -1255,11 +1036,11 @@
       "steelMarksPrice": 500
     },
     {
-      "id": "trials_pr_frank",
-      "displayName": "Artificer",
-      "displayDescription": "This Lantern Core grants a drone that can perform a number of support actions depending on what you target it at.",
-      "displayPriority": 1,
-      "maxAllowed": 1,
+      "id": "trials_cell_discipline_e",
+      "displayName": "+3 Discipline Cell",
+      "displayDescription": "Prevents you from having over half health. Increases critical strike chance.",
+      "displayPriority": 6,
+      "maxAllowed": null,
       "remaining": 1,
       "images": {},
       "tags": [
@@ -1269,7 +1050,7 @@
       "scheduledTags": null,
       "items": [
         {
-          "catalogId": "PR_FRANK",
+          "catalogId": "CELL_TRIALS_05_E",
           "quantity": 1
         }
       ],
@@ -1281,7 +1062,662 @@
       "timeAvailabilityReason": null,
       "platformOfferId": null,
       "missingEntitlementNames": null,
-      "steelMarksPrice": 300
+      "steelMarksPrice": 150
+    },
+    {
+      "id": "ladyluck_weapon_twin_suns",
+      "displayName": "The Twin Suns",
+      "displayDescription": "Exotic repeaters. Activate Legendary to drop a large bomb from your airship that deals massive damage.",
+      "displayPriority": 14,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "WP_DP_EXOTIC_BOMBS",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 1000
+    },
+    {
+      "id": "ladyluck_eb_special_parry",
+      "displayName": "Avenging Overdrive",
+      "displayDescription": "Activate at full meter to enter Overdrive, gaining +20% attack speed and causing attacks to deal +60-80 aoe damage. Reactivate to parry and riposte a Behemoth attack, dealing 800 damage and granting 1 Valour when successful (2 second cooldown).",
+      "displayPriority": 13,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_EB_SPECIAL_PARRY",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 500
+    },
+    {
+      "id": "ladyluck_ih_special_islandcracker",
+      "displayName": "Mighty Landbreaker",
+      "displayDescription": "Hold to load ammo into the hammer. Release to create an aether vent that buffs players who step over it, granting them up to +35% damage based on ammo quality.",
+      "displayPriority": 13,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_IH_SPECIAL_ISLANDCRACKER",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 500
+    },
+    {
+      "id": "ladyluck_ms_special_attack_speed_damage_buff",
+      "displayName": "Savage Wellspring",
+      "displayDescription": "Press to convert meter into ammo. Hold to spend ammo to create an aura that buffs nearby allies with +25% critical strike chance for up to 12 seconds based on ammo quality.",
+      "displayPriority": 13,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_MS_SPECIAL_ATTACK_SPEED_DAMAGE_BUFF",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 500
+    },
+    {
+      "id": "ladyluck_ac_special_mastery",
+      "displayName": "Titan's Crash",
+      "displayDescription": "Unleash energy forward in a pressure wave, dealing 500 damage to the closest target and 166 damage to up to 2 other nearby targets. Deals up to +100% damage when Tempest Form and Karma Breaker's effects are active.",
+      "displayPriority": 13,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_AC_SPECIAL_MASTERY",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 500
+    },
+    {
+      "id": "ladyluck_ga_special_skillshot",
+      "displayName": "Grim Onslaught",
+      "displayDescription": "Hurl the axe forward, dealing up to 800 damage (further increased by determination) to enemies in its path and gaining 15 meter when hitting a Behemoth. Catch the axe to gain 30 meter.",
+      "displayPriority": 13,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_GA_SPECIAL_SKILLSHOT",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 500
+    },
+    {
+      "id": "ladyluck_cb_passive_trials_01",
+      "displayName": "Momentum Blades",
+      "displayDescription": "After using a special, your next special use within 4 seconds is free.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_CB_PASSIVE_TRIALS_01",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_dp_passive_trials_01",
+      "displayName": "Tactician's Magazine",
+      "displayDescription": "Empowered Reloading at exactly 0 ammo decreases the cooldown of both abilities by 4 seconds.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_DP_PASSIVE_TRIALS_01",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_dp_passive_trials_02",
+      "displayName": "Demolition Sights",
+      "displayDescription": "While empowered, deal +50% damage to objects created by Behemoths",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_DP_PASSIVE_TRIALS_02",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_eb_passive_trials_01",
+      "displayName": "Keen Edge",
+      "displayDescription": "After the Bladesurge projectile travels a short distance, the damage is increased by 100%.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_EB_PASSIVE_TRIALS_01",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_eb_passive_trials_02",
+      "displayName": "Dynamic Bladecore",
+      "displayDescription": "After using any Valour combo, your next Valour combo within 5 seconds deals +30% damage.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_EB_PASSIVE_TRIALS_02",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_ga_passive_trials_01",
+      "displayName": "Railsplitter's Canteen",
+      "displayDescription": "Tonics consumed while your axe is thrown have +50% effectiveness.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_GA_PASSIVE_TRIALS_01",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_ga_passive_trials_02",
+      "displayName": "Furious Axecore",
+      "displayDescription": "Perfectly charged attacks grants +15 meter on hit, but no longer grant resolve",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_GA_PASSIVE_TRIALS_02",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_ih_passive_trials_01",
+      "displayName": "Antique Clip",
+      "displayDescription": "Ammo decreased to 2, but bonus from aethercharged ammo is increased by 300%.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_IH_PASSIVE_TRIALS_01",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_ih_passive_trials_02",
+      "displayName": "Turbine Trigger",
+      "displayDescription": "Priming attacks increases attack speed by 10% until the combo ends. Stacks.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_IH_PASSIVE_TRIALS_02",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_ms_passive_trials_01",
+      "displayName": "Barbed Spearhead",
+      "displayDescription": "After a dodge piercing attack, gain +50% wound damage for 8 seconds.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_MS_PASSIVE_TRIALS_01",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "ladyluck_ms_passive_trials_02",
+      "displayName": "Executioner's Spearhead",
+      "displayDescription": "Each time the Behemoth is wounded, gain +6% damage. Stacks up to 10.",
+      "displayPriority": 12,
+      "maxAllowed": 1,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "live",
+        "one_time"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "PART_MS_PASSIVE_TRIALS_02",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 250
+    },
+    {
+      "id": "trials_cell_berserker_e",
+      "displayName": "+3 Berserker Cell",
+      "displayDescription": "Reduces max health. Dealing damage stacks increased damage dealt for a short period.",
+      "displayPriority": 6,
+      "maxAllowed": null,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "store_trials_tab_cells"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "CELL_TRIALS_01_E",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 150
+    },
+    {
+      "id": "trials_cell_strategist_e",
+      "displayName": "+3 Strategist Cell",
+      "displayDescription": "Reduces max health. Dodging through behemoth attacks grants health shields to all slayers.",
+      "displayPriority": 6,
+      "maxAllowed": null,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "store_trials_tab_cells"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "CELL_TRIALS_02_E",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 150
+    },
+    {
+      "id": "trials_cell_engineer_e",
+      "displayName": "+3 Engineer Cell",
+      "displayDescription": "Reduces healing from Slayer Flask. Increases range of Pylons.",
+      "displayPriority": 6,
+      "maxAllowed": null,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "store_trials_tab_cells"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "CELL_TRIALS_03_E",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 150
+    },
+    {
+      "id": "trials_cell_sprinter_e",
+      "displayName": "+3 Sprinter Cell",
+      "displayDescription": "Reduces max stamina. Increases movespeed and reduces sprint cost.",
+      "displayPriority": 6,
+      "maxAllowed": null,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "store_trials_tab_cells"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "CELL_TRIALS_04_E",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 150
+    },
+    {
+      "id": "trials_cell_mender_e",
+      "displayName": "+3 Mender Cell",
+      "displayDescription": "Reduces healing from Slayer Flask. Using your flask restores other Slayers' health.",
+      "displayPriority": 6,
+      "maxAllowed": null,
+      "remaining": 1,
+      "images": {},
+      "tags": [
+        "ladyluckstore",
+        "store_trials_tab_cells"
+      ],
+      "scheduledTags": null,
+      "items": [
+        {
+          "catalogId": "CELL_TRIALS_06_E",
+          "quantity": 1
+        }
+      ],
+      "entitlements": [],
+      "skuProgression": null,
+      "loadoutSlots": null,
+      "availableFrom": null,
+      "availableTo": null,
+      "timeAvailabilityReason": null,
+      "platformOfferId": null,
+      "missingEntitlementNames": null,
+      "steelMarksPrice": 150
     }
   ],
   "itemKinds": {
@@ -1291,7 +1727,6 @@
     "WP_MS_TRIALS_01": "instanced",
     "WP_IH_TRIALS_01": "instanced",
     "PART_CB_PASSIVE_TRIALS_02": "stacked",
-    "CONTAINER_CORE_SILVER_CELLCORE": "stacked",
     "WP_CB_TRIALS_01": "instanced",
     "AR_TRIALS_CHEST_01": "instanced",
     "WP_EB_TRIALS_00": "instanced",
@@ -1318,30 +1753,42 @@
     "QI_LANTERN_POTION": "stacked",
     "QI_ATTACK_SPEED_POTION": "stacked",
     "LT_TRIALS_00": "stacked",
-    "EJ_LADYLUCK_01": "instanced",
-    "EJ_LADYLUCK_02": "instanced",
-    "EJ_LADYLUCK_03": "instanced",
-    "EJ_LADYLUCK_04": "instanced",
-    "EJ_LADYLUCK_05": "instanced",
     "DYE_GRAY01_DURABLE": "instanced",
     "LT_TRIALS_01": "instanced",
-    "CONTAINER_CORE_GOLD_DEFENCE_CELLCORE": "stacked",
-    "CONTAINER_CORE_GOLD_POWER_CELLCORE": "stacked",
-    "CONTAINER_CORE_GOLD_TECHNIQUE_CELLCORE": "stacked",
-    "CONTAINER_CORE_GOLD_MOBILITY_CELLCORE": "stacked",
-    "CONTAINER_CORE_GOLD_UTILITY_CELLCORE": "stacked",
     "DYE_HP08B_PUNK_02_DURABLE": "instanced",
     "DYE_HP11B_ENGINEER_00_DURABLE": "instanced",
-    "PR_FRANK": "instanced"
+    "CELL_TRIALS_05_E": "stacked",
+    "WP_DP_EXOTIC_BOMBS": "instanced",
+    "PART_EB_SPECIAL_PARRY": "stacked",
+    "PART_IH_SPECIAL_ISLANDCRACKER": "stacked",
+    "PART_MS_SPECIAL_ATTACK_SPEED_DAMAGE_BUFF": "stacked",
+    "PART_AC_SPECIAL_MASTERY": "stacked",
+    "PART_GA_SPECIAL_SKILLSHOT": "stacked",
+    "PART_CB_PASSIVE_TRIALS_01": "stacked",
+    "PART_DP_PASSIVE_TRIALS_01": "stacked",
+    "PART_DP_PASSIVE_TRIALS_02": "stacked",
+    "PART_EB_PASSIVE_TRIALS_01": "stacked",
+    "PART_EB_PASSIVE_TRIALS_02": "stacked",
+    "PART_GA_PASSIVE_TRIALS_01": "stacked",
+    "PART_GA_PASSIVE_TRIALS_02": "stacked",
+    "PART_IH_PASSIVE_TRIALS_01": "stacked",
+    "PART_IH_PASSIVE_TRIALS_02": "stacked",
+    "PART_MS_PASSIVE_TRIALS_01": "stacked",
+    "PART_MS_PASSIVE_TRIALS_02": "stacked",
+    "CELL_TRIALS_01_E": "stacked",
+    "CELL_TRIALS_02_E": "stacked",
+    "CELL_TRIALS_03_E": "stacked",
+    "CELL_TRIALS_04_E": "stacked",
+    "CELL_TRIALS_06_E": "stacked"
   },
   "repeatable": [
-    "ladyluck_core_silver_slayer",
     "ladyluck_bundle_consumables_00",
     "ladyluck_bundle_consumables_01",
-    "trials_cell_core_gold_defence",
-    "trials_cell_core_gold_power",
-    "trials_cell_core_gold_technique",
-    "trials_cell_core_gold_mobility",
-    "trials_cell_core_gold_utility"
+    "trials_cell_discipline_e",
+    "trials_cell_berserker_e",
+    "trials_cell_strategist_e",
+    "trials_cell_engineer_e",
+    "trials_cell_sprinter_e",
+    "trials_cell_mender_e"
   ]
 }

@@ -199,13 +199,13 @@ export const MiddlemanFusionGuards = DefineSwitch({
     Show: ShowOnOff
 });
 
-// Trials leaderboards (roadmap 3.8; controllers/trials.ts). Off by default until the five 1.4.4
-// response shapes have been exercised by the real client. When on, game servers may submit completed
-// runs to the aggregate endpoint and players may read the five leaderboard routes.
+// Trials leaderboards (roadmap 3.8; controllers/trials.ts). On by default; TRIALS_LEADERBOARDS=off
+// turns them off. When on, game servers may submit completed runs to the aggregate endpoint and
+// players may read the five leaderboard routes.
 export const TrialsLeaderboards = DefineSwitch({
     Env: "TRIALS_LEADERBOARDS",
     Label: "trialsLeaderboards",
-    Default: false,
+    Default: true,
     Parse: ParseOnOff,
     Show: ShowOnOff
 });

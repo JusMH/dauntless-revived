@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { Router } from "express";
 import { logger } from "../logger";
 import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth";
@@ -153,6 +155,42 @@ function SendStoreError(res: any, error: unknown, What: string){
     res.json({ code: "500", message: "Store request failed" });
 }
 
+// ---- Store offer images. ----
+// The 1.4.4 client downloads an offer's picture from images.standard / images.feature (its ImageURL);
+// retail served them from Phoenix's CDN. store-images/ holds the items' own 1.4.4 icons, one PNG per
+// catalog id (lower case), extracted from the game's textures. An offer whose first item has one gets
+// its URL on this server, built from the host the client called so it works behind the relay too.
+const STORE_IMAGES_DIR = path.join(process.cwd(), "store-images");
+let StoreImageFiles: Set<string> | undefined;
+
+function StoreImageFor(Offer: any){
+    StoreImageFiles ??= new Set(fs.existsSync(STORE_IMAGES_DIR) ? fs.readdirSync(STORE_IMAGES_DIR) : []);
+    const CatalogId = Offer?.items?.[0]?.catalogId;
+    const File = typeof CatalogId === "string" ? `${CatalogId.toLowerCase()}.png` : undefined;
+    return File != undefined && StoreImageFiles.has(File) ? File : undefined;
+}
+
+function WithStoreImage(req: any, Offer: any){
+    const File = StoreImageFor(Offer);
+    if(File == undefined) return Offer;
+
+    const Url = `${req.protocol}://${req.get("host")}/store-images/${File}`;
+    return {...Offer, images: {...(Offer.images ?? {}), standard: Url, feature: Url}};
+}
+
+storeRouter.get("/store-images/:file", (req, res) => {
+    const File = req.params.file;
+
+    if(!/^[a-z0-9_]+\.png$/.test(File) || !StoreImageFor({items: [{catalogId: File.slice(0, -4)}]})){
+        res.status(404);
+        res.send();
+        return;
+    }
+
+    res.set("Cache-Control", "public, max-age=86400");
+    res.sendFile(path.join(STORE_IMAGES_DIR, File));
+});
+
 // StoreGetItemByTagEndpoint: a bare array of offers
 storeRouter.get("/product/skus/public", StoreListOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
     const RequiredTags = req.query.requiredTags;
@@ -175,7 +213,7 @@ storeRouter.get("/product/skus/public", StoreListOn, HasUndauntedMetagameAuth, P
         }
 
         res.status(200);
-        res.json(Offers);
+        res.json(Offers.map((Offer: any) => WithStoreImage(req, Offer)));
     }
     catch(error){
         SendStoreError(res, error, `list ${RequiredTags}`);
@@ -186,7 +224,7 @@ storeRouter.get("/product/skus/public", StoreListOn, HasUndauntedMetagameAuth, P
 storeRouter.get("/product/sku/:skuId", StoreSkuOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
     try{
         res.status(200);
-        res.json(GetStoreOffer(req.AuthData.userId, req.params.skuId));
+        res.json(WithStoreImage(req, GetStoreOffer(req.AuthData.userId, req.params.skuId)));
     }
     catch(error){
         SendStoreError(res, error, `offer ${req.params.skuId}`);
