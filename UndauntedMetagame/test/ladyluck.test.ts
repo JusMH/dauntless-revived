@@ -99,7 +99,7 @@ describe("Lady Luck Trials store", () => {
         const A = await MakePlayer();
         const Steel: Record<string, number> = {
             ladyluck_weapon_twin_suns: 1000,
-            ladyluck_eb_special_parry: 500, ladyluck_ih_special_islandcracker: 500, ladyluck_ms_special_attack_speed_damage_buff: 500,
+            ladyluck_eb_special_parry: 500, ladyluck_ih_special_islandcracker: 500, ladyluck_ms_special_rocketlunge: 500,
             ladyluck_ac_special_mastery: 500, ladyluck_ga_special_skillshot: 500,
             ladyluck_cb_passive_trials_01: 250, ladyluck_cb_passive_trials_02: 250, ladyluck_dp_passive_trials_01: 250, ladyluck_dp_passive_trials_02: 250,
             ladyluck_eb_passive_trials_01: 250, ladyluck_eb_passive_trials_02: 250, ladyluck_ga_passive_trials_01: 250, ladyluck_ga_passive_trials_02: 250,
