@@ -1,7 +1,7 @@
 // Ported from Harmonicrain/Undaunted (895f7c7), Copyright (C) 2026 Harmonic, AGPL-3.0-only; modified for Dauntless Revived.
 
 import { createHash, randomBytes } from "node:crypto";
-import { and, count, eq, gt, isNotNull, isNull, lt } from "drizzle-orm";
+import { and, count, eq, gt, gte, isNotNull, isNull, lt } from "drizzle-orm";
 import { GetDb } from "../db";
 import { characters, inventory, storepurchases } from "../db/schema";
 import { logger } from "../logger";
@@ -362,9 +362,23 @@ function HeldCatalogIds(tx: Tx, CharacterId: string | undefined){
     return Held;
 }
 
+// A Middleman weekly cell is sold once per account per weekly rotation: a redeemed purchase of that
+// offer since this week's reset uses it up, whether or not the cell is still held.
+function BoughtThisMiddlemanWeek(tx: Tx, AccountId: string, SkuId: string){
+    return tx.select({tokenHash: storepurchases.tokenHash}).from(storepurchases).where(and(
+        eq(storepurchases.accountId, AccountId),
+        eq(storepurchases.skuId, SkuId),
+        gte(storepurchases.redeemedDate, new Date(MiddlemanWindowStart()).toISOString())
+    )).get() !== undefined;
+}
+
 // Owned when everything it grants is held: all of its items and all of its entitlements (active ones:
 // a revoked or expired entitlement can be bought again)
 function WithRemaining(tx: Tx, AccountId: string, Held: Set<string>, Offer: StoreOffer): StoreOffer {
+    if(MIDDLEMAN_OFFER_IDS.has(Offer.id)){
+        return {...Offer, remaining: BoughtThisMiddlemanWeek(tx, AccountId, Offer.id) ? 0 : 1};
+    }
+
     if(IsRepeatable(Offer)){
         return {...Offer, remaining: 1};
     }
@@ -478,7 +492,9 @@ export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: 
         }
 
         if(WithRemaining(tx, AccountId, HeldCatalogIds(tx, Character.characterId), Offer).remaining === 0){
-            throw new StoreError(409, "You already own everything this offer grants");
+            throw new StoreError(409, MIDDLEMAN_OFFER_IDS.has(Offer.id)
+                ? "Already bought this week; the Middleman restocks at the weekly reset"
+                : "You already own everything this offer grants");
         }
 
         if(Pricing.Price > 0 && CurrencyBalance(tx, Character.characterId, Pricing.CatalogId) < Pricing.Price){
@@ -564,6 +580,11 @@ export function RedeemStorePurchase(AccountId: string, Currency: string, Token: 
 
         if(Pricing.Currency !== Currency){
             throw new StoreError(400, "Offer is not sold in that currency");
+        }
+
+        // Two tokens issued before either was redeemed: only the first one buys this week's cell
+        if(MIDDLEMAN_OFFER_IDS.has(Offer.id) && BoughtThisMiddlemanWeek(tx, AccountId, Offer.id)){
+            throw new StoreError(409, "Already bought this week; the Middleman restocks at the weekly reset");
         }
 
         if(Pricing.Price > 0 && CurrencyBalance(tx, Purchase.characterId, Pricing.CatalogId) < Pricing.Price){
