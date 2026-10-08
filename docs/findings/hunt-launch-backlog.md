@@ -25,3 +25,11 @@ SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP is now 2 on both hosts (previously
 5 on AUS and 10 on Germany). Both workers were restarted with config backups.
 The two-pending-spawn bound, memory checks and CPU admission at 80/65 remain.
 This raises launch throughput, not a promise that all 96 hunts fit under load.
+
+Corrected live probes: AUS Funguy Easy escalation returned HTTP 200 in 7.13s;
+Germany Hard Trials returned HTTP 200 in 15.4s. Direct worker requests must omit
+Region (or use main); regional routing belongs at the primary coordinator. Earlier
+direct-worker probes sent aus/ger and falsely received capacity_unavailable because
+workers have no regional routing destination configured. Those probe failures are
+not evidence of exhausted capacity. Successful allocation still does not prove
+client travel or full combat completion.
