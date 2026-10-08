@@ -3,7 +3,7 @@ set -eu
 
 PIN_EXE=d3d41e614908d2befd518b27046d9822d6130ef12ba3504babbdb786bef9cff4
 PIN_DXGI=9a431d7b6fd20c43fa92bebd91c3bc023ec7a3fcbc52871c41f4df293d4b0d1f
-PIN_SERVER=d0c22019cc39eb90f6ed9f7c64d90f8bdda64aff7351fa039a8d0a536f26ebd7
+PIN_SERVER=c9af7495e60e4f9c8d1b6fc08638d76a0eb48936acf7a1ff429608165e3164bd
 
 usage() {
   echo "usage: $0 --game-dir <folder containing Archon> [--repo <dauntless-revived checkout>]" >&2
