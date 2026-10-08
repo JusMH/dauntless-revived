@@ -391,18 +391,24 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         bool HasConnection = false;
 
         for (UNetConnection* Connection : Networking::NetDriver->ClientConnections) {
-            if (Connection) {
+            // Pending (2) and open (3) connections protect clients still loading.
+            if (Connection && (*(uint32_t*)((uintptr_t)Connection + 0x134) == 2
+                || *(uint32_t*)((uintptr_t)Connection + 0x134) == 3)) {
                 HasConnection = true;
                 break;
             }
         }
 
-        if (EnableWatchdog && HuntIdle.Advance(DeltaTime, HasConnection)) {
+        static auto PreviousIdleCheck = std::chrono::steady_clock::now();
+        const auto IdleNow = std::chrono::steady_clock::now();
+        const double Elapsed = std::chrono::duration<double>(IdleNow - PreviousIdleCheck).count();
+        PreviousIdleCheck = IdleNow;
+        if (EnableWatchdog && HuntIdle.Advance(Elapsed, HasConnection)) {
             std::cout << "Hunt idle timeout on port " << Globals::Port << std::endl;
             DR_WriteDiagnostic("idle_timeout\n", 13);
             // This is an injected DLL in a multithreaded UE process. CRT exit runs
             // teardown while engine threads still use its state, hanging/crashing.
-            // Only empty hunts reach here; end the whole process without DLL teardown.
+            // Only empty temporary worlds reach here; end the whole process without DLL teardown.
             TerminateProcess(GetCurrentProcess(), 0);
             return;
         }
@@ -686,6 +692,8 @@ void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms) {
         Params::AbilitySystemComponent_ServerTryActivateAbilityWithEventData* ActivateAbilityParams = (Params::AbilitySystemComponent_ServerTryActivateAbilityWithEventData*)Parms;
 
         ServerTryActivateAbilityInternal((UAbilitySystemComponent*)Object, ActivateAbilityParams->AbilityToActivate, ActivateAbilityParams->InputPressed, ActivateAbilityParams->PredictionKey, &ActivateAbilityParams->TriggerEventData);
+        // Replaces the native RPC handler; forwarding would activate it twice.
+        return;
     }
     else if (Function == ServerTryActivateAbility || (!ServerTryActivateAbility && Function->GetFullName().contains("ServerTryActivateAbility"))) {
         ServerTryActivateAbility = Function;
@@ -693,6 +701,8 @@ void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms) {
         Params::AbilitySystemComponent_ServerTryActivateAbility* ActivateAbilityParams = (Params::AbilitySystemComponent_ServerTryActivateAbility*)Parms;
 
         ServerTryActivateAbilityInternal((UAbilitySystemComponent*)Object, ActivateAbilityParams->AbilityToActivate, ActivateAbilityParams->InputPressed, ActivateAbilityParams->PredictionKey, nullptr);
+        // Replaces the native RPC handler; forwarding would activate it twice.
+        return;
     }
 
     reinterpret_cast<void(*)(UObject*, UFunction*, void*)>(OrigProcessEvent)(Object, Function, Parms);
@@ -1035,7 +1045,7 @@ void Init() {
             Globals::ExpectedPlayerString = Args[6];
             Globals::MyIpAndPort = Args[7];
 
-            if (Globals::Port >= 8776) {
+            if (std::wstring(Globals::MapPath).contains(L"/ramsgate/ramsgate_01_persistent")) {
                 EnableWatchdog = false;
                 Globals::EnableLogging = true;
             }

@@ -19,9 +19,9 @@ const PARTY_JOIN_WAIT_MS = 2500;
 export const REJOIN_PARK_MS = 20 * 1000;
 const SOLO_REJOIN_WINDOW_MS = 60 * 1000;
 const SOLO_JOIN_DEDUPE_MS = 30 * 1000;
-// A hunt queue goes to the deploy server this long after its last join (checked when a queued
+// A hunt queue goes to the deploy server this long after its first join (checked when a queued
 // player polls), or at once when it reaches QUEUE_FULL_PLAYERS
-const QUEUE_WAIT_MS = 20 * 1000;
+const QUEUE_WAIT_MS = 5 * 1000;
 const QUEUE_FULL_PLAYERS = 4;
 // Capacity is not an endless queue. End the attempt promptly when the host stays full.
 export const CAPACITY_WAIT_MS = 60 * 1000;
@@ -33,7 +33,7 @@ type MatchmakingQueueData = {
     CapacityDeadline?: number,
     Players: string[],
     CandidateIds: Map<string, string>,
-    LastPlayerAddedTime: number,
+    FirstPlayerAddedTime: number,
     Resolved: boolean
 };
 
@@ -283,7 +283,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
             return PlayerMatchmakingResult;
         }
 
-        if(PartyNow() - MatchmakingQueue.LastPlayerAddedTime > QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
+        if(PartyNow() - MatchmakingQueue.FirstPlayerAddedTime >= QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
             await WaitBriefly(PopQueue(PlayerMatchmakingResult.HuntId, MatchmakingQueue));
         }
     }
@@ -350,7 +350,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
             HuntId: HuntId,
             Players: [],
             CandidateIds: new Map<string, string>(),
-            LastPlayerAddedTime: PartyNow(),
+            FirstPlayerAddedTime: PartyNow(),
             Resolved: false
         };
         if (!Private) MatchmakingQueueMap.set(QueueKey, Queue);
@@ -358,7 +358,6 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
 
     Queue.Players.push(PlayerId);
     Queue.CandidateIds.set(PlayerId, CandidateId);
-    Queue.LastPlayerAddedTime = PartyNow();
     PlayerQueueMap.set(PlayerId, Queue);
 
     if(Private || Queue.Players.length >= QUEUE_FULL_PLAYERS){
