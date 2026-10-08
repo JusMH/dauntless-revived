@@ -28,7 +28,7 @@ export function backend(base, key, request = fetch) {
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Metagame must use loopback HTTP');
   async function api(path, body) {
     const response = await request(new URL(`/undaunted/api/${path}`, url), {
-      method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(5000),
+      method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(15000),
       headers: {'x-undaunted-user-api-key': key, 'content-type': 'application/json'},
       body: body ? JSON.stringify(body) : undefined,
     });

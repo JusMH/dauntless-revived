@@ -8,6 +8,16 @@ import { syncKeyCommands } from './commands.mjs';
 import { keyInstructions } from './link-input.mjs';
 
 const token = process.env.DISCORD_BOT_TOKEN;
+// A live process is not necessarily a connected bot. Let the supervisor recover
+// stalled startup or a gateway that never reconnects, without changing key state.
+let lastReady = Date.now();
+const healthTimer = setInterval(() => {
+  if (Date.now() - lastReady > 120000) {
+    console.error('Key bot connection unavailable for 120 seconds; restarting');
+    process.exit(1);
+  }
+}, 15000);
+healthTimer.unref();
 const adminKey = process.env.METAGAME_ADMIN_KEY;
 if (!token || !adminKey) throw new Error('Configure DISCORD_BOT_TOKEN and METAGAME_ADMIN_KEY');
 const stateFile = resolve(process.env.KEY_STATE_FILE || './data/keys.json');
@@ -15,11 +25,14 @@ await acquireInstance(stateFile);
 const inviteConfig = await loadInviteConfig(process.env.SERVER_CONFIG_FILE);
 const keys = new Keys(await loadState(stateFile), state => saveState(stateFile, state), backend(process.env.METAGAME_URL || 'http://127.0.0.1:61000', adminKey));
 await keys.migrateLinks();
+console.log('Key state and account links loaded');
 
 const rest = new REST({version: '10'}).setToken(token);
 const appInfo = await rest.get('/oauth2/applications/@me');
+console.log('Discord application authenticated');
 const memberIntentEnabled = !!(appInfo.flags & ((1 << 14) | (1 << 15)));
 const client = new Client({intents: [GatewayIntentBits.Guilds, ...(memberIntentEnabled ? [GatewayIntentBits.GuildMembers] : [])]});
+setInterval(() => { if (client.isReady()) lastReady = Date.now(); }, 15000).unref();
 const counters=await createCounters(client,process.env.COUNTER_STATE_FILE || join(dirname(stateFile),'counters.json'));
 if (!memberIntentEnabled) {
   console.error('Counter unavailable: enable Server Members Intent in Discord Developer Portal. Key commands remain online.');
