@@ -1201,20 +1201,20 @@ function renderSettings(): void {
     windowed.addEventListener("click", () => void api.setSettings({ windowed: !snap.settings.windowed }));
 
     const huntRegion = h('select', {class:'select',id:'hunt-region','data-fk':'hunt-region'});
-    for (const [value,label] of [['main','EU'],['aus','Australia (OCE)'],['ger','Germany']]) {
+    for (const [value,label] of [['auto','Automatic (closest region)'],['main','EU'],['aus','Australia (OCE)'],['ger','Germany']]) {
       const option = h('option',{value},label);
-      option.selected = value === (snap.settings.huntRegion ?? 'main');
+      option.selected = value === (snap.settings.huntRegion ?? 'auto');
       huntRegion.appendChild(option);
     }
     huntRegion.disabled = busy;
-    huntRegion.addEventListener('change',()=>void api.setSettings({huntRegion:huntRegion.value as 'main'|'aus'|'ger'}));
+    huntRegion.addEventListener('change',()=>void api.setSettings({huntRegion:huntRegion.value as 'auto'|'main'|'aus'|'ger'}));
 
     const game = card(
       "settings-section",
       h("h2", { class: "card-title" }, t("set_game")),
       h('div',{class:'settings-row'},h('div',{class:'settings-row-text'},
         h('label',{class:'settings-row-title',for:'hunt-region'},'World region'),
-        h('span',{class:'settings-row-sub'},'Applies when you next press Play. Australia uses OCE Ramsgate and hunts. A party follows its leader’s region; invites work across regions. If OCE is full, matchmaking waits instead of moving you to Main.')),huntRegion),
+        h('span',{class:'settings-row-sub'},'Automatic measures available regions when you press Play. You can choose any region yourself. A party follows its leader’s region; invites work across regions. If OCE is full, matchmaking waits instead of moving you to Main.')),huntRegion),
       settingsRow(
         t("set_folder"),
         snap.install.dir,

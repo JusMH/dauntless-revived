@@ -706,3 +706,41 @@ the first connection it allows 180 seconds for cold client loading. Ramsgate rem
 permanent. The Dojo is restarted on the next request rather than immediately by the
 watchdog. These native changes require rebuilding and installing the DLL; the pinned
 launcher binary does not change when its source is edited.
+
+### Ramsgate instances and automatic region selection
+
+`RAMSGATE_POOL=1` is the deploy server default. A new installation starts no empty
+Ramsgate at boot. A CITY request reserves seats in a local instance with fewer than
+20 players; when none fits the whole travelling party, another city starts. The
+first instance uses `PORT_RANGE_END`; extra cities share the hunt port pool, excluding
+the Dojo port. Memory and port capacity can still reject a start. Each instance
+advertises and sets a native GameSession limit of 20. Reservations protect concurrent
+travellers while they load. Fresh native occupancy snapshots consume arriving
+reservations; missing or stale snapshots never prove free seats.
+
+An occupied city exits on its first tick without pending or open connections. A newly
+requested city has 180 seconds to receive its first connection, so it cannot exit
+before its requesting client loads. Exited cities release their ports and stay stopped
+until requested again. `RAMSGATE_POOL=0` restores the old permanent-city behavior for
+rollback/older DLLs. In pool mode the old two-city `CITY_OVERFLOW` balancer is bypassed;
+regional routing still chooses the worker, which owns its own pool.
+
+The launcher now defaults to **Automatic (closest region)** when no explicit region
+is saved. On Play it measures two TCP handshakes per available region and compares the
+second handshake latency (avoiding the initial DNS/cold-connection cost). This is a
+network-latency estimate, not geographic distance or an in-game UDP RTT measurement.
+Players can still choose EU, Australia, or Germany, and existing manual choices stay
+manual. Parties still follow their leader. Automatic is reevaluated on each Play.
+
+On the metagame, `REGION_MAIN_PROBE_HOST`, `REGION_AUS_PROBE_HOST`, and
+`REGION_GER_PROBE_HOST` identify reachable TCP listeners on the actual regional hosts;
+corresponding `REGION_*_PROBE_PORT` values default to 443. Main falls back to the invite
+host and port. Australia and Germany are advertised only with `AUS_REGION=1` and
+`GERMANY_REGION=1`. Probe sockets transmit no credentials or application data.
+Failed probes are ignored; if none works, the current backend region is retained.
+Configure a reachable listener before enabling automatic selection of another region.
+GET `/undaunted/api/HuntRegion` now includes `probes: [{region, host, port}]` alongside
+its existing fields. Region saving and the manually selected region API are unchanged.
+
+Install the rebuilt server DLL and updated launcher to activate native shutdown and
+automatic selection. Editing source does not replace the pinned installer binaries.

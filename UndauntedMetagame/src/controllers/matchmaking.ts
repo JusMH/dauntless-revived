@@ -641,7 +641,7 @@ async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: st
     const TryLaunch = async () => {
         const Active = Members.filter(member => MatchmakingResultMap.get(member)?.CandidateId === CandidateId && TheParty.Members.includes(member));
         if (TheParty.Candidate?.CandidateId !== CandidateId || Active.length === 0) return true;
-        const Game = await LaunchGameOnDeployserver(GameMode, '', HuntId, GameMode === 'ISLAND' ? Active : undefined, Region);
+        const Game = await LaunchGameOnDeployserver(GameMode, '', HuntId, ['ISLAND','CITY'].includes(GameMode) ? Active : undefined, Region);
         if (Game.capacity) return false;
         await FinishPartyCandidate(TheParty, CandidateId, Active, Game);
         return true;
@@ -859,7 +859,7 @@ async function HandlePlayerMatchmakingOnce(GameMode: string, GameArgs: string, H
             // Keep the saved personal preference intact for when they leave.
             const WorldParty = (GameMode === 'CITY' || GameMode === 'SHARED') ? GetPartyOf(PlayerId) : undefined;
             const Region = PlayerRegion(WorldParty?.LeaderId ?? PlayerId);
-            const GameOnDeployServer = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, Region);
+            const GameOnDeployServer = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, GameMode === 'CITY' ? [PlayerId] : undefined, Region);
 
             const Entry: MatchmakingResult = {
                 Ready: GameOnDeployServer.succeeded,
@@ -873,7 +873,7 @@ async function HandlePlayerMatchmakingOnce(GameMode: string, GameArgs: string, H
             if (GameOnDeployServer.capacity) {
                 const parked = ParkCapacity(Entry.CandidateId, async () => {
                     if (MatchmakingResultMap.get(PlayerId) !== Entry) return true;
-                    const result = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, Region);
+                    const result = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, GameMode === 'CITY' ? [PlayerId] : undefined, Region);
                     if (result.capacity) return false;
                     if (MatchmakingResultMap.get(PlayerId) === Entry) Object.assign(Entry, {Ready: result.succeeded, Host: result.host, Port: result.port, Failed: !result.succeeded});
                     return true;

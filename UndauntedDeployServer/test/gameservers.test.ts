@@ -174,7 +174,7 @@ describe("DescribeGameservers", () => {
 
         assert.deepEqual(City, {
             id: Ramsgate.id, port: 8777, kind: "city", map: "/Game/Maps/ramsgate/ramsgate_01_persistent", gameMode: null,
-            behemoth: null, huntId: null, matchmakerHuntId: null, expectedPlayers: [], maxPlayers: null, startedAt: "2026-09-21T12:00:00.000Z"
+            behemoth: null, huntId: null, matchmakerHuntId: null, expectedPlayers: [], maxPlayers: 20, startedAt: "2026-09-21T12:00:00.000Z"
         });
         assert.equal(Training.kind, "dojo");
         assert.equal(Training.maxPlayers, 12);

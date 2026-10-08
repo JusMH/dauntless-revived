@@ -1,3 +1,4 @@
+import {chooseClosestRegion} from './autoregion';
 // The launcher's state machine. It owns every piece of state; the renderer draws Snapshots and
 // sends intents. Nothing in here imports Electron: main.ts passes the platform pieces in, which
 // keeps this testable with plain Node.
@@ -1093,9 +1094,11 @@ export class Controller {
         return this.fail(account.error);
       }
       this.keyRejected = false;
-      if (this.s.huntRegion) {
+      const chosenRegion = !this.s.huntRegion || this.s.huntRegion === 'auto'
+        ? await chooseClosestRegion(ep, key) : this.s.huntRegion;
+      if (chosenRegion) {
         try {
-          if (!await saveHuntRegion(ep,key,this.s.huntRegion)) return this.fail('server_error','The selected hunt region is unavailable. Choose Main in Settings or try again later.');
+          if (!await saveHuntRegion(ep,key,chosenRegion)) return this.fail('server_error','The selected hunt region is unavailable. Choose Main in Settings or try again later.');
         } catch { return this.fail('server_unreachable'); }
       }
       const dir = this.installDir;
@@ -1221,7 +1224,7 @@ export class Controller {
         if (GRAPHICS_PRESETS.includes(p.graphics as GraphicsPreset)) s.graphics = p.graphics as GraphicsPreset;
         if (EXPOSURE_MODES.includes(p.exposure as ExposureMode)) s.exposure = p.exposure as ExposureMode;
         if (typeof p.windowed === "boolean") s.windowed = p.windowed;
-        if (p.huntRegion === 'main' || p.huntRegion === 'aus' || p.huntRegion === 'ger') s.huntRegion = p.huntRegion;
+        if (p.huntRegion === 'auto' || p.huntRegion === 'main' || p.huntRegion === 'aus' || p.huntRegion === 'ger') s.huntRegion = p.huntRegion;
         if (p.language === "en" || p.language === "fi") s.language = p.language;
       });
     }

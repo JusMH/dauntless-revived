@@ -1,3 +1,6 @@
+#include "CityIdlePolicy.h"
+#include <filesystem>
+#include <fstream>
 #include "HuntIdlePolicy.h"
 #include "NativeDiagnostics.h"
 
@@ -334,6 +337,8 @@ void EncounterableSetupHook() {
 }
 
 HuntIdlePolicy HuntIdle;
+CityIdlePolicy CityIdle;
+bool IsPooledCity = false;
 
 bool EnableWatchdog = true;
 
@@ -361,6 +366,11 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         PreviousTick = std::chrono::steady_clock::now();
     }
 
+    if (IsPooledCity) {
+        auto* World = UWorld::GetWorld();
+        if (World && World->AuthorityGameMode && World->AuthorityGameMode->GameSession)
+            World->AuthorityGameMode->GameSession->MaxPlayers = 20;
+    }
     DR_TickStage = 1;
     DR_ServerTickCount = DR_ServerTickCount + 1;
     DR_ServerSimulatedSeconds = DR_ServerSimulatedSeconds + DeltaTime;
@@ -389,13 +399,14 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
 
     if (Globals::Listening && Networking::NetDriver) {
         bool HasConnection = false;
+        int ActiveConnections = 0;
 
         for (UNetConnection* Connection : Networking::NetDriver->ClientConnections) {
             // Pending (2) and open (3) connections protect clients still loading.
             if (Connection && (*(uint32_t*)((uintptr_t)Connection + 0x134) == 2
                 || *(uint32_t*)((uintptr_t)Connection + 0x134) == 3)) {
                 HasConnection = true;
-                break;
+                ++ActiveConnections;
             }
         }
 
@@ -403,7 +414,23 @@ void GameEngineTickHook(UGameEngine* GameEngine, float DeltaTime, char CanRender
         const auto IdleNow = std::chrono::steady_clock::now();
         const double Elapsed = std::chrono::duration<double>(IdleNow - PreviousIdleCheck).count();
         PreviousIdleCheck = IdleNow;
-        if (EnableWatchdog && HuntIdle.Advance(Elapsed, HasConnection)) {
+        if (IsPooledCity) {
+            static auto NextOccupancyWrite = IdleNow;
+            if (IdleNow >= NextOccupancyWrite) {
+                NextOccupancyWrite = IdleNow + std::chrono::seconds(1);
+                wchar_t Directory[32768] = {};
+                const auto Length = GetEnvironmentVariableW(L"GAMESERVER_READY_DIR", Directory, 32768);
+                if (Length > 0 && Length < 32768) {
+                    const auto File = std::filesystem::path(Directory) / (L"city-occupancy-" + std::to_wstring(GetCurrentProcessId()) + L".txt");
+                    const auto Temporary = std::filesystem::path(File.wstring() + L".tmp");
+                    { std::ofstream Output(Temporary); Output << GetCurrentProcessId() << " " << ActiveConnections << "\n"; }
+                    MoveFileExW(Temporary.c_str(), File.c_str(), MOVEFILE_REPLACE_EXISTING);
+                }
+            }
+        }
+        const bool IdleExpired = IsPooledCity ? CityIdle.Advance(Elapsed, HasConnection)
+            : EnableWatchdog && HuntIdle.Advance(Elapsed, HasConnection);
+        if (IdleExpired) {
             std::cout << "Hunt idle timeout on port " << Globals::Port << std::endl;
             DR_WriteDiagnostic("idle_timeout\n", 13);
             // This is an injected DLL in a multithreaded UE process. CRT exit runs
@@ -1046,6 +1073,8 @@ void Init() {
             Globals::MyIpAndPort = Args[7];
 
             if (std::wstring(Globals::MapPath).contains(L"/ramsgate/ramsgate_01_persistent")) {
+                wchar_t Pool[2] = {};
+                IsPooledCity = GetEnvironmentVariableW(L"DR_RAMSGATE_POOL", Pool, 2) == 1 && Pool[0] == L'1';
                 EnableWatchdog = false;
                 Globals::EnableLogging = true;
             }

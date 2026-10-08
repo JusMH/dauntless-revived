@@ -1,7 +1,7 @@
 import {cpuAdmission} from '../controllers/cpuadmission';
 import { Router } from "express";
 import { DescribeGameservers, huntAdmission, Gameservers } from "../controllers/gameservers";
-import { NativeOccupancy } from '../controllers/nativeoccupancy';
+import { NativeOccupancy, NativeCityOccupancy } from '../controllers/nativeoccupancy';
 import { DescribeOverflow } from '../controllers/overflow';
 import { DescribeAus } from '../controllers/regions';
 
@@ -38,7 +38,7 @@ gameserversRouter.get("/gameservers", async (req, res) => {
     res.json({
         servers: [...DescribeGameservers().map(server => {
             const process=Gameservers.find(s=>s.id===server.id);
-            return {...server, connectedPlayers: process ? NativeOccupancy(process.processId,process.startTime) : undefined};
+            return {...server, connectedPlayers: process ? (process.isRamsgate ? NativeCityOccupancy(process.processId,process.startTime) : NativeOccupancy(process.processId,process.startTime)) : undefined};
         }), ...overflow, ...aus, ...germany],
         capacity: {...huntAdmission.status(), cpu:cpuAdmission.status()}
     });

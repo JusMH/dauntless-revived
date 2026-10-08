@@ -1,3 +1,4 @@
+import {RegionProbes} from '../controllers/regionprobes';
 import { DiscordKeyStats } from '../controllers/discordstats';
 import { GetHuntRegion, SaveHuntRegion } from '../controllers/regionpreferences';
 
@@ -33,7 +34,7 @@ export const undauntedApiRouter = Router();
 
 undauntedApiRouter.get('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({region:GetHuntRegion((req as any).UndauntedUserInfo.UserId), enabled:process.env.AUS_REGION === '1'});
+    res.json({region:GetHuntRegion((req as any).UndauntedUserInfo.UserId), enabled:process.env.AUS_REGION === '1', probes:RegionProbes()});
 });
 undauntedApiRouter.post('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');

@@ -1,7 +1,7 @@
 import {CapacityUnavailable} from './capacity';
 import { logger } from "../logger";
 import { GetRamsgateConnectionDetails, GetTrainingDojoConnectionDetails, StartupGameserverWithArgs, StartupGameserverWithHuntIdAndPlayers } from "./gameservers";
-import { Gameservers, KindOfGameserver, huntAdmission, DescribeGameservers } from './gameservers';
+import { Gameservers, KindOfGameserver, huntAdmission, DescribeGameservers, CityPoolEnabled } from './gameservers';
 import { HuntRouter, RemoteLaunch, OverflowUrl, DescribeOverflow } from './overflow';
 import { CityRouter } from './cityrouter';
 import { NativeOccupancy } from './nativeoccupancy';
@@ -50,11 +50,11 @@ export async function HandleMatchmakingRequest(GameMode: string, GameArgs: strin
     if (process.env.HUNT_WORKER === '1' && GameMode !== 'ISLAND' && !(GameMode === 'CITY' && process.env.WORKER_RAMSGATE === '1') && !(GameMode === 'SHARED' && process.env.WORKER_DOJO === '1')) throw new Error('Hunt worker does not accept this world');
     const body = {GameMode, GameArgs, HuntId, ExpectedPlayers};
     return Regions.launch(body, Region, async () => {
-        if (GameMode === 'CITY' && process.env.CITY_OVERFLOW === '1') {
+        if (GameMode === 'CITY' && !CityPoolEnabled() && process.env.CITY_OVERFLOW === '1') {
             const url = OverflowUrl();
             if (!url) throw new Error('City overflow needs the worker tunnel');
             return Cities.launch(ExpectedPlayers?.length ?? 1,
-                () => GetRamsgateConnectionDetails(),
+                () => GetRamsgateConnectionDetails(ExpectedPlayers?.length ?? 1),
                 () => RemoteLaunch(url, body),
                 Number(process.env.RAMSGATE_PLAYER_LIMIT ?? 28));
         }
@@ -66,7 +66,7 @@ async function HandleLocalMatchmaking(GameMode: string, GameArgs: string, HuntId
     logger.info(`Handling matchmaking with GameMode: ${GameMode} HuntId: ${HuntId} and GameArgs: ${GameArgs} and ExpectedPlayers ${ExpectedPlayers}`);
 
     if(GameMode === "CITY"){
-        return await GetRamsgateConnectionDetails();
+        return await GetRamsgateConnectionDetails(ExpectedPlayers?.length ?? 1);
     }
     else if(GameMode === "SHARED"){
         if (HuntId != undefined && HuntId.trim().length > 0){
@@ -88,5 +88,5 @@ async function HandleLocalMatchmaking(GameMode: string, GameArgs: string, HuntId
     if (process.env.HUNT_WORKER === '1') throw new Error('No hunt could be resolved on worker');
     logger.error("Matchmaking failed, sending you to Ramsgate!");
 
-    return await GetRamsgateConnectionDetails();
+    return await GetRamsgateConnectionDetails(ExpectedPlayers?.length ?? 1);
 }

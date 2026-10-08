@@ -26,7 +26,7 @@ test("the actual preload bridge forwards OCE and Main settings across IPC", asyn
   const dir = mkdtempSync(path.join(os.tmpdir(), "dr-region-"));
   try {
     const store = new SettingsStore(dir, "en");
-    for (const region of ["aus", "main", "ger"] as const) {
+    for (const region of ["auto", "aus", "main", "ger"] as const) {
       const patch = await api!.setSettings({ huntRegion: region, unexpected: "discard" });
       assert.equal(JSON.stringify(calls.at(-1)), JSON.stringify([IPC.setSettings, { huntRegion: region }]));
       await store.update(s => Object.assign(s, patch));
