@@ -32,18 +32,34 @@ export function ParseFusionData(Item: any): FusionData {
     return Data as FusionData;
 }
 
+// Matching and removal must never refuse a claim because the token's itemData is not the shape we expect.
+function TryParseFusionData(Item: any): FusionData | undefined {
+    try{
+        return ParseFusionData(Item);
+    }
+    catch{
+        return undefined;
+    }
+}
+
 export function FusionInstanceId(SlotID: number){
     return `${FUSION_CATALOG_ID}:${SlotID}`;
 }
 
 // Some clients use the same generic instance id for every pending exchange. Persist by slot instead so
 // several fusions survive at once. Non-fusion items and a fusion token without usable itemData are untouched.
-export function NormaliseFusionItem(Item: any){
+// Strict (throws on bad itemData) for adds and saves; Lenient for removals, which keep the client's id.
+export function NormaliseFusionItem(Item: any, Lenient = false){
     if(Item?.catalogId !== FUSION_CATALOG_ID || Item?.itemData == null){
         return Item;
     }
 
-    Item.instanceId = FusionInstanceId(ParseFusionData(Item).SlotID);
+    const Data = Lenient ? TryParseFusionData(Item) : ParseFusionData(Item);
+
+    if(Data != undefined){
+        Item.instanceId = FusionInstanceId(Data.SlotID);
+    }
+
     return Item;
 }
 
@@ -52,12 +68,13 @@ export function FindFusionItemIndex(InstancedItems: any[], IncomingItem: any){
         return -1;
     }
 
-    if(IncomingItem?.itemData != null){
-        const Incoming = ParseFusionData(IncomingItem);
+    const Incoming = TryParseFusionData(IncomingItem);
+
+    if(Incoming != undefined){
         const BySlot = InstancedItems.findIndex((Item) => {
-            if(Item?.catalogId !== FUSION_CATALOG_ID || Item?.itemData == null) return false;
-            const Current = ParseFusionData(Item);
-            return Current.SlotID === Incoming.SlotID || Current.ExchangeID === Incoming.ExchangeID;
+            if(Item?.catalogId !== FUSION_CATALOG_ID) return false;
+            const Current = TryParseFusionData(Item);
+            return Current != undefined && (Current.SlotID === Incoming.SlotID || Current.ExchangeID === Incoming.ExchangeID);
         });
 
         if(BySlot >= 0){
@@ -84,10 +101,11 @@ function SameFusion(CurrentItem: any, IncomingItem: any){
         return false;
     }
 
-    const Current = ParseFusionData(CurrentItem);
-    const Incoming = ParseFusionData(IncomingItem);
+    const Current = TryParseFusionData(CurrentItem);
+    const Incoming = TryParseFusionData(IncomingItem);
 
-    return Current.SlotID === Incoming.SlotID &&
+    return Current != undefined && Incoming != undefined &&
+        Current.SlotID === Incoming.SlotID &&
         Current.ExchangeID === Incoming.ExchangeID &&
         Current.ResultCell === Incoming.ResultCell;
 }
@@ -106,12 +124,14 @@ export function IsValidFusionSave(CurrentItem: any, IncomingItem: any, Operation
     return Date.parse(ParseFusionData(IncomingItem).EndTime) <= Date.parse(ParseFusionData(CurrentItem).EndTime);
 }
 
-// Revealing a completed exchange removes the version-zero token the game already holds. It is the same
-// token, not a newer revision, so the generic stale-version rule must not reject that removal.
+// Claiming a completed exchange removes the token the game already holds. The client's copy can lag the
+// stored one (an older updateVersion after a speed-up, or itemData we cannot parse), so the generic
+// stale-version rule must not reject it: refusing it left finished fusions unclaimable. Removing a
+// pending token only loses that fusion; the reveal-time checks live in ValidateFusionCompletions.
 export function IsValidFusionRemoval(CurrentItem: any, IncomingItem: any, Operation: string){
     return Operation === "remove" &&
-        CurrentItem?.updateVersion === IncomingItem?.updateVersion &&
-        SameFusion(CurrentItem, IncomingItem);
+        CurrentItem?.catalogId === FUSION_CATALOG_ID &&
+        IncomingItem?.catalogId === FUSION_CATALOG_ID;
 }
 
 // Optional strict guard used once the live 1.4.4 transaction shape is confirmed. The server must reveal

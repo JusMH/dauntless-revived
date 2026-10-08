@@ -26,6 +26,7 @@
 #include "TrialsSchedule.h"
 #include "AutoPressStart.h"
 #include "CellFusionTime.h"
+#include "VendorTabs.h"
 
 #include "SDK/GameplayAbilities_parameters.hpp"
 #include "SDK/Archon_parameters.hpp"
@@ -649,6 +650,7 @@ void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
     TrialsSchedule::Tick();
     CellFusionTime::Tick();
     AutoPressStart::OnProcessEvent(Object, Function);
+    VendorTabs::OnProcessEvent(Object);
 
     static UFunction* CanPurchase = nullptr;
     if (Function == CanPurchase || (!CanPurchase && Function && Function->GetFullName().contains("EquipmentItemViewModel.CanPurchase"))) {
