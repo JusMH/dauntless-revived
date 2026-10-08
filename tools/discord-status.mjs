@@ -30,7 +30,7 @@ export function payload(sample, now = Date.now(), fleet = null) {
     const seconds=Math.floor(sample.uptime);
     fields.push({name:'Shared backend',value:`🟢 Online · ${Math.round(sample.ms)} ms local check\nUptime: ${Math.floor(seconds/86400)}d ${Math.floor(seconds%86400/3600)}h ${Math.floor(seconds%3600/60)}m\nStarted <t:${at-seconds}:R>`});
   }
-  fields.push({name:'Region guide',value:'Main is now EU. Choose EU or Australia (OCE) in launcher Settings, then relaunch. EU uses its overflow worker; OCE stays in Australia unless joining a party led in another region. Parties follow their leader. Germany is monitored; its player region is awaiting activation.'});
+  fields.push({name:'Region guide',value:'Main is now EU. Choose EU, Germany or Australia (OCE) in launcher Settings, then relaunch. EU uses its overflow workers. Germany and OCE stay in their selected region unless joining a party led elsewhere. Parties follow their leader; invitations work across regions.'});
   fields.push({name:'📥 Launcher 0.1.26 · Cloudflare downloads',value:'Update your launcher for direct Cloudflare game downloads, resume support and verified files. Existing verified installs need no redownload. Includes the Trials, Lady Luck and Middleman DLL. [Download / release notes](https://github.com/mixutin/dauntless-revived/releases/tag/launcher-v0.1.26)'});
   fields.push({name:'Last checked',value:`<t:${at}:F> (<t:${at}:R>)`});
   return {allowed_mentions:{parse:[]},embeds:[{title:'Dauntless Revived · Live realm status',

@@ -166,6 +166,29 @@ const PATHS: Path[] = [
     { Name: "a full hunt queue of 4", Players: 4, Join: () => ({ gameMode: "ISLAND", gameArgs: "", playerHuntId: `CR19_PlayerHunt_Failure_Test_${++Hunts}` }) }
 ];
 
+it('private hunts allocate immediately, poll quickly, and never take a public waiting player', async () => {
+    const hunt = `CR19_PlayerHunt_Private_Fast_${++Hunts}`;
+    const publicPlayer = NewPlayer(), privatePlayer = NewPlayer();
+    const body = {gameMode: 'ISLAND', gameArgs: '', playerHuntId: hunt};
+    await Call('POST', '/candidate/join', publicPlayer.Token, body);
+    assert.equal(Calls.length, 0, 'public queue should still wait for players');
+    let finish!: () => void;
+    CurrentMode = {Name: 'starting private hunt', Reply: res => {finish = () => WORKING.Reply(res);}};
+    const joined = await Call('POST', '/candidate/join', privatePlayer.Token, {...body, privateMatch: true});
+    assert.equal(joined.json.candidateStatusPeriodMillis, 1000);
+    await WaitForCalls(1);
+    const pending = await Call('GET', '/candidate/status', privatePlayer.Token);
+    assert.equal(pending.json.status, 'MATCHING');
+    assert.equal(pending.json.candidateStatusPeriodMillis, 1000);
+    assert.equal(pending.json.connection, undefined, 'no destination before readiness');
+    assert.ok(!JSON.stringify(Calls[0]).includes(publicPlayer.UserId));
+    finish();
+    await WaitForStatus(privatePlayer.Token, 'IN_PROGRESS');
+    assert.equal((await Call('GET', '/candidate/status', publicPlayer.Token)).json.status, 'MATCHING');
+    const {CancelMatchmaking} = await import('../src/controllers/matchmaking');
+    CancelMatchmaking(publicPlayer.UserId);
+});
+
 // New players join along the path, all with the same body; returns them
 async function JoinAll(ThePath: Path){
     const Players = Array.from({ length: ThePath.Players }, () => NewPlayer());

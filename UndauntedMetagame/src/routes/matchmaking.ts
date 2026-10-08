@@ -115,7 +115,7 @@ matchmakingRouter.get("/candidate/status", HasUndauntedMetagameAuth, async (req:
             res.status(200);
             res.json({
                 candidateId: MatchmakingResult.CandidateId,
-                candidateStatusPeriodMillis: 10000,
+                candidateStatusPeriodMillis: MatchmakingResult.Private || MatchmakingResult.PartyCandidate ? 1000 : 10000,
                 gameMode: "ISLAND",
                 huntId: MatchmakingResult.HuntId,
                 playerStates: PlayerStatesOf(MatchmakingResult),
@@ -130,7 +130,7 @@ matchmakingRouter.get("/candidate/status", HasUndauntedMetagameAuth, async (req:
             res.status(200);
             res.json({
                 candidateId: MatchmakingResult.CandidateId,
-                candidateStatusPeriodMillis: 10000,
+                candidateStatusPeriodMillis: MatchmakingResult.Private || MatchmakingResult.PartyCandidate ? 1000 : 10000,
                 gameMode: "ISLAND",
                 huntId: MatchmakingResult.HuntId,
                 playerStates: PlayerStatesOf(MatchmakingResult),
@@ -151,7 +151,7 @@ matchmakingRouter.get("/candidate/status", HasUndauntedMetagameAuth, async (req:
             res.status(200);
             res.json({
                 candidateId: MatchmakingResult.CandidateId,
-                candidateStatusPeriodMillis: 10000,
+                candidateStatusPeriodMillis: MatchmakingResult.Private || MatchmakingResult.PartyCandidate ? 1000 : 10000,
                 gameMode: "ISLAND",
                 huntId: MatchmakingResult.HuntId,
                 playerStates: PlayerStatesOf(MatchmakingResult),
@@ -174,7 +174,6 @@ matchmakingRouter.post("/candidate/join", HasUndauntedMetagameAuth, async (req: 
     const GameMode = req.body.gameMode;
     const GameArgs = req.body.gameArgs;
     const HuntId = req.body.playerHuntId;
-    const PrivateMatch = req.body.privateMatch === true || req.body.isPrivate === true;
 
     logger.info(`UserId ${UserId} wants to join a game with GameMode ${GameMode} & GameArgs ${GameArgs} & HuntId ${HuntId}`);
 
@@ -203,6 +202,7 @@ matchmakingRouter.post("/candidate/join", HasUndauntedMetagameAuth, async (req: 
     res.status(200);
     res.json({
         candidateId: MatchmakingEntry.CandidateId,
+        candidateStatusPeriodMillis: MatchmakingEntry.Private || MatchmakingEntry.PartyCandidate ? 1000 : 10000,
         gameMode: GameMode,
         huntId: HuntId,
         status: "MATCHING",
@@ -229,6 +229,7 @@ matchmakingRouter.post("/candidate/join/:candidateId", HasUndauntedMetagameAuth,
     res.status(200);
     res.json({
         candidateId: Candidate.CandidateId,
+        candidateStatusPeriodMillis: 1000,
         gameMode: Candidate.GameMode,
         huntId: Candidate.HuntId,
         status: "MATCHING",
