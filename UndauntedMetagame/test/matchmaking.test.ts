@@ -268,3 +268,34 @@ describe("concurrent hunt queues", () => {
     });
 
 });
+
+
+describe("bounded public grouping window", () => {
+    it("launches five seconds after the first join even when another player joins late", async () => {
+        ResetMatchmakingForTests();
+        let now = 100000;
+        SetPartyClockForTests(() => now);
+        const originalFetch = globalThis.fetch;
+        const requests: any[] = [];
+        globalThis.fetch = (async (_url: any, init: any) => {
+            requests.push(JSON.parse(init.body));
+            return new Response(JSON.stringify({host: '127.0.0.1', port: 39000}), {status: 200});
+        }) as typeof fetch;
+        try {
+            await HandlePlayerMatchmaking('ISLAND', '', 'Hunt_Test_A', 'UID-first');
+            now += 4999;
+            await HandlePlayerMatchmaking('ISLAND', '', 'Hunt_Test_A', 'UID-late');
+            assert.equal((await CheckAndUpdateQueueStatus('UID-first'))?.Ready, false);
+            assert.equal(requests.length, 0);
+            now += 1;
+            assert.equal((await CheckAndUpdateQueueStatus('UID-first'))?.Ready, true);
+            assert.equal((await CheckAndUpdateQueueStatus('UID-late'))?.Ready, true);
+            assert.equal(requests.length, 1);
+            assert.deepEqual(requests[0].ExpectedPlayers, ['UID-first', 'UID-late']);
+        } finally {
+            globalThis.fetch = originalFetch;
+            SetPartyClockForTests();
+            ResetMatchmakingForTests();
+        }
+    });
+});

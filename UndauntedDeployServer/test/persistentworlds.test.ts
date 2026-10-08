@@ -99,13 +99,22 @@ describe("Ramsgate", () => {
             assert.equal(Gameservers.filter(s=>!s.isRamsgate&&!s.isTrainingDojo).length,1);
         } finally {delete process.env.MAX_LOCAL_HUNTS;}
     });
-    it('worker hard capacity rejects concurrent requests beyond three',async()=>{
+    it('worker limits pending launches to two and running hunts to three',async()=>{
         process.env.HUNT_WORKER='1'; process.env.MAX_HUNTS='3';
         try {
             await Startup();
             const results=await Promise.allSettled(Array.from({length:8},()=>StartupGameserverWithArgs(TUTORIAL_ARGS)));
-            assert.equal(results.filter(r=>r.status==='fulfilled').length,3);
+            assert.equal(results.filter(r=>r.status==='fulfilled').length,2, 'only two launches may be pending at once');
+            assert.equal(results.filter(r=>r.status==='rejected').length,6);
+            for (const result of results) {
+                if (result.status === 'rejected') assert.match(String(result.reason), /capacity unavailable: hunts/);
+            }
+            assert.equal(Spawned.length,2);
+            // Once the burst has spawned, the worker still has its third running slot.
+            await StartupGameserverWithArgs(TUTORIAL_ARGS);
             assert.equal(Spawned.length,3);
+            await assert.rejects(StartupGameserverWithArgs(TUTORIAL_ARGS), /capacity unavailable: hunts/);
+            assert.equal(Spawned.length,3, 'a full worker must not spawn a fourth hunt');
         } finally {delete process.env.HUNT_WORKER;delete process.env.MAX_HUNTS;}
     });
     it('low memory blocks new worlds before spawn without consuming hunt ports or stopping Ramsgate', async () => {
@@ -231,6 +240,21 @@ describe("Ramsgate", () => {
 });
 
 describe("the Training Dojo", () => {
+    it("stays stopped after cleanup and starts once on the next concurrent requests", async () => {
+        await Startup();
+        await GetTrainingDojoConnectionDetails();
+        const dead = GameserverStateForTests().Dojo!;
+        Kill(dead.processId);
+        await CleanupServer(dead);
+        await RunWatchdog();
+        assert.equal(Spawned.length, 2);
+        assert.equal(GameserverStateForTests().Dojo, undefined);
+        assert.equal(Gameservers.includes(dead), false);
+        await Promise.all([GetTrainingDojoConnectionDetails(), GetTrainingDojoConnectionDetails()]);
+        assert.equal(Spawned.length, 3);
+        assert.notEqual(GameserverStateForTests().Dojo!.processId, dead.processId);
+    });
+
     it("starts on first use, once for requests that arrive together, and again after its process ended", async () => {
         await Startup();
 

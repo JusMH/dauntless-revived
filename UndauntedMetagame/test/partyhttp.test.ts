@@ -520,12 +520,12 @@ describe("one queued join per player (the 22 September 2026 two-player test)", (
         const Again = await HuntJoin(A);
         assert.equal((await Call("DELETE", "/candidate", { as: A })).status, 404);
         assert.notEqual(Again.json.candidateId, Stale.json.candidateId);
-        Offset += 17 * 1000;
+        Offset += 4 * 1000;
         assert.equal((await HuntJoin(B)).status, 200);
         assert.equal((await Call("DELETE", "/candidate", { as: B })).status, 404);
-        assert.equal(Deploy.Calls.length, Before, "the queue waits 20 s after its last join");
+        assert.equal(Deploy.Calls.length, Before, "the queue waits five seconds after its first join");
 
-        Offset += 21 * 1000;
+        Offset += 1 * 1000;
         const PolledO = await Status(B);
         const PolledV = await Status(A);
         assert.equal(Deploy.Calls.length, Before + 1, "one hunt server");
