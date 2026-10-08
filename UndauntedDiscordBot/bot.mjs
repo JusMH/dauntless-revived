@@ -47,9 +47,9 @@ client.once(Events.ClientReady, async () => {
     const guilds = process.env.DISCORD_GUILD_ID ? [process.env.DISCORD_GUILD_ID] : [...client.guilds.cache.keys()];
     const changed = await syncKeyCommands(rest, client.application.id, guilds);
     await syncCounterCommand(rest,client.application.id);
-    if(memberIntentEnabled) await counters.start();
     console.log(`Key command registration: ${changed} scopes updated`);
     console.log('Revived key bot ready');
+    if(memberIntentEnabled) void counters.start().catch(() => console.error('Counter startup failed; key commands remain online'));
   } catch { console.error('Could not register /key'); await client.destroy(); process.exitCode = 1; }
 });
 const active = new Set();
@@ -81,7 +81,10 @@ client.on(Events.InteractionCreate, async interaction => {
         ? await keys.link(id, interaction.options.getString('key', true).trim())
         : claim ? await keys.deliverPrivate(id, code => interaction.editReply({content: inviteMessage(inviteConfig, code), allowedMentions: {parse: []}}))
         : await keys.run(id, false);
-      if (result.status === 'private_sent') return;
+      if (result.status === 'private_sent') {
+        console.log(JSON.stringify({event:'key_private_reply_sent',at:new Date().toISOString()}));
+        return;
+      }
       {
         const messages = {
           sent: '🔑 **Invite Sent**\nCheck your DMs. Paste the complete invite into the launcher’s Join box.\n**Clear skies, Slayer.**',
@@ -105,7 +108,7 @@ client.on(Events.InteractionCreate, async interaction => {
       }
     } finally { active.delete(id); }
   } catch (error) {
-    console.error(JSON.stringify({event:'key_interaction_failed',at:new Date().toISOString(),discordId:id,code:Number.isInteger(error.code)?error.code:undefined})); // No tokens/codes/payloads.
+    console.error(JSON.stringify({event:'key_interaction_failed',at:new Date().toISOString(),discordId:id,code:Number.isInteger(error.code)?error.code:undefined,status:Number.isInteger(error.status)?error.status:undefined,kind:['AbortError','TimeoutError','TypeError','SyntaxError'].includes(error.name)?error.name:'Error'})); // No tokens/codes/payloads.
     if (interaction.deferred) await interaction.editReply('The key service is unavailable. Please try again shortly.').catch(() => {});
   }
 });

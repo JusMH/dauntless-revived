@@ -32,7 +32,7 @@ export function backend(base, key, request = fetch) {
       headers: {'x-undaunted-user-api-key': key, 'content-type': 'application/json'},
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!response.ok) throw new Error('Metagame request failed');
+    if (!response.ok) throw Object.assign(new Error('Metagame request failed'), {status: response.status});
     return path === 'RegisterInviteCode' ? undefined : response.json();
   }
   return {
