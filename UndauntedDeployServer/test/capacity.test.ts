@@ -82,3 +82,14 @@ test('hunt estimates keep the full floor and correctly sum mixed reservations', 
         delete process.env.GAMESERVER_MEMORY_GUARD;
     }
 });
+
+test('launch backlog is bounded independently of free hunt slots',()=>{
+    const slots=new HuntAdmission(()=>0,()=>96);
+    const first=slots.reserve(), second=slots.reserve();
+    assert.throws(()=>slots.reserve(),CapacityUnavailable);
+    first(); first();
+    const third=slots.reserve();
+    assert.equal(slots.pending,2);
+    second(); third();
+    assert.equal(slots.pending,0);
+});

@@ -24,6 +24,8 @@ export class HuntAdmission {
     status() { return {running: this.running(), pending: this.pending, limit: this.limit()}; }
     reserve() {
         const {running, pending, limit} = this.status();
+        // Keep paced launches within the caller's request timeout instead of spawning abandoned hunts.
+        if (pending >= 2) throw new CapacityUnavailable('hunts');
         if (limit !== null && running + pending >= limit) throw new CapacityUnavailable('hunts');
         this.pending++;
         let active = true;
