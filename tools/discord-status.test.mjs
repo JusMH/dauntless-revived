@@ -1,6 +1,19 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {payload, Publisher, sampleBackend, webhookUrl} from './discord-status.mjs';
+import {sampleFleet} from './discord-status.mjs';
+
+test('four-server fleet remains visible when one monitor is stale', async () => {
+ const row={online:true,cpu:50,ramUsedMB:1024,ramTotalMB:4096,hunts:2};
+ const f=await sampleFleet('http://127.0.0.1:61110','test',async()=>Response.json({fleet:{rows:[row,{...row,cpu:5},{...row,online:false,cpu:null,hunts:null},row]}}));
+ assert.equal(f.servers,4);assert.equal(f.online,3);assert.equal(f.hunts,null);assert.equal(f.knownHunts,6);
+ assert.equal(f.meanCpu,35);assert.equal(f.ramUsedMB,3072);
+ const b=payload({players:12,uptime:5,ms:1},Date.now(),f);
+ const s=JSON.stringify(b);
+ assert.ok(s.includes('Server #4 · Germany'));assert.ok(s.includes('6 reported · partial'));assert.ok(s.includes('35.0%'));
+ assert.ok(!s.includes('Monitoring unavailable'));assert.ok(!s.includes('Server #1 · Main'));
+ assert.ok(s.includes('Cloudflare'));assert.ok(s.length<6000);
+});
 const url = 'https://discord.com/api/webhooks/123/test-token';
 test('only aggregate status leaves the machine; timestamps are Discord-localized', () => {
   const body = payload({players: 4, uptime: 3600, ms: 12.3, ip: 'SECRET_IP', names: ['SECRET_NAME']}, 1700000000000);

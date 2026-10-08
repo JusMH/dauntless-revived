@@ -15,23 +15,27 @@ export function payload(sample, now = Date.now(), fleet = null) {
   const fields=[
     {name:'👥 Slayers online',value:online?String(sample.players):'Unknown',inline:true},
     {name:'🌐 Fleet availability',value:fleet?`${fleet.online} / ${fleet.servers} hosts reporting`:'Monitoring unavailable',inline:true},
-    {name:'⚔️ Active hunts',value:Number.isInteger(fleet?.hunts)?String(fleet.hunts):'Unknown',inline:true}
+    {name:'⚔️ Active hunts',value:Number.isInteger(fleet?.hunts)?String(fleet.hunts):fleet?`${fleet.knownHunts} reported · partial`:'Unknown',inline:true}
   ];
-  for(const [i,name] of ['Server #1 · EU','Server #2 · EU overflow','Server #3 · Australia (OCE)'].entries()){
+  for(const [i,name] of ['Server #1 · EU','Server #2 · EU overflow','Server #3 · Australia (OCE)','Server #4 · Germany'].entries()){
     const r=fleet?.rows?.[i];
     fields.push({name,inline:true,value:r?.online
       ? `🟢 Online\nHunts: ${Number.isInteger(r.hunts)?r.hunts:'Unknown'}\nCPU: ${num(r.cpu,'%')}\nRAM: ${num(r.ramUsedMB===null?null:r.ramUsedMB/1024)} / ${num(r.ramTotalMB===null?null:r.ramTotalMB/1024)} GB`
       : '🟠 Unavailable / stale'});
   }
+  if(fleet){
+    fields.push({name:'📊 Reporting hosts combined',value:`Mean CPU: ${num(fleet.meanCpu,'%')}\nRAM: ${num(fleet.ramUsedMB/1024)} / ${num(fleet.ramTotalMB/1024)} GB\n${fleet.online}/${fleet.servers} hosts reporting; unavailable hosts excluded.`});
+  }
   if(online){
     const seconds=Math.floor(sample.uptime);
     fields.push({name:'Shared backend',value:`🟢 Online · ${Math.round(sample.ms)} ms local check\nUptime: ${Math.floor(seconds/86400)}d ${Math.floor(seconds%86400/3600)}h ${Math.floor(seconds%3600/60)}m\nStarted <t:${at-seconds}:R>`});
   }
-  fields.push({name:'Region guide',value:'Choose EU, Germany or Australia in launcher Settings, then relaunch. Ramsgate and hunts follow that selection. Parties follow their leader; invitations work across regions.'});
+  fields.push({name:'Region guide',value:'Main is now EU. Choose EU or Australia (OCE) in launcher Settings, then relaunch. EU uses its overflow worker; OCE stays in Australia unless joining a party led in another region. Parties follow their leader. Germany is monitored; its player region is awaiting activation.'});
+  fields.push({name:'📥 Launcher 0.1.26 · Cloudflare downloads',value:'Update your launcher for direct Cloudflare game downloads, resume support and verified files. Existing verified installs need no redownload. Includes the Trials, Lady Luck and Middleman DLL. [Download / release notes](https://github.com/mixutin/dauntless-revived/releases/tag/launcher-v0.1.26)'});
   fields.push({name:'Last checked',value:`<t:${at}:F> (<t:${at}:R>)`});
   return {allowed_mentions:{parse:[]},embeds:[{title:'Dauntless Revived · Live realm status',
-    description:online?'**Clear skies, Slayers.** Shared accounts and progression across Main and OCE.':'The shared backend is currently unavailable. Please check again shortly.',
-    color:online&&fleet?.online===3?0x35bc84:0xe1a349,fields,
+    description:online?'**Clear skies, Slayers.** Shared accounts and progression across EU, Germany and OCE.':'The shared backend is currently unavailable. Please check again shortly.',
+    color:online&&fleet?.servers>0&&fleet.online===fleet.servers?0x35bc84:0xe1a349,fields,
     footer:{text:'Host health and backend activity, not player ping or proof of hunt completion. Stale readings are unknown.'}}]};
 }
 
@@ -141,9 +145,15 @@ export async function sampleFleet(dashboard, key, fetcher=fetch) {
     const r=await fetcher(new URL('/api/status',url),{headers:{'x-dashboard-key':key},signal:AbortSignal.timeout(3000),redirect:'error'});
     if(!r.ok)return null;
     const data=await r.json(), f=data.fleet;
-    if(!Array.isArray(f?.rows) || f.rows.length!==3)return null;
+    if(!Array.isArray(f?.rows) || f.rows.length<3 || f.rows.length>4)return null;
     const n=v=>Number.isFinite(v)&&v>=0?v:null;
     const rows=f.rows.map(row=>({online:row.online===true,cpu:n(row.cpu),ramUsedMB:n(row.ramUsedMB),ramTotalMB:n(row.ramTotalMB),hunts:Number.isInteger(row.hunts)&&row.hunts>=0?row.hunts:null}));
-    return {rows,online:rows.filter(r=>r.online).length,servers:rows.length,hunts:rows.every(r=>r.online&&r.hunts!==null)?rows.reduce((v,r)=>v+r.hunts,0):null};
+    const reporting=rows.filter(r=>r.online), cpus=reporting.filter(r=>r.cpu!==null);
+    return {rows,online:reporting.length,servers:rows.length,
+      knownHunts:reporting.reduce((v,r)=>v+(r.hunts??0),0),
+      hunts:rows.every(r=>r.online&&r.hunts!==null)?rows.reduce((v,r)=>v+r.hunts,0):null,
+      meanCpu:cpus.length?cpus.reduce((v,r)=>v+r.cpu,0)/cpus.length:null,
+      ramUsedMB:reporting.reduce((v,r)=>v+(r.ramUsedMB??0),0),
+      ramTotalMB:reporting.reduce((v,r)=>v+(r.ramTotalMB??0),0)};
   }catch{return null;}
 }
