@@ -718,3 +718,31 @@ opetusjaksot ja Dojon, kun niissä ei ole odottavaa tai avointa verkkoyhteyttä 
 Ennen ensimmäistä yhteyttä lataamiselle annetaan 180 sekuntia. Aika mitataan monotonisella
 kellolla. Ramsgate pysyy käynnissä; Dojo käynnistyy seuraavasta pyynnöstä. Muutos vaatii DLL:n
 kääntämisen ja asentamisen: lähdekoodin muokkaus ei päivitä käynnistimen mukana tulevaa DLL:ää.
+
+### Ramsgate-instanssit ja automaattinen aluevalinta
+
+Deploy-palvelimen oletus on `RAMSGATE_POOL=1`. Tyhjä Ramsgate ei käynnisty asennuksen tai
+palvelimen käynnistyksen yhteydessä. CITY-pyyntö varaa koko matkustavalle ryhmälle paikat
+instanssista, jonka kapasiteetti on 20. Tarvittaessa käynnistyy uusi instanssi. Ensimmäinen
+käyttää `PORT_RANGE_END`-porttia; muut jakavat metsästysportit. Dojon portti pysyy varattuna.
+Muisti- ja porttirajat koskevat uusia instansseja. Uusi kaupunki odottaa ensimmäistä yhteyttä
+180 sekuntia. Sen jälkeen viimeisen odottavan tai avoimen yhteyden poistuminen sulkee sen
+seuraavalla pelitickillä. Se ei käynnisty uudelleen ilman pyyntöä. `RAMSGATE_POOL=0` palauttaa
+vanhan pysyvän kaupungin. Poolissa vanha `CITY_OVERFLOW`-tasain ohitetaan; alueellinen reititys
+valitsee edelleen työntekijän, jolla on oma kaupunkipooli.
+
+Käynnistimen oletus on Automatic (closest region), ellei pelaajalla ole tallennettua käsin
+valittua aluetta. Play mittaa saatavilla olevien alueiden TCP-yhteyden muodostuksen kahdesti
+ja vertaa toista mittausta. Tämä arvioi verkkoviivettä, ei maantieteellistä etäisyyttä tai
+pelin UDP-viivettä. EU, Australia ja Saksa ovat edelleen valittavissa käsin; ryhmä seuraa
+johtajaa. Automaattinen valinta arvioidaan uudelleen jokaisella Play-painalluksella.
+
+Metagamen `REGION_MAIN_PROBE_HOST`, `REGION_AUS_PROBE_HOST` ja `REGION_GER_PROBE_HOST`
+määrittävät alueiden saavutettavat TCP-kuuntelijat. `REGION_*_PROBE_PORT` on oletuksena 443.
+Main käyttää ilman asetusta kutsun osoitetta ja porttia. Australia ja Saksa näytetään vain,
+kun `AUS_REGION=1` ja `GERMANY_REGION=1`. Mittaus ei lähetä tunnuksia tai sovellusdataa.
+Epäonnistuneet mittaukset ohitetaan; jos kaikki epäonnistuvat, nykyinen backend-alue säilyy.
+GET `/undaunted/api/HuntRegion` palauttaa lisäksi `probes: [{region, host, port}]`.
+
+Toiminta vaatii uudelleen käännetyn palvelin-DLL:n ja päivitetyn käynnistimen asentamisen.
+Lähdekoodin muutos ei vaihda asennuspaketin mukana tulevia binäärejä.

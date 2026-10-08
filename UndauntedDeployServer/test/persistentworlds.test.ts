@@ -60,8 +60,8 @@ for(const Level of ["fatal", "error", "warn", "info"] as const){
 }
 
 async function WaitFor(Condition: () => boolean){
-    for(let i = 0; i < 200 && !Condition(); i++){
-        await new Promise((Resolve) => setImmediate(Resolve));
+    for(const Deadline = Date.now() + 5000; Date.now() < Deadline && !Condition();){
+        await new Promise((Resolve) => setTimeout(Resolve, 10));
     }
 
     assert.ok(Condition(), "timed out waiting");

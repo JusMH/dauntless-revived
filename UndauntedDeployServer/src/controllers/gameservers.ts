@@ -1,3 +1,5 @@
+import {CityPool, CITY_PLAYER_LIMIT} from './citypool';
+import {NativeCityOccupancy} from './nativeoccupancy';
 import {CheckCpuAdmission} from './cpuadmission';
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
 import { setTimeout } from "node:timers/promises";
@@ -40,6 +42,7 @@ type ExpectedPlayer = {
 };
 
 export let Gameservers: Gameserver[] = [];
+export function CityPoolEnabled() { return process.env.RAMSGATE_POOL !== '0'; }
 const SpawnedChildren = new Map<string,ChildProcess>();
 export function StopExpiredHunt(server:Gameserver):boolean {
     if(!Gameservers.includes(server)||server.isRamsgate||server.isTrainingDojo)return false;
@@ -121,9 +124,15 @@ function TransformExpectedPlayerArgs(ExpectedPlayers: ExpectedPlayer[]){
 export async function CleanupServer(ServerToShutdown: Gameserver){
     if (!Gameservers.includes(ServerToShutdown)) return; // exit event and watchdog may race
     SpawnedChildren.delete(ServerToShutdown.id);
+    if (ServerToShutdown.isRamsgate && process.env.GAMESERVER_READY_DIR)
+        void unlink(path.join(process.env.GAMESERVER_READY_DIR, `city-occupancy-${ServerToShutdown.processId}.txt`)).catch(() => {});
     Gameservers = Gameservers.filter(Server => Server !== ServerToShutdown);
 
-    if(ServerToShutdown.isRamsgate){
+    if(ServerToShutdown.isRamsgate && CityPoolEnabled()){
+        if (RamsgateServer === ServerToShutdown) RamsgateServer = undefined;
+        if (ServerToShutdown.port !== RAMSGATE_PORT) FreePorts.push(ServerToShutdown.port);
+    }
+    else if(ServerToShutdown.isRamsgate){
         await EnsurePersistentWorld("ramsgate", "RAMSGATE HAS FALLEN! Restarting!");
     }
     else if(ServerToShutdown.isTrainingDojo){
@@ -228,6 +237,7 @@ function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId
 async function StartServerNow(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean, Spawned: () => void){
 
     const ReadyDir = process.env.GAMESERVER_READY_DIR ?? path.join(tmpdir(), `dauntless-revived-ready-${process.pid}`);
+    process.env.GAMESERVER_READY_DIR ??= ReadyDir;
     await mkdir(ReadyDir, { recursive: true, mode: 0o700 });
     if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
     if (!IsRamsgate && !IsTrainingDojo) CheckCpuAdmission();
@@ -236,13 +246,16 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     let Port;
 
     if(IsRamsgate){
-        Port = RAMSGATE_PORT;
+        try {
+            Port = CityPoolEnabled() && (Gameservers.some(s => s.isRamsgate && s.port === RAMSGATE_PORT && ProcessIsAlive(s.processId)) || await PortIsBound(RAMSGATE_PORT))
+                ? await TakeHuntPort() : RAMSGATE_PORT;
+        } catch(error) { ReleaseReservation(); throw error; }
     }
     else if(IsTrainingDojo){
         Port = TRAINING_DOJO_PORT;
     }
     else{
-        Port = await TakeHuntPort();
+        try { Port = await TakeHuntPort(); } catch(error) { ReleaseReservation(); throw error; }
     }
 
     const Id = crypto.randomUUID();
@@ -254,9 +267,11 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     }
 
     const IsHunt = !IsRamsgate && !IsTrainingDojo;
+    const BorrowedPort = !IsTrainingDojo && Port !== RAMSGATE_PORT;
 
     if(!IsHunt && await PortIsBound(Port)){
         ReleaseReservation();
+        if (BorrowedPort) FreePorts.push(Port);
         throw new Error(`Persistent game server port ${Port} is already in use; refusing to reuse a stale listener`);
     }
 
@@ -277,12 +292,12 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
             // Keep the long-running Ramsgate and Dojo diagnostic windows visible,
             // but do not flash a new command window for every temporary hunt.
             windowsHide: IsHunt,
-            env: { ...process.env, DR_SERVER_READY_FILE: ReadyFile }
+            env: { ...process.env, GAMESERVER_READY_DIR: ReadyDir, DR_SERVER_READY_FILE: ReadyFile, DR_RAMSGATE_POOL: CityPoolEnabled() ? '1' : '0' }
         });
     }
     catch(error){
         ReleaseReservation();
-        if(IsHunt){
+        if(BorrowedPort){
             FreePorts.push(Port);
         }
 
@@ -298,7 +313,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         ReleaseReservation();
         void unlink(ReadyFile).catch(() => {});
         // Release hunt ports immediately instead of waiting up to 60s for the watchdog.
-        if (IsHunt || IsTrainingDojo) {
+        if (IsHunt || IsTrainingDojo || (IsRamsgate && CityPoolEnabled())) {
             const Finished = Gameservers.find(Server => Server.id === Id);
             if (Finished) void CleanupServer(Finished);
         }
@@ -319,7 +334,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
     // metagame reports to the player as FAILED instead of an address nothing listens on.
     if(Child.pid === undefined){
         ReleaseReservation();
-        if(IsHunt){
+        if(BorrowedPort){
             FreePorts.push(Port);
         }
 
@@ -350,14 +365,26 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         }
     } catch (error) {
         if (Gameservers.includes(NewGameserver) && Child.pid && ProcessIsAlive(Child.pid)) Child.kill();
-        else if (IsHunt) await CleanupServer(NewGameserver);
+        else if (IsHunt || (IsRamsgate && CityPoolEnabled())) await CleanupServer(NewGameserver);
         throw error;
     }
 
     return NewGameserver;
 }
 
-export async function GetRamsgateConnectionDetails(){
+const CityInstances = new CityPool<Gameserver>(
+    () => Gameservers.filter(s => s.isRamsgate && ProcessIsAlive(s.processId)).map(s => ({
+        id:s.id, players:NativeCityOccupancy(s.processId,s.startTime), startedAt:s.startTime.getTime()
+    })),
+    () => StartServer(`${RAMSGATE_MAP_PATH}?MaxPlayers=${CITY_PLAYER_LIMIT}`, undefined, undefined, undefined, true, false),
+    id => Gameservers.find(s => s.id === id)!
+);
+
+export async function GetRamsgateConnectionDetails(size = 1){
+    if (CityPoolEnabled()) {
+        const server = await CityInstances.allocate(size);
+        return {host:MY_IP, port:server.port, sessionId:server.id};
+    }
     let Server = RamsgateServer;
 
     if(Server === undefined || IsPersistentWorldLivenessOn()){
@@ -613,6 +640,8 @@ function MaxPlayersFromTables(MatchmakerHuntId: string){
 // null where the tables don't say (Ramsgate): the metagame fills in its default
 function MaxPlayersOf(Server: Gameserver, Kind: GameserverKind): number | null {
     switch(Kind){
+        case "city":
+            return CityPoolEnabled() ? CITY_PLAYER_LIMIT : null;
         case "tutorial":
             return 1;
         case "dojo":
@@ -666,7 +695,7 @@ export async function Startup(){
 
     if (process.env.HUNT_WORKER === '1' && process.env.WORKER_RAMSGATE !== '1') return;
 
-    await EnsurePersistentWorld("ramsgate");
+    if (!CityPoolEnabled()) await EnsurePersistentWorld("ramsgate");
 
     // Upstream always started the Dojo here. Opt back in with ENABLE_DOJO=1 on
     // a machine with RAM to spare; otherwise it starts on first use.
@@ -704,6 +733,7 @@ export function UseProcessFunctionsForTests(Functions: {
 }
 
 export function ResetGameserversForTests(){
+    CityInstances.reset();
     ServerLaunchQueue = Promise.resolve();
     NextServerLaunchAt = 0;
     Gameservers = [];

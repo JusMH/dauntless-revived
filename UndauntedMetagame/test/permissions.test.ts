@@ -773,7 +773,7 @@ describe("matchmaking input", () => {
 
         const City = await Call("POST", "/candidate/join", { as: A, body: { gameMode: "CITY", gameArgs: "", playerHuntId: "ShatteredIsles_ReturnToRamsgate" } });
         assert.equal(City.status, 200);
-        assert.deepEqual(DeployCalls[DeployCalls.length - 1], { GameMode: "CITY", GameArgs: "", HuntId: "ShatteredIsles_ReturnToRamsgate" });
+        assert.deepEqual(DeployCalls[DeployCalls.length - 1], { GameMode: "CITY", GameArgs: "", HuntId: "ShatteredIsles_ReturnToRamsgate", ExpectedPlayers: [A] });
 
         const Hunt = await Call("POST", "/candidate/join", { as: B, body: { gameMode: "ISLAND", gameArgs: "", playerHuntId: "CR19_PlayerHunt_Patrol_Heroic+_Gem" } });
         assert.deepEqual([Hunt.status, Hunt.json?.status], [200, "MATCHING"], "queued");

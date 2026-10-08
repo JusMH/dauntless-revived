@@ -17,7 +17,7 @@ export interface StoredServer {
 }
 
 export interface StoredSettings {
-  huntRegion?: 'main' | 'aus' | 'ger';
+  huntRegion?: 'auto' | 'main' | 'aus' | 'ger';
   version: 1;
   server: StoredServer | null;
   installDir: string | null; // null = the default folder
@@ -85,7 +85,7 @@ export function sanitizeSettings(raw: unknown, language: Language, platform: Nod
   if (GRAPHICS_PRESETS.includes(raw.graphics as GraphicsPreset)) s.graphics = raw.graphics as GraphicsPreset;
   if (EXPOSURE_MODES.includes(raw.exposure as ExposureMode)) s.exposure = raw.exposure as ExposureMode;
   s.windowed = raw.windowed === true;
-  if (raw.huntRegion === 'main' || raw.huntRegion === 'aus' || raw.huntRegion === 'ger') s.huntRegion = raw.huntRegion;
+  if (raw.huntRegion === 'auto' || raw.huntRegion === 'main' || raw.huntRegion === 'aus' || raw.huntRegion === 'ger') s.huntRegion = raw.huntRegion;
   if (raw.language === "en" || raw.language === "fi") s.language = raw.language;
   if (isObject(raw.usernames)) {
     for (const [k, v] of Object.entries(raw.usernames)) if (/^[0-9a-f]{24}$/.test(k) && isValidUsername(v)) s.usernames[k] = v;
