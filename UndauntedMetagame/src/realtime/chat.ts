@@ -47,7 +47,8 @@ import {
 
 const FRAME_LIMIT = 32768;
 export const BODY_LIMIT = 2048;
-const MAX_SOCKETS = 64;
+// Shared by every region; leave headroom beyond the realm's 100+ concurrent players.
+const MAX_SOCKETS = 512;
 // Connections that have not bound yet (not logged in, or logged in and not bound), per address
 const MAX_UNBOUND_PER_ADDRESS = 8;
 const MAX_FRAMES_BEFORE_LOGIN = 4;
