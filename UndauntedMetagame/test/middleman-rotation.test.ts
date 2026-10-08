@@ -46,7 +46,7 @@ describe("Middleman weekly Aetherdust offers", () => {
         assert.deepEqual(First.map((Offer) => Offer.cellDustPrice), [40, 40, 100]);
     });
 
-    it("lists only this week's cells and keeps them repeatable", async () => {
+    it("lists only this week's cells, each available once", async () => {
         const A = await MakePlayer();
         const Offers = ListStoreOffers(A.UserId, "weekly_cell_offering");
 
@@ -62,23 +62,42 @@ describe("Middleman weekly Aetherdust offers", () => {
         assert.throws(() => CreateStorePurchase(A.UserId, "platinum", Offers[0].id), {Status: 400});
     });
 
-    it("spends Aetherdust atomically and can buy the same weekly cell again", async () => {
+    it("spends Aetherdust atomically and sells each weekly cell once per reset", async () => {
+        const A = await MakePlayer();
+        Credit(A.CharacterId, 500);
+        const Offer = ListStoreOffers(A.UserId, "weekly_cell_offering")[0];
+        const Price = Offer.cellDustPrice as number;
+
+        const Token = CreateStorePurchase(A.UserId, "CURRENCY_CELLDUST", Offer.id).purchaseToken;
+        assert.equal(RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", Token).Replayed, false);
+        assert.equal(RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", Token).Replayed, true);
+
+        // Sold out for this account until the reset, even once the cell is no longer held
+        assert.equal(ListStoreOffers(A.UserId, "weekly_cell_offering").find((Candidate) => Candidate.id === Offer.id)?.remaining, 0);
+        assert.throws(() => CreateStorePurchase(A.UserId, "CURRENCY_CELLDUST", Offer.id), {Status: 409});
+        Credit(A.CharacterId, 500 - Price);
+        assert.throws(() => CreateStorePurchase(A.UserId, "CURRENCY_CELLDUST", Offer.id), {Status: 409});
+
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 500 - Price);
+
+        // The other cells this week are still for sale, and other accounts are unaffected
+        const Other = ListStoreOffers(A.UserId, "weekly_cell_offering").filter((Candidate) => Candidate.id !== Offer.id);
+        assert.ok(Other.every((Candidate) => Candidate.remaining === 1));
+        const B = await MakePlayer();
+        assert.equal(ListStoreOffers(B.UserId, "weekly_cell_offering").find((Candidate) => Candidate.id === Offer.id)?.remaining, 1);
+    });
+
+    it("lets only the first of two outstanding tokens buy this week's cell", async () => {
         const A = await MakePlayer();
         Credit(A.CharacterId, 500);
         const Offer = ListStoreOffers(A.UserId, "weekly_cell_offering")[0];
         const CatalogId = (Offer.items ?? [])[0].catalogId;
-        const Price = Offer.cellDustPrice as number;
 
-        for(let i = 0; i < 2; i++){
-            const Token = CreateStorePurchase(A.UserId, "CURRENCY_CELLDUST", Offer.id).purchaseToken;
-            const First = RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", Token);
-            const Retry = RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", Token);
-            assert.equal(First.Replayed, false);
-            assert.equal(Retry.Replayed, true);
-        }
-
-        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 500 - Price * 2);
-        assert.equal(StackQuantity(A.CharacterId, CatalogId), 2);
-        assert.equal(ListStoreOffers(A.UserId, "weekly_cell_offering").find((Candidate) => Candidate.id === Offer.id)?.remaining, 1);
+        const First = CreateStorePurchase(A.UserId, "CURRENCY_CELLDUST", Offer.id).purchaseToken;
+        const Second = CreateStorePurchase(A.UserId, "CURRENCY_CELLDUST", Offer.id).purchaseToken;
+        RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", First);
+        assert.throws(() => RedeemStorePurchase(A.UserId, "CURRENCY_CELLDUST", Second), {Status: 409});
+        assert.equal(StackQuantity(A.CharacterId, CatalogId), 1);
+        assert.equal(StackQuantity(A.CharacterId, "CURRENCY_CELLDUST"), 500 - (Offer.cellDustPrice as number));
     });
 });
