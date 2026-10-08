@@ -50,7 +50,7 @@ import {
   type StatusResult,
 } from "./hostapi";
 import { compareManifests, resolveInside, type GameManifest, type ManifestFile } from "./manifest";
-import { DownloadError, DownloadJob } from "./downloader";
+import { contentDownloadBase, DownloadError, DownloadJob } from "./downloader";
 import { AbortedError, hashFile, removePartFiles, verifyInstall, VerifiedCache } from "./verify";
 import { dllStatus, installPinnedDlls, DllError, win64Dir } from "./dlls";
 import { installClientMods } from "./client-mods";
@@ -997,6 +997,7 @@ export class Controller {
 
         const job = new DownloadJob({
           endpoint: cep,
+          downloadBaseUrl: contentDownloadBase(serverManifest),
           key,
           installDir: dir,
           files: needed,
