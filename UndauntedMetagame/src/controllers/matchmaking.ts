@@ -810,7 +810,26 @@ async function HandlePartyMatchmaking(GameMode: unknown, GameArgs: unknown, Hunt
     return true;
 }
 
+const TutorialJoins = new Map<string, {key:string, pending:boolean, until:number, result?:MatchmakingResult, promise:Promise<boolean>}>();
 export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string, HuntId: string, PlayerId: string, Private = false){
+    if(GameMode !== 'ISLAND' || typeof GameArgs !== 'string' || !GameArgs.trim())
+        return HandlePlayerMatchmakingOnce(GameMode, GameArgs, HuntId, PlayerId, Private);
+    for(const [id, entry] of TutorialJoins) if(!entry.pending && entry.until < PartyNow()) TutorialJoins.delete(id);
+    const key=JSON.stringify([GameArgs,HuntId,PlayerRegion(PlayerId)]);
+    const previous=TutorialJoins.get(PlayerId);
+    if(previous?.key===key && (previous.pending || (previous.until>PartyNow() && previous.result===MatchmakingResultMap.get(PlayerId) && !previous.result?.Failed)))
+        return previous.promise;
+    const entry={key,pending:true,until:0,result:undefined as MatchmakingResult|undefined,promise:Promise.resolve(false)};
+    TutorialJoins.set(PlayerId,entry);
+    entry.promise=HandlePlayerMatchmakingOnce(GameMode,GameArgs,HuntId,PlayerId,Private).then(ok=>{
+        entry.result=MatchmakingResultMap.get(PlayerId);
+        entry.until=PartyNow()+60000;
+        return ok;
+    }).finally(()=>{entry.pending=false;});
+    return entry.promise;
+}
+
+async function HandlePlayerMatchmakingOnce(GameMode: string, GameArgs: string, HuntId: string, PlayerId: string, Private = false){
     const BadInput = CheckMatchmakingInput(GameMode, GameArgs, HuntId);
 
     if(BadInput != undefined){
@@ -837,7 +856,11 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
             // Ramsgate, the Dojo or the tutorial instead of a hunt the player was still queued for
             LeaveWaitingQueues(PlayerId, "their new join replaces it");
 
-            const GameOnDeployServer = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, PlayerRegion(PlayerId));
+            // Accepted party members follow their leader for shared worlds too.
+            // Keep the saved personal preference intact for when they leave.
+            const WorldParty = (GameMode === 'CITY' || GameMode === 'SHARED') ? GetPartyOf(PlayerId) : undefined;
+            const Region = PlayerRegion(WorldParty?.LeaderId ?? PlayerId);
+            const GameOnDeployServer = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, Region);
 
             const Entry: MatchmakingResult = {
                 Ready: GameOnDeployServer.succeeded,
@@ -851,7 +874,7 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
             if (GameOnDeployServer.capacity) {
                 const parked = ParkCapacity(Entry.CandidateId, async () => {
                     if (MatchmakingResultMap.get(PlayerId) !== Entry) return true;
-                    const result = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, PlayerRegion(PlayerId));
+                    const result = await LaunchGameOnDeployserver(GameMode, GameArgs, HuntId, undefined, Region);
                     if (result.capacity) return false;
                     if (MatchmakingResultMap.get(PlayerId) === Entry) Object.assign(Entry, {Ready: result.succeeded, Host: result.host, Port: result.port, Failed: !result.succeeded});
                     return true;
@@ -874,6 +897,7 @@ export async function HandlePlayerMatchmaking(GameMode: string, GameArgs: string
 
 // Tests only
 export function ResetMatchmakingForTests(){
+    TutorialJoins.clear();
     CapacityWaits.clear();
     ServerSessions.clear();
     MatchmakingQueueMap.clear();

@@ -38,7 +38,7 @@ gameserversRouter.get("/gameservers", async (req, res) => {
     res.json({
         servers: [...DescribeGameservers().map(server => {
             const process=Gameservers.find(s=>s.id===server.id);
-            return {...server, connectedPlayers: server.kind==='city' && process ? NativeOccupancy(process.processId,process.startTime) : undefined};
+            return {...server, connectedPlayers: process ? NativeOccupancy(process.processId,process.startTime) : undefined};
         }), ...overflow, ...aus, ...germany],
         capacity: {...huntAdmission.status(), cpu:cpuAdmission.status()}
     });

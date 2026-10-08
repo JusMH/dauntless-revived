@@ -36,6 +36,7 @@ export type Where = "menu" | "city" | "hunt" | "dojo" | "tutorial" | "unknown";
 
 // One entry of the deploy server's GET /gameservers (UndauntedDeployServer/src/controllers/gameservers.ts)
 export type DeployGameserver = {
+    connectedPlayers?: number,
     id: string,
     port: number,
     kind: InstanceKind,
@@ -403,7 +404,8 @@ export async function BuildServerStatus(): Promise<ServerStatus> {
             title: InstanceTitle(Server, Behemoth),
             map: MapCodename(Server.map),
             behemoth: Behemoth,
-            players: Counts.get(Server.id) ?? 0,
+            players: Number.isSafeInteger(Server.connectedPlayers) && Server.connectedPlayers! >= 0
+                ? Server.connectedPlayers! : Counts.get(Server.id) ?? 0,
             maxPlayers: Server.maxPlayers ?? DEFAULT_MAX_PLAYERS[Server.kind],
             startedAt: Server.startedAt
         };

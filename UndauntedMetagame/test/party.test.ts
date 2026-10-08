@@ -672,6 +672,46 @@ describe("one queued join per player", () => {
     });
 });
 
+it('a travelling party member survives the heartbeat gap, but the grace is bounded', async () => {
+    await FormParty(A,B);
+    await HandlePlayerMatchmaking('ISLAND','',HUNT,A);
+    await WaitForCandidateKind(A,'travel');
+    await WaitForCandidateKind(B,'travel');
+    Advance(121);
+    await PollParty(B);
+    assert.equal(GetPartyOf(B)?.LeaderId,A);
+    EvictPartyLeader(B,A);
+    assert.equal(GetPartyOf(B)?.LeaderId,A);
+    Advance(181);
+    await PollParty(B);
+    assert.equal(GetPartyOf(B)?.LeaderId,B);
+});
+
+it('duplicate tutorial joins share one allocation and the immediate retry keeps that allocation', async () => {
+    Deploy.DelayMs=100;
+    await Promise.all([HandlePlayerMatchmaking('ISLAND',TUTORIAL,'',A),HandlePlayerMatchmaking('ISLAND',TUTORIAL,'',A)]);
+    await HandlePlayerMatchmaking('ISLAND',TUTORIAL,'',A);
+    assert.equal(Deploy.Calls.length,1);
+    Advance(61);
+    await HandlePlayerMatchmaking('ISLAND',TUTORIAL,'',A);
+    assert.equal(Deploy.Calls.length,2);
+});
+
+it('cross-region party members follow the leader for shared worlds, then recover their own region on leaving', async () => {
+    const {SetRegionReader}=await import('../src/controllers/huntregion');
+    SetRegionReader(id=>id===B?'aus':'main');
+    try {
+        await FormParty(B,A);
+        await HandlePlayerMatchmaking('CITY','','ShatteredIsles_ReturnToRamsgate',A);
+        assert.equal(Deploy.Calls.at(-1).Region,'aus');
+        await HandlePlayerMatchmaking('SHARED','','ShatteredIsles_TrainingDojo',A);
+        assert.equal(Deploy.Calls.at(-1).Region,'aus');
+        LeaveParty(A);
+        await HandlePlayerMatchmaking('CITY','','ShatteredIsles_ReturnToRamsgate',A);
+        assert.equal(Deploy.Calls.at(-1).Region,undefined);
+    } finally {SetRegionReader(()=> 'main');}
+});
+
 it('OCE party leader retains region when inviting Main players and city requests carry the selection', async () => {
     const {SetRegionReader}=await import('../src/controllers/huntregion');
     SetRegionReader(id=>id===B?'aus':'main');

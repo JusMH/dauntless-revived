@@ -257,6 +257,11 @@ function ExpireCandidate(TheParty: Party){
 // Drops members of a party of 2+ that nobody has heard from (never the caller, and never
 // the last one: a party of one is only forgotten after IDLE_PARTY_MS), then expires the
 // candidate
+function IsLoadingHunt(TheParty: Party, Member: string){
+    const Candidate = TheParty.Candidate ?? TheParty.LastCandidate;
+    return Candidate?.Served.has(Member) && Candidate.LastServedAt !== undefined && Clock() - Candidate.LastServedAt < 5 * 60 * 1000;
+}
+
 function Refresh(TheParty: Party, Caller?: string){
     if(TheParty.Members.length >= 2){
         for(const Member of [...TheParty.Members]){
@@ -270,7 +275,7 @@ function Refresh(TheParty: Party, Caller?: string){
 
             const Ago = SeenAgo(Member);
 
-            if(Ago > MEMBER_TIMEOUT_MS){
+            if(Ago > MEMBER_TIMEOUT_MS && !IsLoadingHunt(TheParty, Member)){
                 logger.info(`party: swept ${Member} from P=${TheParty.PartyId}: not seen for ${Seconds(Ago)} (by=${Caller ?? "sweep"})`);
                 RemoveMember(TheParty, Member, "the leader was not seen");
             }
@@ -783,7 +788,7 @@ export function EvictPartyLeader(CallerId: string, LeaderId: string): PartyActio
 
     const Ago = SeenAgo(LeaderId);
 
-    if(Ago > MEMBER_TIMEOUT_MS){
+    if(Ago > MEMBER_TIMEOUT_MS && !IsLoadingHunt(TheParty, LeaderId)){
         RemoveMember(TheParty, LeaderId, "the leader was not seen");
         logger.info(`party: leader ${LeaderId} removed by=${CallerId}: not seen for ${Seconds(Ago)}; ${Describe(TheParty)}`);
     }
@@ -866,8 +871,10 @@ export function MarkPartyCandidateServed(UserId: string, CandidateId: string){
     const Candidate = GetPartyOf(UserId)?.Candidate;
 
     if(Candidate != null && Candidate.CandidateId === CandidateId){
-        Candidate.Served.add(UserId);
-        Candidate.LastServedAt = Clock();
+        if(!Candidate.Served.has(UserId)){
+            Candidate.Served.add(UserId);
+            Candidate.LastServedAt = Clock();
+        }
     }
 }
 

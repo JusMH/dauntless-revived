@@ -86,6 +86,23 @@ export class Keys {
     this.queue = task;
     return task;
   }
+  deliverPrivate(user, reply) {
+    const task = this.queue.catch(() => {}).then(async () => {
+      const result = await this.handle(user, true);
+      if (result.status !== 'ready') return result;
+      // Re-display only this user's existing unused invite, including failed DMs.
+      await reply(result.code);
+      const entry = this.state.users[user];
+      entry.delivery = 'sent';
+      entry.deliveryChannel = 'ephemeral';
+      entry.sentAt = new Date().toISOString();
+      delete entry.lastDeliveryError;
+      await this.save(this.state);
+      return {status: 'private_sent'};
+    });
+    this.queue = task;
+    return task;
+  }
   deliver(user, send, reconcile) {
     const task = this.queue.catch(() => {}).then(async () => {
       const result = await this.handle(user, true);

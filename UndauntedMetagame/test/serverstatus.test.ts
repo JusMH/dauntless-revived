@@ -127,6 +127,16 @@ describe("ServerStatus", () => {
         ClearServerStatusCache();
     });
 
+    it('uses native occupancy for instance counts, including an explicit zero', async () => {
+        Fake!.Servers[0].connectedPlayers=7;
+        Fake!.Servers[1].connectedPlayers=0;
+        try {
+            const status=await BuildServerStatus();
+            assert.equal(status.instances.find(s=>s.id===Fake!.Servers[0].id)?.players,7);
+            assert.equal(status.instances.find(s=>s.id===Fake!.Servers[1].id)?.players,0);
+        } finally {delete Fake!.Servers[0].connectedPlayers;delete Fake!.Servers[1].connectedPlayers;}
+    });
+
     it("lists who is where and the three servers, with titles and per-server counts", async () => {
         const Status = await BuildServerStatus();
 

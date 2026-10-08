@@ -20,6 +20,25 @@ test('claims produce complete launcher invites and valid registration code chara
   assert.throws(()=>launcherInvite({...config,CertFingerprint:'wrong'},'GOOD-CODE'));
 });
 const user = '123456789012345678';
+
+test('private claims recover uncertain DMs and reuse one invite across repeated claims',async()=>{
+  const f=setup(); const first=await f.service.run(user,true);
+  f.state.users[user].delivery='reserved';
+  const seen=[];
+  await Promise.all([f.service.deliverPrivate(user,async code=>seen.push(code)),f.service.deliverPrivate(user,async code=>seen.push(code))]);
+  assert.deepEqual(seen,[first.code,first.code]);assert.equal(f.count(),1);
+  assert.equal(f.state.users[user].deliveryChannel,'ephemeral');
+  f.rows.get(first.code).usesRemaining=0;
+  assert.deepEqual(await f.service.deliverPrivate(user,()=>assert.fail('must not show redeemed invite')),{status:'redeemed'});
+});
+
+test('failed private response preserves the existing invite for retry',async()=>{
+  const f=setup();
+  await assert.rejects(f.service.deliverPrivate(user,async()=>{throw Error('response failed')}));
+  assert.equal(f.state.users[user].delivery,'unsent');
+  await f.service.deliverPrivate(user,async code=>assert.equal(code,'DR-test'));
+  assert.equal(f.count(),1);
+});
 test('old Join invites explain account-key recovery without verifying an invite as a credential',async()=>{
   const f=setup(); f.api.identity=async()=>assert.fail('Join invite must never be sent as an account key');
   assert.deepEqual(await f.service.link(user,'dauntless-revived://join?v=2&code=OLD-CODE'),{status:'invite_not_key'});
