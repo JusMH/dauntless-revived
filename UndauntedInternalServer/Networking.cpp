@@ -105,7 +105,7 @@ namespace Networking {
             [Connection](int i) { return Connection->OpenChannels[i]; }, ChannelActor);
     }
 
-    static UActorChannel* GetActorChannelForConnectionAndActor(UNetConnection* Connection, AActor* Actor, const ChannelIndex& Index) {
+    static UActorChannel* GetActorChannelForConnectionAndActor(UNetConnection* Connection, AActor* Actor, ChannelIndex& Index) {
         return static_cast<UActorChannel*>(FindChannel(Actor, Index, Connection->OpenChannels.Num(),
             [Connection](int i) { return Connection->OpenChannels[i]; }, ChannelActor));
     }
@@ -216,7 +216,7 @@ namespace Networking {
             if (!Connection || !Connection->OwningActor || *(uint32_t*)((uintptr_t)Connection + 0x134) != 3)
                 continue;
 
-            const ChannelIndex Channels = IndexActorChannels(Connection);
+            ChannelIndex Channels = IndexActorChannels(Connection);
             for (AActor* Actor : Actors) {
                 // The engine's normal relevancy pass is replaced by this loop. Preserve
                 // owner-only isolation rather than opening private actors on every client.

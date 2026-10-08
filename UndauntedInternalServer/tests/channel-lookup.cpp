@@ -23,8 +23,10 @@ int main() {
     assert(examined == 1000); // Original full scans examine 500500 channels.
 
     channels.erase(channels.begin()); // Every cached index is now stale.
+    examined = 0;
     for (int i = 1; i < 1000; ++i)
         assert(FindChannel(&actors[i], index, static_cast<int>(channels.size()), at, actorOf) == &storage[i]);
+    assert(examined < 3000); // One repair, then indexed lookups; not 499500 scans.
     assert(FindChannel(&actors[0], index, static_cast<int>(channels.size()), at, actorOf) == nullptr);
     channels[0] = nullptr;
     assert(FindChannel(&actors[1], index, static_cast<int>(channels.size()), at, actorOf) == nullptr);
