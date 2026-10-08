@@ -33,13 +33,13 @@ gameserversRouter.get("/gameservers", async (req, res) => {
         return;
     }
 
-    const [overflow, aus] = await Promise.all([DescribeOverflow(), DescribeAus()]);
+    const [overflow, aus, germany] = await Promise.all([DescribeOverflow(), DescribeAus(), DescribeAus('ger')]);
     res.status(200);
     res.json({
         servers: [...DescribeGameservers().map(server => {
             const process=Gameservers.find(s=>s.id===server.id);
             return {...server, connectedPlayers: server.kind==='city' && process ? NativeOccupancy(process.processId,process.startTime) : undefined};
-        }), ...overflow, ...aus],
+        }), ...overflow, ...aus, ...germany],
         capacity: {...huntAdmission.status(), cpu:cpuAdmission.status()}
     });
 });

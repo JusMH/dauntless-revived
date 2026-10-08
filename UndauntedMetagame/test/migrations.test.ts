@@ -119,6 +119,8 @@ describe("migrations after the last release (0013_guilds)", () => {
 
     it("the new migration files only create tables and indexes", () => {
         for(const Entry of NewEntries){
+            // SQLite CHECK constraints require a table rebuild; covered with seeded rows below.
+            if (Entry.tag === '0022_germany_region') continue;
             const Sql = fs.readFileSync(path.join(MIGRATIONS, `${Entry.tag}.sql`), "utf8");
 
             assert.doesNotMatch(Sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, Entry.tag);
@@ -127,6 +129,21 @@ describe("migrations after the last release (0013_guilds)", () => {
                 assert.match(Statement, /^CREATE (TABLE|INDEX|UNIQUE INDEX) /, `${Entry.tag}: ${Statement.slice(0, 60)}`);
             }
         }
+    });
+
+    it('Germany migration preserves existing preferences and enforces supported regions', () => {
+        const db = Open(path.join(Dir, 'regions.db'));
+        try {
+            db.$client.exec("CREATE TABLE users (userId text PRIMARY KEY); INSERT INTO users VALUES ('eu'), ('au'), ('de');");
+            db.$client.exec(fs.readFileSync(path.join(MIGRATIONS,'0020_hunt_regions.sql'),'utf8'));
+            db.$client.exec("INSERT INTO huntregions VALUES ('eu','main'),('au','aus'); PRAGMA foreign_keys=ON;");
+            const before = Rows(db,'huntregions');
+            db.$client.transaction(() => db.$client.exec(fs.readFileSync(path.join(MIGRATIONS,'0022_germany_region.sql'),'utf8')))();
+            assert.deepEqual(Rows(db,'huntregions'), before);
+            db.$client.prepare('INSERT INTO huntregions VALUES (?,?)').run('de','ger');
+            assert.throws(()=>db.$client.prepare('UPDATE huntregions SET region=? WHERE userId=?').run('unknown','de'), /CHECK/);
+            assert.deepEqual(db.$client.pragma('foreign_key_check'), []);
+        } finally {db.$client.close();}
     });
 
     it("keeps every row of a released database, adds empty tables, and the previous build's migrator still runs", () => {

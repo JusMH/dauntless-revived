@@ -155,6 +155,13 @@
       "when": 1791500000000,
       "tag": "0021_onetime_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1791600000000,
+      "tag": "0022_germany_region",
+      "breakpoints": true
     }
   ]
 }

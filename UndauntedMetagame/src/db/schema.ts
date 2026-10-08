@@ -16,8 +16,8 @@ export const discordlinks = sqliteTable('discordlinks', {
 
 export const huntregions = sqliteTable('huntregions', {
     userId: text('userId').notNull().primaryKey().references(() => users.userId),
-    region: text('region', {enum:['main','aus']}).notNull()
-}, table => [check('huntregions_region', sql`${table.region} IN ('main', 'aus')`)]);
+    region: text('region', {enum:['main','aus','ger']}).notNull()
+}, table => [check('huntregions_region', sql`${table.region} IN ('main', 'aus', 'ger')`)]);
 
 
 export const characters = sqliteTable("characters", {

@@ -1220,7 +1220,7 @@ export class Controller {
         if (GRAPHICS_PRESETS.includes(p.graphics as GraphicsPreset)) s.graphics = p.graphics as GraphicsPreset;
         if (EXPOSURE_MODES.includes(p.exposure as ExposureMode)) s.exposure = p.exposure as ExposureMode;
         if (typeof p.windowed === "boolean") s.windowed = p.windowed;
-        if (p.huntRegion === 'main' || p.huntRegion === 'aus') s.huntRegion = p.huntRegion;
+        if (p.huntRegion === 'main' || p.huntRegion === 'aus' || p.huntRegion === 'ger') s.huntRegion = p.huntRegion;
         if (p.language === "en" || p.language === "fi") s.language = p.language;
       });
     }

@@ -1201,13 +1201,13 @@ function renderSettings(): void {
     windowed.addEventListener("click", () => void api.setSettings({ windowed: !snap.settings.windowed }));
 
     const huntRegion = h('select', {class:'select',id:'hunt-region','data-fk':'hunt-region'});
-    for (const [value,label] of [['main','Main'],['aus','Australia (OCE)']]) {
+    for (const [value,label] of [['main','EU'],['aus','Australia (OCE)'],['ger','Germany']]) {
       const option = h('option',{value},label);
       option.selected = value === (snap.settings.huntRegion ?? 'main');
       huntRegion.appendChild(option);
     }
     huntRegion.disabled = busy;
-    huntRegion.addEventListener('change',()=>void api.setSettings({huntRegion:huntRegion.value as 'main'|'aus'}));
+    huntRegion.addEventListener('change',()=>void api.setSettings({huntRegion:huntRegion.value as 'main'|'aus'|'ger'}));
 
     const game = card(
       "settings-section",

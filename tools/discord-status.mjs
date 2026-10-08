@@ -17,7 +17,7 @@ export function payload(sample, now = Date.now(), fleet = null) {
     {name:'🌐 Fleet availability',value:fleet?`${fleet.online} / ${fleet.servers} hosts reporting`:'Monitoring unavailable',inline:true},
     {name:'⚔️ Active hunts',value:Number.isInteger(fleet?.hunts)?String(fleet.hunts):'Unknown',inline:true}
   ];
-  for(const [i,name] of ['Server #1 · Main','Server #2 · Main overflow','Server #3 · Australia (OCE)'].entries()){
+  for(const [i,name] of ['Server #1 · EU','Server #2 · EU overflow','Server #3 · Australia (OCE)'].entries()){
     const r=fleet?.rows?.[i];
     fields.push({name,inline:true,value:r?.online
       ? `🟢 Online\nHunts: ${Number.isInteger(r.hunts)?r.hunts:'Unknown'}\nCPU: ${num(r.cpu,'%')}\nRAM: ${num(r.ramUsedMB===null?null:r.ramUsedMB/1024)} / ${num(r.ramTotalMB===null?null:r.ramTotalMB/1024)} GB`
@@ -27,7 +27,7 @@ export function payload(sample, now = Date.now(), fleet = null) {
     const seconds=Math.floor(sample.uptime);
     fields.push({name:'Shared backend',value:`🟢 Online · ${Math.round(sample.ms)} ms local check\nUptime: ${Math.floor(seconds/86400)}d ${Math.floor(seconds%86400/3600)}h ${Math.floor(seconds%3600/60)}m\nStarted <t:${at-seconds}:R>`});
   }
-  fields.push({name:'Region guide',value:'Choose Main or Australia in launcher Settings, then relaunch. Ramsgate and hunts follow that selection. Parties follow their leader; invitations work across regions.'});
+  fields.push({name:'Region guide',value:'Choose EU, Germany or Australia in launcher Settings, then relaunch. Ramsgate and hunts follow that selection. Parties follow their leader; invitations work across regions.'});
   fields.push({name:'Last checked',value:`<t:${at}:F> (<t:${at}:R>)`});
   return {allowed_mentions:{parse:[]},embeds:[{title:'Dauntless Revived · Live realm status',
     description:online?'**Clear skies, Slayers.** Shared accounts and progression across Main and OCE.':'The shared backend is currently unavailable. Please check again shortly.',

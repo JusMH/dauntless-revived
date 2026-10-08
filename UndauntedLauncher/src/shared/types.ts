@@ -119,7 +119,7 @@ export interface ServerInfo {
 }
 
 export interface Settings {
-  huntRegion?: 'main' | 'aus';
+  huntRegion?: 'main' | 'aus' | 'ger';
   graphics: GraphicsPreset;
   exposure: ExposureMode;
   windowed: boolean;

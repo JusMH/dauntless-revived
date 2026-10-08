@@ -38,8 +38,9 @@ undauntedApiRouter.get('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
 undauntedApiRouter.post('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const region = req.body?.region;
-    if (region !== 'main' && region !== 'aus') { res.status(400).json({error:'invalid_region'}); return; }
+    if (region !== 'main' && region !== 'aus' && region !== 'ger') { res.status(400).json({error:'invalid_region'}); return; }
     if (region === 'aus' && process.env.AUS_REGION !== '1') { res.status(503).json({error:'region_unavailable'}); return; }
+    if (region === 'ger' && process.env.GERMANY_REGION !== '1') { res.status(503).json({error:'region_unavailable'}); return; }
     SaveHuntRegion((req as any).UndauntedUserInfo.UserId, region);
     res.json({region});
 });

@@ -25,6 +25,17 @@ test('worker and primary have independent configured hard limits',()=>{
     } finally {delete process.env.HUNT_WORKER; delete process.env.MAX_LOCAL_HUNTS; delete process.env.MAX_HUNTS;}
 });
 
+test('automatic capacity uses ports with CPU and memory guards, not a fixed hunt count',()=>{
+ const names=['HUNT_WORKER','MAX_HUNTS','PORT_RANGE_BEGIN','PORT_RANGE_END','GAMESERVER_CPU_GUARD','GAMESERVER_MEMORY_GUARD'];
+ const old=names.map(n=>process.env[n]);
+ try {
+  Object.assign(process.env,{HUNT_WORKER:'1',MAX_HUNTS:'auto',PORT_RANGE_BEGIN:'8700',PORT_RANGE_END:'8797',GAMESERVER_CPU_GUARD:'1',GAMESERVER_MEMORY_GUARD:'1'});
+  assert.equal(HuntLimit(),96);
+  process.env.GAMESERVER_CPU_GUARD='0';assert.throws(HuntLimit,/requires/);
+  process.env.GAMESERVER_CPU_GUARD='1';process.env.PORT_RANGE_END='8701';assert.throws(HuntLimit,/port range/);
+ } finally {names.forEach((n,i)=>{if(old[i]===undefined)delete process.env[n];else process.env[n]=old[i];});}
+});
+
 test('memory floor, startup reservations, release and expiry', () => {
     process.env.GAMESERVER_MEMORY_GUARD = '1';
     let free = 4608 * 1048576, now = 0;

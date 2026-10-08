@@ -1,27 +1,28 @@
 import { CapacityUnavailable } from './capacity';
 import { RemoteLaunch } from './overflow';
 
-export type RegionChoice = 'main' | 'aus' | 'mixed';
+export type RegionChoice = 'main' | 'aus' | 'ger' | 'mixed';
 type Request = Parameters<typeof RemoteLaunch>[1];
 type Load = {running:number,pending:number,limit:number|null};
-export function AusUrl() {
-    if (!process.env.AUS_DEPLOYSERVER_URL) return undefined;
-    const url = new URL(process.env.AUS_DEPLOYSERVER_URL);
+export function AusUrl(region: 'aus' | 'ger' = 'aus') {
+    const setting = region === 'ger' ? 'GERMANY_DEPLOYSERVER_URL' : 'AUS_DEPLOYSERVER_URL';
+    if (!process.env[setting]) return undefined;
+    const url = new URL(process.env[setting]!);
     if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.pathname !== '/' || url.search || url.hash)
-        throw new Error('AUS_DEPLOYSERVER_URL must be an HTTP loopback tunnel');
+        throw new Error(`${setting} must be an HTTP loopback tunnel`);
     return url;
 }
 export function Utilization(load: Load) {
     return load.limit && load.limit > 0 ? (load.running + load.pending) / load.limit : Infinity;
 }
-export async function DescribeAus(): Promise<any[]> {
-    const url = AusUrl();
+export async function DescribeAus(region: 'aus' | 'ger' = 'aus'): Promise<any[]> {
+    const url = AusUrl(region);
     if (!url) return [];
     try {
         const response = await fetch(new URL('/gameservers',url),{signal:AbortSignal.timeout(1500),redirect:'error'});
         if (!response.ok) return [];
         const body = await response.json() as any;
-        return Array.isArray(body.servers) ? body.servers.map((server:any)=>({...server,host:'aus',region:'aus'})) : [];
+        return Array.isArray(body.servers) ? body.servers.map((server:any)=>({...server,host:region,region})) : [];
     } catch { return []; }
 }
 export class RegionalRouter {
@@ -34,6 +35,26 @@ export class RegionalRouter {
             return body.capacity;
         }) {}
     async launch<T>(body: Request, choice: RegionChoice, main: () => Promise<T>): Promise<T | NonNullable<Awaited<ReturnType<typeof RemoteLaunch>>>> {
+        if (choice === 'ger') {
+            const germany = AusUrl('ger');
+            if (!germany) throw new CapacityUnavailable('hunts');
+            const connection = await this.remote(germany, body);
+            if (!connection) throw new CapacityUnavailable('hunts');
+            if (process.env.GERMANY_PUBLIC_HOST && connection.host !== process.env.GERMANY_PUBLIC_HOST)
+                throw new Error('Germany worker returned a destination outside the selected region');
+            return connection;
+        }
+        const primary = main;
+        main = async () => {
+            try { return await primary(); }
+            catch (error) {
+                if (!(error instanceof CapacityUnavailable)) throw error;
+                const germany = AusUrl('ger');
+                const connection = germany && await this.remote(germany, {...body, Overflow:true});
+                if (connection) return connection as T;
+                throw error;
+            }
+        };
         const url = AusUrl();
         if (!['ISLAND','CITY','SHARED'].includes(body.GameMode)) return main();
         if (!url) { if (choice === 'aus') throw new CapacityUnavailable('hunts'); return main(); }

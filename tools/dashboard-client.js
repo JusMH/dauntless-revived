@@ -1,5 +1,5 @@
 (() => {
-  let key = '', busy = false, lastSample = null, lastWorker = null, lastAus = null, accountPage = [], accountOffset = 0, nextOffset = null, accountsBusy = false;
+  let key = '', busy = false, lastSample = null, lastWorker = null, lastAus = null, lastGermany = null, accountPage = [], accountOffset = 0, nextOffset = null, accountsBusy = false;
   const el = id => document.getElementById(id);
   const number = (n, suffix = '') => Number.isFinite(n) ? `${n.toFixed(1)}${suffix}` : '—';
   const duration = seconds => Number.isFinite(seconds) && seconds >= 0 ? `${Math.floor(seconds / 86400)}d ${Math.floor(seconds / 3600) % 24}h ${Math.floor(seconds / 60) % 60}m` : '—';
@@ -47,7 +47,7 @@
   }
 
   function renderWorker(worker, prefix='worker') {
-    if(prefix==='worker')lastWorker=worker;else lastAus=worker;
+    if(prefix==='worker')lastWorker=worker;else if(prefix==='aus')lastAus=worker;else lastGermany=worker;
     const el=id=>document.getElementById(id.replace(/^worker/,prefix));
     const s=worker?.sample;
     el('workerConnection').textContent=!worker?.configured?'Not configured':worker.online?'Connected':'Unavailable · stale';
@@ -83,6 +83,7 @@
 
       renderWorker(result.worker);
       renderWorker(result.aus,'aus');
+      renderWorker(result.germany,'germany');
       el('login').hidden = true; el('data').hidden = false;
       el('invites').hidden = !result.invitesEnabled;
       el('invitesUnavailable').hidden = result.invitesEnabled;
@@ -130,6 +131,7 @@
     if (button.dataset.view === 'people') loadAccounts();
     if (button.dataset.view === 'worker' && lastWorker) renderWorker(lastWorker);
     if (button.dataset.view === 'aus' && lastAus) renderWorker(lastAus,'aus');
+    if (button.dataset.view === 'germany' && lastGermany) renderWorker(lastGermany,'germany');
   };
   function showAccounts() {
     const query = el('accountSearch').value.trim().toLowerCase();

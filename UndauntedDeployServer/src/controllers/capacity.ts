@@ -6,6 +6,15 @@ export class CapacityUnavailable extends Error {
 
 export function HuntLimit() {
     const name = process.env.HUNT_WORKER === '1' ? 'MAX_HUNTS' : 'MAX_LOCAL_HUNTS';
+    if (process.env[name] === 'auto') {
+        if (process.env.GAMESERVER_CPU_GUARD !== '1' || process.env.GAMESERVER_MEMORY_GUARD === '0')
+            throw new Error('Automatic hunt capacity requires CPU and memory guards');
+        const first = setting('PORT_RANGE_BEGIN', 1), last = setting('PORT_RANGE_END', 1);
+        if (last > 65535 || last - first < 2) throw new Error('Invalid automatic hunt port range');
+        // Two ports remain reserved for Ramsgate and Training. CPU and RAM admission
+        // decide how many of the remaining ports can actually run at any moment.
+        return last - first - 1;
+    }
     return process.env[name] === undefined ? null : setting(name, 1);
 }
 
