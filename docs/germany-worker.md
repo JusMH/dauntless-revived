@@ -34,8 +34,8 @@ same machine remain outside this job: their usage can make total host CPU exceed
 ## Backups
 
 Run `Receive-WeeklyDatabaseBackup.ps1` on the backup worker with the source host
-and a protected SSH identity. It requests a consistent source backup using the
-existing SQLite online backup helper, copies only the database over SSH, compares
+and a protected SSH identity. It selects a source snapshot less than two hours old
+made by the existing hourly SQLite online backup helper, copies only the database over SSH, compares
 SHA-256 and runs SQLite `quick_check` before publishing the copy. A `.partial`
 file is not a successful backup. `backups/last-success.json` records verification.
 Protect the backup directory for administrators and SYSTEM. Pin the source host

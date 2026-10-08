@@ -14,8 +14,8 @@ try {
     $source = $SourceRoot.Replace("'","''")
     $script = @"
 `$ErrorActionPreference='Stop';`$ProgressPreference='SilentlyContinue'
-& powershell.exe -NoProfile -ExecutionPolicy Bypass -File '$source/bin/Backup-DauntlessServer.ps1' -Root '$source' | Out-Null
-if(`$LASTEXITCODE){throw 'Source backup failed'}
+# The source already makes hourly online backups. Copy a fresh completed snapshot
+# instead of launching another expensive backup from an SSH session.
 `$db=Get-ChildItem '$source/backups' -Directory | Where-Object {`$_.Name -match '^\d{4}-\d{2}-\d{2}_\d{6}$'} | Sort-Object Name -Descending | ForEach-Object {Get-Item (Join-Path `$_.FullName 'undaunted.db') -ErrorAction SilentlyContinue} | Where-Object {`$_.Length -gt 0 -and `$_.LastWriteTimeUtc -gt [DateTime]::UtcNow.AddHours(-2)} | Select-Object -First 1
 if(!`$db){throw 'No fresh database backup'}
 @{path=`$db.FullName.Replace('\','/');hash=(Get-FileHash `$db.FullName -Algorithm SHA256).Hash} | ConvertTo-Json -Compress
