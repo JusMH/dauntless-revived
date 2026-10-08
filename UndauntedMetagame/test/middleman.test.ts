@@ -143,6 +143,39 @@ describe("Middleman fusion persistence", () => {
         assert.deepEqual(ReadInventory(A.CharacterId).instanced, []);
     });
 
+    it("lets a finished fusion be claimed after a speed-up even if the client sends its older token", async () => {
+        const A = await MakePlayer();
+        const Token = Fusion(1, "fusion-claim", "2099-01-01T00:00:00.000Z", "CELL_TEST_CLAIM_R");
+
+        await Run(A.UserId, A.CharacterId, "middleman-claim-start", {addInstanced: [Token]});
+        const SpedUp = {...Fusion(1, "fusion-claim", "2020-01-01T00:00:00.000Z", "CELL_TEST_CLAIM_R"), updateVersion: 1};
+        assert.equal((await Run(A.UserId, A.CharacterId, "middleman-claim-speed", {saveInstanced: [SpedUp]})).success, true);
+
+        const Claimed = await Run(A.UserId, A.CharacterId, "middleman-claim", {
+            removeInstanced: [Fusion(1, "fusion-claim", "2099-01-01T00:00:00.000Z", "CELL_TEST_CLAIM_R")],
+            addStacked: [{catalogId: "CELL_TEST_CLAIM_R", quantity: 1}]
+        });
+
+        assert.equal(Claimed.success, true);
+        assert.deepEqual(ReadInventory(A.CharacterId).instanced, []);
+        assert.equal(StackQuantity(A.CharacterId, "CELL_TEST_CLAIM_R"), 1);
+    });
+
+    it("lets a fusion be claimed when the removal's itemData is not the shape we expect", async () => {
+        const A = await MakePlayer();
+        const Token = Fusion(2, "fusion-odd", "2020-01-01T00:00:00.000Z", "CELL_TEST_ODD_R");
+
+        await Run(A.UserId, A.CharacterId, "middleman-odd-start", {addInstanced: [Token]});
+        const Claimed = await Run(A.UserId, A.CharacterId, "middleman-odd-claim", {
+            removeInstanced: [{catalogId: "TOKEN_CELL_EXCHANGE", instanceId: "TOKEN_CELL_EXCHANGE:2", updateVersion: 0, itemData: "{\"Slot\":2}"}],
+            addStacked: [{catalogId: "CELL_TEST_ODD_R", quantity: 1}]
+        });
+
+        assert.equal(Claimed.success, true);
+        assert.deepEqual(ReadInventory(A.CharacterId).instanced, []);
+        assert.equal(StackQuantity(A.CharacterId, "CELL_TEST_ODD_R"), 1);
+    });
+
     it("with strict guards, refuses early or wrong reveals and makes a completed reveal idempotent", async () => {
         const A = await MakePlayer();
         process.env.MIDDLEMAN_FUSION_GUARDS = "1";

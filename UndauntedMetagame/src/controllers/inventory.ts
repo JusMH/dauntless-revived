@@ -497,8 +497,12 @@ function PrepareInventoryTransaction(Request: InventoryTransactionRequest): Prep
 
     // Pending Middleman exchanges are inventory items. Give each slot a stable identity before
     // dedupe/hash checks so three simultaneous slots do not overwrite one another.
-    for(const Item of [...InstancedItemsToAdd, ...InstancedItemsToRemove, ...InstancedItemsToSave]){
+    for(const Item of [...InstancedItemsToAdd, ...InstancedItemsToSave]){
         NormaliseFusionItem(Item);
+    }
+
+    for(const Item of InstancedItemsToRemove){
+        NormaliseFusionItem(Item, true);
     }
 
     return {
