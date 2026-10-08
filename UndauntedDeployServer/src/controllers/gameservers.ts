@@ -115,7 +115,7 @@ function TransformExpectedPlayerArgs(ExpectedPlayers: ExpectedPlayer[]){
     return ToReturn;
 }
 
-// Called by the watchdog for a server whose process has exited. Ramsgate and the Dojo are started
+// Called by the watchdog for a server whose process has exited. Ramsgate is started
 // again (through the same shared launch as a player's request, so the two never start two processes
 // on one port); a hunt's port goes back to the pool.
 export async function CleanupServer(ServerToShutdown: Gameserver){
@@ -127,7 +127,8 @@ export async function CleanupServer(ServerToShutdown: Gameserver){
         await EnsurePersistentWorld("ramsgate", "RAMSGATE HAS FALLEN! Restarting!");
     }
     else if(ServerToShutdown.isTrainingDojo){
-        await EnsurePersistentWorld("dojo", "Training Dojo Crashed! Restarting!");
+        // The next SHARED request starts the Dojo on demand.
+        if (TrainingDojoServer === ServerToShutdown) TrainingDojoServer = undefined;
     }
     else{
         FreePorts.push(ServerToShutdown.port);
@@ -297,7 +298,7 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
         ReleaseReservation();
         void unlink(ReadyFile).catch(() => {});
         // Release hunt ports immediately instead of waiting up to 60s for the watchdog.
-        if (IsHunt) {
+        if (IsHunt || IsTrainingDojo) {
             const Finished = Gameservers.find(Server => Server.id === Id);
             if (Finished) void CleanupServer(Finished);
         }

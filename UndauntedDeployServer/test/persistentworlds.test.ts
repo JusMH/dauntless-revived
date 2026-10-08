@@ -231,6 +231,21 @@ describe("Ramsgate", () => {
 });
 
 describe("the Training Dojo", () => {
+    it("stays stopped after cleanup and starts once on the next concurrent requests", async () => {
+        await Startup();
+        await GetTrainingDojoConnectionDetails();
+        const dead = GameserverStateForTests().Dojo!;
+        Kill(dead.processId);
+        await CleanupServer(dead);
+        await RunWatchdog();
+        assert.equal(Spawned.length, 2);
+        assert.equal(GameserverStateForTests().Dojo, undefined);
+        assert.equal(Gameservers.includes(dead), false);
+        await Promise.all([GetTrainingDojoConnectionDetails(), GetTrainingDojoConnectionDetails()]);
+        assert.equal(Spawned.length, 3);
+        assert.notEqual(GameserverStateForTests().Dojo!.processId, dead.processId);
+    });
+
     it("starts on first use, once for requests that arrive together, and again after its process ended", async () => {
         await Startup();
 
