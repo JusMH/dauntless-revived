@@ -306,6 +306,7 @@ const EXPECTED_ROUTES = [
 
     "GET /undaunted/api/BackendHealth [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/DashboardAccounts [HasUndauntedAdminApiKey]",
+    "POST /undaunted/api/PlayingEnded [HasUndauntedUserApiKey]",
     "GET /undaunted/api/Moderation/:accountId [HasUndauntedAdminApiKey]",
     "POST /undaunted/api/Moderation [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/RegistrationStatus []",

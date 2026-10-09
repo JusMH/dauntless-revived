@@ -123,6 +123,11 @@ describe("migrations after the last release (0013_guilds)", () => {
             if (Entry.tag === '0022_germany_region') continue;
             const Sql = fs.readFileSync(path.join(MIGRATIONS, `${Entry.tag}.sql`), "utf8");
 
+            // Explicit retention change: only legacy address observations may be deleted.
+            if(Entry.tag === '0024_ephemeral_addresses'){
+                assert.equal(Sql.trim(), 'DELETE FROM player_addresses;');
+                continue;
+            }
             assert.doesNotMatch(Sql, /\b(DROP|ALTER|RENAME|DELETE|UPDATE)\b/i, Entry.tag);
             assert.doesNotMatch(Sql, /INSERT\s+INTO[\s\S]*?SELECT/i, Entry.tag);
             for(const Statement of Sql.split("--> statement-breakpoint").map((Part) => Part.trim()).filter((Part) => Part.length > 0)){
