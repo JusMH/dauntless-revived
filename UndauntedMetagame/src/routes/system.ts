@@ -1,3 +1,4 @@
+import {RecordPlayingAddress} from '../controllers/moderation';
 import { Router } from "express";
 import { logger } from "../logger";
 import { HasUndauntedMetagameAuth } from "../middleware/HasUndauntedMetagameAuth";
@@ -53,6 +54,7 @@ systemRouter.post("/heartbeat", HasUndauntedMetagameAuth, async (req: any, res) 
 	// (upstream stored it under the key undefined). A player's heartbeat also keeps them in
 	// their party (controllers/party.ts drops members nobody has heard from).
 	if(typeof UserId === "string"){
+		if(!req.AuthData.IsGameserver) RecordPlayingAddress(req,UserId);
 		await UpdatePlayerActivity(UserId, UserMap, req.body?.state);
 		TouchPlayer(UserId);
 	}

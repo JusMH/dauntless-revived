@@ -12,12 +12,20 @@ account-only ban. An IP ban must use an address observed for that account and ca
 affect other users behind the same router/VPN. Unban requires a reason too.
 Administrator accounts are protected from this interface.
 
-The backend records distinct authenticated addresses and their last-seen time.
+The backend associates the current username with the observed public IP only after an
+ authenticated game heartbeat. Opening the launcher or logging in does not record it.
+These observations live only in memory, never in the database or application logs.
+Launcher 0.1.30 sends an authenticated end-of-play notification when its game exits.
+If that notification cannot arrive (crash, network loss, older launcher), observations
+expire after 90 seconds without a heartbeat; memory cleanup runs every ten seconds.
+The moderation endpoint filters expired entries immediately and returns the username.
 Only the trusted gateway's secret-authenticated forwarding header is accepted;
 loopback addresses and arbitrary forwarded headers are not recorded. No hardware
-IDs are collected. These records and ban history remain in the private database
-until the operator removes them under their retention policy. Do not publish DB
-backups or expose the owner dashboard publicly.
+IDs or external IP lookup services are used. Explicit IP bans and their audit history
+remain persistent, separately from these temporary observations.
+Migration 0024 clears legacy observations in the live database. Historical backups
+created before this migration can still contain the previous records; it does not
+rewrite backups or securely erase old SQLite pages. Keep backups private.
 
 `GET /undaunted/api/Moderation/:accountId` and `POST /undaunted/api/Moderation`
 require a direct owner/admin key, never a proxied request. POST accepts

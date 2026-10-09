@@ -17,7 +17,7 @@ import { missingDirectX, gameExitDetail } from './windows-runtime';
 import { parseInvite, isLoopbackHost, type Invite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
 import { limitedView, type ServerStatus } from "../shared/status";
-import { saveHuntRegion } from './hostapi';
+import { saveHuntRegion, endPlaying } from './hostapi';
 import type {
   ActionResult,
   Branding,
@@ -124,6 +124,7 @@ export class Controller {
   private readonly settings: SettingsStore;
   private readonly keys: KeyStore;
   private readonly game: GameProcess;
+  private endPlayingSession: (()=>Promise<void>) | null = null;
   private readonly verified: VerifiedCache;
 
   private reachable: boolean | null = null;
@@ -167,6 +168,8 @@ export class Controller {
     this.game.onChange((running, code) => {
       log.info(running ? "game started" : `game exited (code ${code ?? "none"})`);
       if (!running) {
+        const end=this.endPlayingSession; this.endPlayingSession=null;
+        if(end) void end().catch(()=>{});
         if (code !== null && code !== 0) this.lastError = {code:'launch_failed',detail:gameExitDetail(code)};
 
         void this.stopRelay().then(() => this.publish());
@@ -1173,8 +1176,10 @@ export class Controller {
         const via = prepared ? ` via ${prepared.runtimeName}` : "";
         log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : ""}`);
         try {
+          this.endPlayingSession=()=>endPlaying(ep,key);
           await this.game.start(win64Dir(dir), args, prepared?.runtime);
         } catch (e) {
+          this.endPlayingSession=null;
           log.error(`launch failed: ${describeError(e)}`);
           return this.fail("launch_failed");
         }

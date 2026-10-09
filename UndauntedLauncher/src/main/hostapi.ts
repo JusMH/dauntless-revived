@@ -261,3 +261,7 @@ export async function fetchBrandingImage(ep: Endpoint, urlPath: string): Promise
     return null;
   }
 }
+
+export async function endPlaying(ep:Endpoint,key:string):Promise<void> {
+  await request(ep,'/undaunted/api/PlayingEnded',{method:'POST',headers:statusHeaders(ep,key),timeoutMs:5000,maxBytes:4096});
+}

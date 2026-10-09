@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {GetDb} from '../src/db';
 import {users,userapikeys} from '../src/db/schema';
 import {HashUserAPIKey,SignMetagameJWTForUid,ValidateMetagameJWTAndGetPayload} from '../src/controllers/auth';
-import {BanFor,CheckPlayerAccess,ModerationInfo,SetAccountBan} from '../src/controllers/moderation';
+import {BanFor,CheckPlayerAccess,ModerationInfo,SetAccountBan,RecordPlayingAddress,EndPlayingAddress,ExpirePlayingAddresses} from '../src/controllers/moderation';
 import {app} from '../src/app';
 after(()=>RemoveTestDb(()=>GetDb().$client.close()));
 test('trusted IP logging, account/IP bans, required reasons, JWT revocation and unban',async()=>{
@@ -19,9 +19,21 @@ test('trusted IP logging, account/IP bans, required reasons, JWT revocation and 
   const response:any={status(){return this},json(){return this}};
   CheckPlayerAccess(req,response,'UID-ban-test');
   assert.equal(ModerationInfo('UID-ban-test').addresses.length,0);
+  RecordPlayingAddress(req,'UID-ban-test');
+  assert.equal(ModerationInfo('UID-ban-test').addresses.length,0);
   req.headers['x-dauntless-gateway']='test-gateway-secret';
   CheckPlayerAccess(req,response,'UID-ban-test');
+  assert.equal(ModerationInfo('UID-ban-test').addresses.length,0);
+  RecordPlayingAddress(req,'UID-ban-test');
+  assert.equal(ModerationInfo('UID-ban-test').username,'BanTest');
   assert.equal(ModerationInfo('UID-ban-test').addresses.length,1);
+  EndPlayingAddress('UID-ban-test');
+  assert.equal(ModerationInfo('UID-ban-test').addresses.length,0);
+  RecordPlayingAddress(req,'UID-ban-test',Date.now()-90001);
+  ExpirePlayingAddresses();
+  assert.equal(ModerationInfo('UID-ban-test').addresses.length,0);
+  RecordPlayingAddress(req,'UID-ban-test');
+  assert.equal((db.$client.prepare('SELECT count(*) n FROM player_addresses').get() as any).n,0);
   assert.throws(()=>SetAccountBan('UID-ban-test',' ',true,null,'owner'),/invalid_ban/);
   assert.throws(()=>SetAccountBan('UID-admin-test','reason',true,null,'owner'),/protected/);
   assert.throws(()=>SetAccountBan('UID-ban-test','reason',true,'203.0.113.10','owner'),/not_observed/);
@@ -38,5 +50,12 @@ test('trusted IP logging, account/IP bans, required reasons, JWT revocation and 
     assert.equal((await request('/undaunted/api/GetUserInfo',key)).status,200);
     assert.equal(BanFor('UID-other','203.0.113.9'),undefined);
     assert.ok(ValidateMetagameJWTAndGetPayload(token));
+    const heartbeat=await fetch(`http://127.0.0.1:${port}/heartbeat`,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json','x-dauntless-gateway':'test-gateway-secret','x-forwarded-for':'203.0.113.9'},body:JSON.stringify({map:'ramsgate',state:'city'})});
+    assert.equal(heartbeat.status,200);
+    assert.equal(ModerationInfo('UID-ban-test').addresses.length,1);
+    assert.equal((await request('/undaunted/api/PlayingEnded',key,{})).status,204);
+    assert.equal(ModerationInfo('UID-ban-test').addresses.length,0);
+    assert.equal((await request('/undaunted/api/GetUserInfo',key)).status,200);
+    assert.equal(ModerationInfo('UID-ban-test').addresses.length,0);
   }finally{await new Promise<void>((r,j)=>server.close(e=>e?j(e):r()));delete process.env.GATEWAY_SECRET;}
 });

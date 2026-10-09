@@ -9,7 +9,7 @@ import { DeleteInviteCode, GetAllUserIds, GetInviteCodes, GetRecentPlayerData, I
 import { HasUndauntedUserApiKey } from "../middleware/HasUndauntedUserApiKey";
 import { HasUndauntedAdminApiKey } from "../middleware/HasUndauntedAdminApiKey";
 import { SignMetagameJWTForUid } from "../controllers/auth";
-import {ModerationInfo,SetAccountBan} from '../controllers/moderation';
+import {ModerationInfo,SetAccountBan,EndPlayingAddress} from '../controllers/moderation';
 import { GetCharacterIdsForUserId, GetSaveHistory, RollbackCharacter, RollbackError, RollbackLoadout } from "../controllers/savehistory";
 import { GetObjectiveRecords, GetSelectedHuntPass, GetTrackRecords, SeedProgression } from "../controllers/realprogression";
 import { IsRealProgressionAccount } from "../controllers/progressionmode";
@@ -81,6 +81,11 @@ undauntedApiRouter.get('/DashboardAccounts', HealthReadRateLimit, HasUndauntedAd
     res.json({accounts: rows.slice(0, 100).map(row => ({id: row.id, name: row.name, admin: row.admin,
         keyFingerprint: row.hash && /^[a-f0-9]{64}$/i.test(row.hash) ? row.hash.slice(0, 16).toLowerCase() : null})),
         nextOffset: rows.length > 100 ? offset + 100 : null});
+});
+
+undauntedApiRouter.post('/PlayingEnded', HasUndauntedUserApiKey, (req:any,res)=>{
+    EndPlayingAddress(req.UndauntedUserInfo.UserId);
+    res.status(204).end();
 });
 
 undauntedApiRouter.get('/Moderation/:accountId', HasUndauntedAdminApiKey, (req,res)=>{
