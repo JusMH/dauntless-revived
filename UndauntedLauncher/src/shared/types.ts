@@ -37,6 +37,7 @@ export type ConnectProblem =
   | null;
 
 export type ErrorCode =
+  | "account_banned"
   | "invite_invalid_format"
   | "invite_invalid"
   | "username_invalid"

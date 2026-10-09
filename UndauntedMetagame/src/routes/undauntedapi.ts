@@ -9,6 +9,7 @@ import { DeleteInviteCode, GetAllUserIds, GetInviteCodes, GetRecentPlayerData, I
 import { HasUndauntedUserApiKey } from "../middleware/HasUndauntedUserApiKey";
 import { HasUndauntedAdminApiKey } from "../middleware/HasUndauntedAdminApiKey";
 import { SignMetagameJWTForUid } from "../controllers/auth";
+import {ModerationInfo,SetAccountBan} from '../controllers/moderation';
 import { GetCharacterIdsForUserId, GetSaveHistory, RollbackCharacter, RollbackError, RollbackLoadout } from "../controllers/savehistory";
 import { GetObjectiveRecords, GetSelectedHuntPass, GetTrackRecords, SeedProgression } from "../controllers/realprogression";
 import { IsRealProgressionAccount } from "../controllers/progressionmode";
@@ -80,6 +81,15 @@ undauntedApiRouter.get('/DashboardAccounts', HealthReadRateLimit, HasUndauntedAd
     res.json({accounts: rows.slice(0, 100).map(row => ({id: row.id, name: row.name, admin: row.admin,
         keyFingerprint: row.hash && /^[a-f0-9]{64}$/i.test(row.hash) ? row.hash.slice(0, 16).toLowerCase() : null})),
         nextOffset: rows.length > 100 ? offset + 100 : null});
+});
+
+undauntedApiRouter.get('/Moderation/:accountId', HasUndauntedAdminApiKey, (req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    res.json(ModerationInfo(String(req.params.accountId)));
+});
+undauntedApiRouter.post('/Moderation', HasUndauntedAdminApiKey, (req:any,res)=>{
+    try {res.json(SetAccountBan(req.body.accountId,req.body.reason,req.body.active,req.body.address,req.UndauntedUserInfo.UserId));}
+    catch(e){const message=e instanceof Error?e.message:'';res.status(400).json({error:['invalid_ban','invalid_address','account_not_found','admin_account_protected','address_not_observed'].includes(message)?message:'moderation_failed'});}
 });
 
 function StatusForRollbackError(Error: RollbackError){

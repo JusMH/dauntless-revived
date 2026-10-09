@@ -3,6 +3,7 @@ import crypto from "crypto";
 import { GetDb } from "../db";
 import { userapikeys, userapikeystoregister } from "../db/schema";
 import { logger } from "../logger";
+import {BanFor} from './moderation';
 
 const PRIVKEY = Buffer.from(process.env.AUTH_SIGNING_PRIVKEY_B64!, "base64").toString("utf-8");
 const PUBKEY = Buffer.from(process.env.AUTH_SIGNING_PUBKEY_B64!, "base64").toString("utf-8");
@@ -49,6 +50,7 @@ export async function GetUserIDForAPIKey(UserAPIKey: string){
 }
 
 function SignMetagameJWTForUid(userId: string){
+    if(BanFor(userId)) throw Error('account_banned');
     return jwt.sign({
         userId: userId
     }, PRIVKEY, {
@@ -60,11 +62,13 @@ function SignMetagameJWTForUid(userId: string){
 }
 
 function ValidateMetagameJWTAndGetPayload(token: string){
-    return jwt.verify(token, PUBKEY, {
+    const payload = jwt.verify(token, PUBKEY, {
         algorithms: ["RS256"],
         issuer: "undaunted-metagame",
         audience: "undaunted-metagame"
     });
+    if(typeof payload !== 'string' && BanFor(payload.userId)) throw Error('account_banned');
+    return payload;
 }
 
 export { SignMetagameJWTForUid, ValidateMetagameJWTAndGetPayload }

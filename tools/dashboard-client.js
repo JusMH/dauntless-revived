@@ -145,6 +145,23 @@
     finally { accountsBusy = false; el('refreshAccounts').disabled = false; el('previousAccounts').disabled = accountOffset === 0; el('nextAccounts').disabled = nextOffset === null; }
   }
   el('accountSearch').oninput = showAccounts;
+  el('loadModeration').onclick = async () => {
+    try {const info=await get(`/api/moderation?accountId=${encodeURIComponent(el('moderationAccount').value.trim())}`);el('moderationInfo').textContent=JSON.stringify(info,null,2);el('moderationStatus').textContent='Current moderation status loaded.';}
+    catch(error){el('moderationStatus').textContent=error.message;}
+  };
+  async function moderate(active){
+    const accountId=el('moderationAccount').value.trim(),reason=el('banReason').value.trim();
+    if(!accountId || !reason){el('moderationStatus').textContent='Account ID and reason are required.';return;}
+    el('banAccount').disabled=el('unbanAccount').disabled=true;
+    try {
+      const response=await fetch('/api/moderation',{method:'POST',headers:{'x-dashboard-key':key,'content-type':'application/json'},body:JSON.stringify({accountId,reason,active,address:active?el('banAddress').value.trim():null}),signal:AbortSignal.timeout(15000)});
+      const result=await response.json();if(!response.ok)throw Error(result.error || 'Moderation failed');
+      el('moderationInfo').textContent=JSON.stringify(result,null,2);el('moderationStatus').textContent=active?'Player banned. Reason will appear in the launcher.':'Player unbanned.';
+    }catch(error){el('moderationStatus').textContent=error.message;}
+    finally{el('banAccount').disabled=el('unbanAccount').disabled=false;}
+  }
+  el('banAccount').onclick=()=>moderate(true);
+  el('unbanAccount').onclick=()=>moderate(false);
   el('refreshAccounts').onclick = loadAccounts;
   el('nextAccounts').onclick = () => { if (!accountsBusy && nextOffset !== null) { accountOffset = nextOffset; loadAccounts(); } };
   el('previousAccounts').onclick = () => { if (!accountsBusy) { accountOffset = Math.max(0, accountOffset - 100); loadAccounts(); } };

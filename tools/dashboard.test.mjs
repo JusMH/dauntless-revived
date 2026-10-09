@@ -5,6 +5,21 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parsePerformance, readPerformance } from './dashboard-performance.mjs';
+
+test('moderation writes require owner authentication and same origin and never retry',async()=>{
+  const key='test-moderation-owner-key';let writes=0;
+  const server=await startDashboard({key,port:0,backend:'http://127.0.0.1:61000',fetcher:async(url,opts)=>{
+    if(opts?.method==='POST'){writes++;assert.equal(url.pathname,'/undaunted/api/Moderation');return {status:200,json:async()=>({ban:{active:1},addresses:[]})};}
+    return {ok:true,json:async()=>({Users:[],players:[],instances:[],playersOnline:0})};
+  }});
+  try{
+    const base=`http://127.0.0.1:${server.address().port}`,body=JSON.stringify({accountId:'UID-test',reason:'test',active:true});
+    assert.equal((await fetch(base+'/api/moderation',{method:'POST',body})).status,401);
+    assert.equal((await fetch(base+'/api/moderation',{method:'POST',headers:{'x-dashboard-key':key,'content-type':'application/json'},body})).status,403);
+    assert.equal((await fetch(base+'/api/moderation',{method:'POST',headers:{'x-dashboard-key':key,'content-type':'application/json',origin:base},body})).status,200);
+    assert.equal(writes,1);
+  }finally{await new Promise(resolve=>server.close(resolve));}
+});
 test('dashboard isolates owner data and only polls read routes', async () => {
   const routes = [];
   const key = 'test-owner-key-not-a-real-secret';

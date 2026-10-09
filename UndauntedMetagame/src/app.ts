@@ -1,4 +1,5 @@
 import express from "express";
+import {CheckPlayerAccess} from './controllers/moderation';
 import { TrackBackendHealth } from './middleware/BackendHealth';
 import { loginRouter } from "./routes/login.js";
 import { logger } from "./logger.js";
@@ -24,6 +25,8 @@ import { backupRouter } from './routes/backup';
 
 export const app = express();
 app.use(TrackBackendHealth);
+// Keep discovery reachable so a banned launcher can display the actual reason.
+app.use((req,res,next)=>{if(/^\/undaunted\/api\/ServerStatus\/?$/i.test(req.path) || CheckPlayerAccess(req,res))next();});
 
 // Development logins (AUTH_MODE=NONE) never answer anything relayed by the gateway or
 // another proxy; a no-op with AUTH_MODE=APIKEY. See middleware/RequestOrigin.ts.

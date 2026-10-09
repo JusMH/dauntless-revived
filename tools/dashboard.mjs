@@ -101,7 +101,8 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
     res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     if (!/^(127\.0\.0\.1|localhost|\[::1\]):\d+$/.test(req.headers.host ?? '') || req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) { res.writeHead(403).end(); return; }
     const createInvite = req.method === 'POST' && req.url === '/api/invites';
-    if (req.method !== 'GET' && !createInvite) { res.writeHead(405).end(); return; }
+    const moderate = req.method === 'POST' && req.url === '/api/moderation';
+    if (req.method !== 'GET' && !createInvite && !moderate) { res.writeHead(405).end(); return; }
     if (Date.now() - windowStart > 60000) { requests = 0; windowStart = Date.now(); }
     if (++requests > 300) { res.writeHead(429).end(); return; }
     if (req.url === '/') { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end(page); return; }
@@ -109,6 +110,24 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
     const supplied = req.headers['x-dashboard-key'];
     if (typeof supplied !== 'string' || !timingSafeEqual(digest(supplied), digest(key))) { res.writeHead(401).end(); return; }
     res.setHeader('Content-Type', 'application/json');
+    if (moderate || req.url?.startsWith('/api/moderation?')) {
+      try {
+        let body;
+        if(moderate){
+          if(req.headers.origin !== `http://${req.headers.host}`){res.writeHead(403).end();return;}
+          if(req.headers['content-type'] !== 'application/json'){res.writeHead(415).end();return;}
+          let text='';for await(const chunk of req){text+=chunk.toString('utf8');if(Buffer.byteLength(text)>2048){res.writeHead(413).end();return;}}
+          body=JSON.parse(text);
+        }
+        const id=new URL(req.url,'http://localhost').searchParams.get('accountId');
+        if(!moderate && (!id || !/^UID-[A-Za-z0-9-]{1,100}$/.test(id))){res.writeHead(400).end();return;}
+        const response=await fetcher(new URL(moderate?'/undaunted/api/Moderation':`/undaunted/api/Moderation/${encodeURIComponent(id)}`,target),{
+          method:moderate?'POST':'GET',headers:{'x-undaunted-user-api-key':key,'content-type':'application/json'},
+          body:moderate?JSON.stringify(body):undefined,signal:AbortSignal.timeout(10000),redirect:'error'});
+        res.writeHead(response.status).end(JSON.stringify(await response.json()));
+      }catch{res.writeHead(502).end(JSON.stringify({error:'Moderation request failed. Refresh status before retrying.'}));}
+      return;
+    }
     if (req.url?.startsWith('/api/accounts?')) {
       const offset = new URL(req.url, 'http://localhost').searchParams.get('offset');
       if (!/^\d{1,8}$/.test(offset || '') || Number(offset) > 10000000) { res.writeHead(400).end(); return; }

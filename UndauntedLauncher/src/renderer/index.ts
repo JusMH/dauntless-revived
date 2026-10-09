@@ -248,6 +248,8 @@ function open(target: ExternalTarget): void {
 
 function errorText(e: LauncherError): string {
   switch (e.code) {
+    case 'account_banned':
+      return `You are banned from this server. Reason: ${e.detail || 'Contact support for details.'} You can appeal in Discord.`;
     case "invite_invalid_format":
       return e.detail ? tk(`invite_err_${e.detail}`) : t("err_invite_invalid_format");
     case "username_invalid":
@@ -1422,6 +1424,7 @@ function renderBanners(): void {
           { class: "banner banner-error", role: "alert" },
           icon("warning"),
           h("span", { class: "banner-text" }, errorText(error)),
+          ...(error.code === 'account_banned' ? [linkButton('Go to support',()=>open('discord'),{fk:'ban-support'})] : []),
           linkButton(t("err_dismiss"), () => {
             state.localError = null;
             void api.dismissError();

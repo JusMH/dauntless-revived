@@ -306,6 +306,8 @@ const EXPECTED_ROUTES = [
 
     "GET /undaunted/api/BackendHealth [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/DashboardAccounts [HasUndauntedAdminApiKey]",
+    "GET /undaunted/api/Moderation/:accountId [HasUndauntedAdminApiKey]",
+    "POST /undaunted/api/Moderation [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/RegistrationStatus []",
     "POST /undaunted/api/RegistrationStatus [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/InviteCodes [HasUndauntedAdminApiKey]",
@@ -489,6 +491,8 @@ const ADMIN_ROUTES = (): [string, string, unknown][] => [
 
     ["GET", "/undaunted/api/BackendHealth", undefined],
     ["GET", "/undaunted/api/DashboardAccounts", undefined],
+    ["GET", `/undaunted/api/Moderation/${C}`, undefined],
+    ["POST", "/undaunted/api/Moderation", {accountId:C,reason:'test',active:false}],
     ["POST", "/undaunted/api/RegisterInviteCode", { NewInviteCode: "PERM-TEST-CODE", Uses: 1 }],
     ["DELETE", "/undaunted/api/InviteCode/PERM-TEST-CODE", undefined],
     ["POST", "/undaunted/api/CreateInvite", {}],

@@ -162,6 +162,13 @@
       "when": 1791600000000,
       "tag": "0022_germany_region",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1791700000000,
+      "tag": "0023_moderation",
+      "breakpoints": true
     }
   ]
 }

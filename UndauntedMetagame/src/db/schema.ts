@@ -8,6 +8,18 @@ export const users = sqliteTable("users", {
     isAdmin: integer("isAdmin", {mode: "boolean"}).notNull().default(false)
 })
 
+export const playeraddresses = sqliteTable('player_addresses', {
+    accountId:text('account_id').notNull(), address:text('address').notNull(), lastSeen:integer('last_seen').notNull()
+},t=>[primaryKey({columns:[t.accountId,t.address]})]);
+export const accountbans = sqliteTable('account_bans', {
+    accountId:text('account_id').notNull().primaryKey(),reason:text('reason').notNull(),address:text('address'),
+    active:integer('active').notNull(),updatedAt:integer('updated_at').notNull(),actor:text('actor').notNull()
+},t=>[index('active_ban_address').on(t.address,t.active)]);
+export const moderationevents = sqliteTable('moderation_events', {
+    id:integer('id').primaryKey({autoIncrement:true}),accountId:text('account_id').notNull(),reason:text('reason').notNull(),
+    address:text('address'),active:integer('active').notNull(),createdAt:integer('created_at').notNull(),actor:text('actor').notNull()
+});
+
 export const discordlinks = sqliteTable('discordlinks', {
     discordId: text('discordId').notNull().primaryKey(),
     userId: text('userId').notNull().unique().references(() => users.userId),

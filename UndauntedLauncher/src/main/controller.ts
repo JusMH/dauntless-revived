@@ -520,6 +520,9 @@ export class Controller {
           s.usernames[sid] = info.info.username;
         });
       }
+    } else if (info.error === "account_banned") {
+      this.keyRejected = true;
+      this.lastError = {code:'account_banned',detail:info.detail};
     } else if (info.error === "key_rejected") {
       this.keyRejected = true;
       this.lastError = { code: "key_rejected" };
@@ -704,8 +707,8 @@ export class Controller {
     if (!ep || !slot || !sid) return err("server_unreachable");
     const info = await fetchUserInfo(ep, key);
     if (!info.ok) {
-      this.lastError = { code: info.error };
-      return err(info.error);
+      this.lastError = { code: info.error, detail: info.detail };
+      return {ok:false,error:this.lastError};
     }
     try {
       await this.keys.save(slot, key);
@@ -1090,8 +1093,8 @@ export class Controller {
       if (!ep) return this.fail('server_unreachable');
       const account = await fetchUserInfo(ep, key);
       if (!account.ok) {
-        this.keyRejected = account.error === 'key_rejected';
-        return this.fail(account.error);
+        this.keyRejected = account.error === 'key_rejected' || account.error === 'account_banned';
+        return this.fail(account.error, account.detail);
       }
       this.keyRejected = false;
       const chosenRegion = !this.s.huntRegion || this.s.huntRegion === 'auto'
