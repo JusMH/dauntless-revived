@@ -27,6 +27,8 @@ import { INVITE_SCHEME, parseInvite } from "./shared/invite";
 import { IPC, type Snapshot, type TaskProgress } from "./shared/types";
 import { systemLanguage, translate } from "./shared/i18n";
 import { APP_ID, SQUIRREL_NAME, UPDATE_FEED_URL } from "./main/constants";
+import { LocalStackManager } from "./main/local-stack";
+import { ElectronLocalStackRuntime } from "./main/local-stack-runtime";
 
 // Squirrel install / update / uninstall events: create or remove shortcuts, then quit.
 if (started) app.quit();
@@ -65,9 +67,77 @@ let controller: Controller | null = null;
 let pendingInviteLink: string | null = null;
 let quitting = false;
 let linuxUpdate: LinuxUpdate | null = null;
+let devLocalStack: LocalStackManager | null = null;
 
 function resourcesDir(): string {
   return app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "assets");
+}
+
+// Development-only bridge for exercising the real local-stack lifecycle before the
+// packaged offline runtime exists. Production Play Offline will provide packaged
+// service paths instead of developer environment variables.
+function makeDevLocalStack(): LocalStackManager | null {
+  if (
+      app.isPackaged ||
+      process.env.DAUNTLESS_REVIVED_LOCAL_STACK_DEV !== "1"
+  ) {
+    return null;
+  }
+
+  const metagameDir =
+      process.env.DAUNTLESS_REVIVED_LOCAL_METAGAME_DIR?.trim();
+
+  const metagameEnv =
+      process.env.DAUNTLESS_REVIVED_LOCAL_METAGAME_ENV?.trim();
+
+  const deployDir =
+      process.env.DAUNTLESS_REVIVED_LOCAL_DEPLOY_DIR?.trim();
+
+  const deployEnv =
+      process.env.DAUNTLESS_REVIVED_LOCAL_DEPLOY_ENV?.trim();
+
+  if (!metagameDir || !metagameEnv || !deployDir || !deployEnv) {
+    throw new Error(
+        "local stack development paths are not configured",
+    );
+  }
+
+  const runtime = new ElectronLocalStackRuntime({
+    runnerPath: path.join(
+        app.getAppPath(),
+        "runtime",
+        "local-service-runner.cjs",
+    ),
+
+    services: {
+      metagame: {
+        serverPath: path.join(metagameDir, "dist", "server.js"),
+        envPath: metagameEnv,
+        cwd: metagameDir,
+        port: 61000,
+        healthPath: "/undaunted/api/RegistrationStatus",
+      },
+
+      deploy: {
+        serverPath: path.join(deployDir, "dist", "server.js"),
+        envPath: deployEnv,
+        cwd: deployDir,
+        port: 61001,
+        healthPath: "/gameservers",
+      },
+    },
+  });
+
+  const stack = new LocalStackManager(runtime);
+
+  stack.onChange((snapshot) => {
+    log.info(
+        `local stack: ${snapshot.state}` +
+        (snapshot.error ? ` (${snapshot.error})` : ""),
+    );
+  });
+
+  return stack;
 }
 
 async function ensureLinuxSecureStorageDependency(): Promise<boolean> {
@@ -467,6 +537,11 @@ if (!started) {
       Menu.setApplicationMenu(null);
       logToFile(path.join(app.getPath("userData"), "logs"));
       log.info(`Dauntless Revived Launcher ${app.getVersion()} starting`);
+      devLocalStack = makeDevLocalStack();
+
+      if (devLocalStack) {
+        await devLocalStack.start();
+      }
       if (process.platform === "linux") {
         log.info(
           `secure storage backend ${safeStorage.getSelectedStorageBackend()}, encryption ${safeStorage.isEncryptionAvailable() ? "available" : "unavailable"}`,
@@ -517,8 +592,14 @@ if (!started) {
 
     app.on("window-all-closed", () => {
       const c = controller;
+      const stack = devLocalStack;
       controller = null;
-      void (c ? c.shutdown() : Promise.resolve()).finally(() => app.quit());
+      devLocalStack = null;
+
+      void Promise.all([
+        c ? c.shutdown() : Promise.resolve(),
+        stack ? stack.stop() : Promise.resolve(),
+      ]).finally(() => app.quit());
     });
   }
 }
