@@ -394,6 +394,7 @@ const en = {
 
   err_compat_runtime_missing: "Linux needs Proton or Wine to run the Windows game client. Install Steam Proton, Proton-GE, Wine, or Lutris Wine and try again.",
   err_config_failed: "The game settings couldn't be written.",
+  err_offline_unavailable: "Offline play isn't available right now. Restart the launcher and try again.",
   err_busy: "Something else is still running. Try again in a moment.",
   err_cancelled: "Cancelled.",
   err_unknown: "Something went wrong. The launcher's log has the details.",
@@ -880,6 +881,7 @@ const fi: Record<StringKey, string> = {
 
   err_compat_runtime_missing: "Linux tarvitsee Protonin tai Winen Windows-peliasiakasohjelman ajamiseen. Asenna Steam Proton, Proton-GE, Wine tai Lutris Wine ja yritä uudelleen.",
   err_config_failed: "Pelin asetuksia ei voitu kirjoittaa.",
+  err_offline_unavailable: "Offline-pelaaminen ei ole juuri nyt käytettävissä. Käynnistä käynnistin uudelleen ja yritä uudelleen.",
   err_busy: "Jokin muu on vielä kesken. Yritä hetken päästä.",
   err_cancelled: "Peruttu.",
   err_unknown: "Jokin meni pieleen. Käynnistimen lokissa on lisätietoja.",
@@ -1362,6 +1364,7 @@ const es: Record<StringKey, string> = {
 
   err_compat_runtime_missing: "Linux necesita Proton o Wine para ejecutar el cliente de Windows del juego. Instala Steam Proton, Proton-GE, Wine o Lutris Wine y vuelve a intentarlo.",
   err_config_failed: "No se han podido guardar los ajustes del juego.",
+  err_offline_unavailable: "El modo offline no está disponible ahora mismo. Reinicia el launcher e inténtalo de nuevo.",
   err_busy: "Hay otra tarea en marcha. Vuelve a intentarlo en un momento.",
   err_cancelled: "Cancelado.",
   err_unknown: "Algo ha salido mal. El registro del launcher tiene los detalles.",

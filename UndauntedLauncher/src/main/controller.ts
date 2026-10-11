@@ -37,6 +37,7 @@ import type {
   Settings,
   Snapshot,
   TaskProgress,
+  OfflinePlayOutcome,
 } from "../shared/types";
 import { EXPOSURE_MODES, GAME_LANGUAGES, GRAPHICS_PRESETS, LANGUAGES } from "../shared/types";
 import type { Endpoint } from "./http";
@@ -106,6 +107,8 @@ export interface Platform {
   findTailscale(): string | null;
   findRunningClients(): Promise<number[]>;
   prepareGameLaunch?(): Promise<{ runtime: LaunchRuntime; configDir: string; runtimeName: string } | null>;
+
+  // Starts the launcher-owned local services without exposing their Electron implementation here.
   startOfflineStack?(): Promise<OfflineStackSession | null>;
   spawn?: SpawnFn;
   installUpdate?(): void;
@@ -123,8 +126,21 @@ interface InstallInfo {
   dllsOk: boolean;
 }
 
+type OfflineReadyAccount = { kind: "ready"; key: string; username: string };
+
+type OfflineAccountResult =
+    | OfflineReadyAccount
+    | { kind: "register" }
+    | { kind: "error"; error: LauncherError };
+
+type OfflineRegistrationResult =
+    | OfflineReadyAccount
+    | { kind: "error"; error: LauncherError };
+
 const err = (code: ErrorCode, detail?: string): { ok: false; error: LauncherError } => ({ ok: false, error: detail ? { code, detail } : { code } });
 const OK: ActionResult = { ok: true };
+// Stable KeyStore namespace for the local profile; this is never used as a network host.
+const OFFLINE_KEY_SLOT: KeySlot = { host: "offline-local", port: 61000, mode: "private", fp: null };
 
 export function endpointFor(sv: StoredServer): Endpoint {
   return { host: sv.host, port: sv.port, pin: sv.mode === "public" ? sv.fp : null };
@@ -675,6 +691,47 @@ export class Controller {
 
   // ------------------------------------------------------------------ account
 
+  private async offlineAccount(ep: Endpoint): Promise<OfflineAccountResult> {
+    let key: string | null;
+    try {
+      key = await this.keys.load(OFFLINE_KEY_SLOT);
+    } catch (e) {
+      log.error(`could not load the offline account key: ${describeError(e)}`);
+      return { kind: "error", error: { code: "key_storage_unavailable" } };
+    }
+
+    if (!key) return { kind: "register" };
+
+    const info = await fetchUserInfo(ep, key);
+    if (info.ok) return { kind: "ready", key, username: info.info.username };
+
+    // Keep the rejected key until a replacement account has actually been created.
+    if (info.error === "key_rejected") return { kind: "register" };
+
+    return { kind: "error", error: { code: info.error, ...(info.detail ? { detail: info.detail } : {}) } };
+  }
+
+  private async registerOfflineAccount(ep: Endpoint, username: unknown,): Promise<OfflineRegistrationResult> {
+    const check = checkUsername(username);
+    if (check !== "ok") return { kind: "error", error: { code: "username_invalid", detail: check } };
+
+    const res = await registerAccount(ep, username as string, "");
+    if (!res.ok) {
+      log.warn(`offline registration refused: ${res.error}`);
+      return { kind: "error", error: { code: res.error } };
+    }
+
+    try {
+      await this.keys.save(OFFLINE_KEY_SLOT, res.key);
+    } catch (e) {
+      log.error(`could not store the offline account key: ${describeError(e)}`);
+      return { kind: "error", error: { code: "key_storage_unavailable" } };
+    }
+
+    log.info(`registered offline account as ${username as string}`);
+    return { kind: "ready", key: res.key, username: username as string };
+  }
+
   async register(username: unknown): Promise<RegisterOutcome> {
     if (this.busy || this.task) return err("busy");
     const check = checkUsername(username);
@@ -1114,6 +1171,73 @@ export class Controller {
 
   // ------------------------------------------------------------------ play
 
+  async playOffline(username?: unknown): Promise<OfflinePlayOutcome> {
+    if (this.busy || this.task) return { kind: "error", error: { code: "busy" } };
+    if (this.game.running) return { kind: "error", error: { code: "already_running" } };
+
+    const startOfflineStack = this.p.startOfflineStack;
+    if (!startOfflineStack) {
+      const failed = this.fail("offline_unavailable");
+      return { kind: "error", error: failed.error };
+    }
+
+    return this.withBusy(async () => {
+      const environment = await this.checkGameLaunchEnvironment();
+      if (!environment.ok) return { kind: "error", error: environment.error };
+
+      let session: OfflineStackSession | null = null;
+      let launched = false;
+
+      try {
+        try {
+          session = await startOfflineStack();
+        } catch (e) {
+          log.error(`local stack could not start: ${describeError(e)}`);
+          const failed = this.fail("offline_unavailable");
+          return { kind: "error", error: failed.error };
+        }
+
+        if (!session) {
+          const failed = this.fail("offline_unavailable");
+          return { kind: "error", error: failed.error };
+        }
+
+        const offlineSession = session;
+        let account = await this.offlineAccount(offlineSession.endpoint);
+        if (account.kind === "register") {
+          if (username === undefined) return { kind: "needs_username" };
+          account = await this.registerOfflineAccount(offlineSession.endpoint, username);
+        }
+        if (account.kind === "error") {
+          const failed = this.fail(account.error.code, account.error.detail);
+          return { kind: "error", error: failed.error };
+        }
+
+        const installReady = await this.prepareGameInstall();
+        if (!installReady.ok) return { kind: "error", error: installReady.error };
+
+        const ep = offlineSession.endpoint;
+        const key = account.key;
+        const result = await this.launchGame(
+            ep.host, ep.port, XMPP_PORT, key,
+            async () => {
+              try {
+                await endPlaying(ep, key);
+              } finally {
+                await offlineSession.stop();
+              }
+            },
+            " (offline)",
+        );
+
+        launched = result.ok;
+        return result.ok ? { kind: "started" } : { kind: "error", error: result.error };
+      } finally {
+        if (!launched) await session?.stop().catch(() => undefined);
+      }
+    });
+  }
+
   async play(): Promise<ActionResult> {
     if (this.busy || this.task) return err("busy");
     if (this.game.running) return this.fail("already_running");
@@ -1124,8 +1248,6 @@ export class Controller {
       const environment = await this.checkGameLaunchEnvironment();
       if (!environment.ok) return environment;
 
-      const others = await this.p.findRunningClients();
-      if (others.length > 0) return this.fail("already_running");
       const key = await this.keys.load(slot).catch(() => null);
       if (!key) return this.fail("key_invalid");
       const ep = this.endpoint();
