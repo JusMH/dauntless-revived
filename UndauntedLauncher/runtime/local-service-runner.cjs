@@ -26,7 +26,12 @@ process.parentPort?.on("message", (event) => {
     if(event.data?.type !== "shutdown" || Stopping)return;
     Stopping = true;
 
-    void Promise.resolve(typeof Service?.shutdown === "function" ? Service.shutdown() : undefined)
+    if(typeof Service?.shutdown !== "function"){
+        process.kill(process.pid, "SIGTERM");
+        return;
+    }
+
+    void Promise.resolve(Service.shutdown())
         .catch((error) => console.error("[local service] shutdown failed:", error instanceof Error ? error.message : String(error)))
         .finally(() => process.exit(0));
 });
