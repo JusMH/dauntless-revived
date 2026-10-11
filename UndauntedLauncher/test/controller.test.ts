@@ -19,7 +19,7 @@ import { formatInvite } from "../src/shared/invite";
 import { setSink } from "../src/main/log";
 import { KeyStore } from "../src/main/keystore";
 import type { SpawnFn } from "../src/main/launch";
-import type { Snapshot } from "../src/shared/types";
+import type { OfflineStatus, Snapshot } from "../src/shared/types";
 import { FakeContentServer, FakeMetagame, makeFiles, manifestFor, sha256, TEST_BUILD } from "./fakes";
 import { makeTestCert, type TestCert } from "./certs";
 
@@ -91,6 +91,7 @@ interface Harness {
   last: () => Snapshot;
   spawns: { exe: string; args: string[]; cwd: string; env?: NodeJS.ProcessEnv }[];
   child: () => EventEmitter | null;
+  offlineStatuses: OfflineStatus[];
   configDir: string;
   installDir: string;
   userData: string;
@@ -101,6 +102,7 @@ interface Harness {
 function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"],): Harness {
   let snap: Snapshot | null = null;
   const spawns: Harness["spawns"] = [];
+  const offlineStatuses: OfflineStatus[] = [];
   let child: EventEmitter | null = null;
   const fakeSpawn = ((exe: string, args: string[], opts: { cwd: string; env?: NodeJS.ProcessEnv }) => {
     spawns.push({ exe, args, cwd: opts.cwd, env: opts.env });
@@ -138,6 +140,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
       snap = s;
     },
     emitProgress: () => undefined,
+    emitOfflineStatus: (status) => {offlineStatuses.push(status);},
     findTailscale: () => null,
     findRunningClients: async () => [],
     runtimeFilesExist: () => true,
@@ -146,7 +149,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
     spawn: fakeSpawn,
   };
   const c = new Controller(p);
-  return { c, last: () => snap ?? c.snapshot(), spawns, child: () => child, configDir, installDir, userData };
+  return { c, last: () => snap ?? c.snapshot(), spawns, child: () => child, configDir, installDir, userData, offlineStatuses, };
 }
 
 function invite(fp: string, code = "ABCD-EFGH-JKLM"): string {
@@ -388,8 +391,11 @@ test("offline play registers once, stores its key and reuses the same account", 
       RELAY_PORT,
       undefined,
       async () => null,
-      async () => {
+      async (onPhase) => {
         starts++;
+        onPhase("starting-metagame");
+        onPhase("starting-deploy");
+
         return {
           endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
           stop: async () => { stops++; },
@@ -401,13 +407,16 @@ test("offline play registers once, stores its key and reuses the same account", 
     installFakeGame(hx.installDir);
     await hx.c.init();
 
-    assert.deepEqual(await hx.c.playOffline(), { kind: "needs_username" });
+    assert.deepEqual(await hx.c.startOffline(), { ok: true });
+    assert.equal(hx.c.offlineStatus().phase, "needs-username");
     assert.equal(starts, 1);
-    assert.equal(stops, 1, "the local stack is released while waiting for a username");
+    assert.equal(stops, 0, "the local stack stays alive while waiting for a username");
     assert.equal(local.registrations.length, 0);
     assert.equal(hx.spawns.length, 0);
 
-    assert.deepEqual(await hx.c.playOffline("Offline_1"), { kind: "started" });
+    assert.deepEqual(await hx.c.startOffline("Offline_1"), { ok: true });
+    assert.equal(starts, 1, "registration continues on the existing local stack");
+    assert.equal(hx.c.offlineStatus().phase, "running");
     assert.equal(local.registrations.length, 1);
     assert.equal(local.registrations[0].username, "Offline_1");
     assert.equal(hx.spawns.length, 1);
@@ -417,18 +426,100 @@ test("offline play registers once, stores its key and reuses the same account", 
     assert.match(firstArgs[1], /^-AUTH_PASSWORD=UUK_[0-9a-f]{48}$/);
     const firstKey = firstArgs[1];
 
+    assert.deepEqual(
+        await hx.c.stopOffline(),
+        { ok: false, error: { code: "busy" } },
+        "stopOffline never tears the local stack down under a running game",
+    );
+    assert.equal(stops, 0);
+    assert.equal(hx.c.offlineStatus().phase, "running");
+
     hx.child()!.emit("exit", 0);
     await new Promise((r) => setTimeout(r, 100));
-    assert.equal(stops, 2, "the local stack stops when the offline game exits");
+    assert.equal(stops, 1, "the local stack stops when the offline game exits");
+    assert.equal(hx.c.offlineStatus().phase, "stopped");
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(stops, 1, "the local stack stops when the offline game exits");
+    assert.equal(hx.c.offlineStatus().phase, "stopped");
 
-    assert.deepEqual(await hx.c.playOffline(), { kind: "started" });
+    assert.deepEqual(await hx.c.startOffline(), { ok: true });
+    assert.equal(hx.c.offlineStatus().phase, "running");
     assert.equal(local.registrations.length, 1, "the saved offline account is reused");
     assert.equal(hx.spawns.length, 2);
     assert.equal(hx.spawns[1].args[1], firstKey, "the same offline account key is reused");
 
     hx.child()!.emit("exit", 0);
     await new Promise((r) => setTimeout(r, 100));
-    assert.equal(stops, 3);
+    assert.equal(stops, 2);
+    assert.deepEqual(
+        hx.offlineStatuses.map((status) => status.phase),
+        [
+          "preparing",
+          "starting-metagame",
+          "starting-deploy",
+          "needs-username",
+
+          "preparing",
+          "launching-game",
+          "running",
+          "stopping",
+          "stopped",
+
+          "preparing",
+          "starting-metagame",
+          "starting-deploy",
+          "launching-game",
+          "running",
+          "stopping",
+          "stopped",
+        ],
+    );
+  }
+  finally {
+    await hx.c.shutdown();
+    await local.stop();
+  }
+});
+
+test("stopOffline tears down a local stack waiting for a username", async () => {
+  const local = new FakeMetagame({
+    name: "Local",
+    registration: "OPEN",
+    contentPort: null,
+  });
+
+  await local.start(OFFLINE_PORT);
+
+  let starts = 0;
+  let stops = 0;
+
+  const hx = harness(
+      RELAY_PORT,
+      undefined,
+      async () => null,
+      async (onPhase) => {
+        starts++;
+        onPhase("starting-metagame");
+        onPhase("starting-deploy");
+
+        return {
+          endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
+          stop: async () => { stops++; },
+        };
+      },
+  );
+
+  try {
+    await hx.c.init();
+
+    assert.deepEqual(await hx.c.startOffline(), { ok: true });
+    assert.equal(starts, 1);
+    assert.equal(stops, 0);
+
+    assert.deepEqual(await hx.c.stopOffline(), { ok: true });
+    assert.equal(stops, 1);
+    assert.equal(hx.c.offlineStatus().phase, "stopped");
+    assert.equal(hx.spawns.length, 0);
   } finally {
     await hx.c.shutdown();
     await local.stop();
