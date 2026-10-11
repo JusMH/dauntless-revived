@@ -1172,53 +1172,92 @@ export class Controller {
       }
 
       let launched = false;
+
       try {
-        let prepared: { runtime: LaunchRuntime; configDir: string; runtimeName: string } | null = null;
-        if (this.p.prepareGameLaunch) {
-          try {
-            prepared = await this.p.prepareGameLaunch();
-          } catch (e) {
-            log.error(`compatibility runtime preparation failed: ${describeError(e)}`);
-            return this.fail("launch_failed");
-          }
-          if (this.hostPlatform === "linux" && prepared === null) return this.fail("compat_runtime_missing");
-        }
-        let displayRepaired = false;
-
-        try {
-          const config = await applyGameConfig({
-            host: gameHost,
+        const result = await this.launchGame(
+            gameHost,
+            gamePort,
             xmppPort,
-            graphics: this.s.graphics,
-            exposure: this.s.exposure,
-            safeWindow: this.s.windowed,
+            key,
+            () => endPlaying(ep, key),
+            sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : "",
+        );
 
-            configDir: prepared?.configDir ?? this.p.gameConfigDir,
-          });
-          displayRepaired = config.displayRepaired;
-
-          if (this.s.exposure !== "game") log.info(`game config: auto exposure ${this.s.exposure}`);
-        } catch (e) {
-          log.error(`could not write the game config: ${describeError(e)}`);
-          return this.fail("config_failed");
-        }
-        const args = buildLaunchArgs({ host: gameHost, port: gamePort, key, windowed: this.s.windowed || displayRepaired, gameLocale: gameLocale(this.s.gameLanguage, this.p.systemLocale ?? "en-US") });
-        const via = prepared ? ` via ${prepared.runtimeName}` : "";
-        log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : ""}`);
-        try {
-          this.endPlayingSession=()=>endPlaying(ep,key);
-          await this.game.start(win64Dir(dir), args, prepared?.runtime, this.s.showConsole ? { DR_SHOW_CONSOLE: "1" } : undefined);
-        } catch (e) {
-          this.endPlayingSession=null;
-          log.error(`launch failed: ${describeError(e)}`);
-          return this.fail("launch_failed");
-        }
-        launched = true;
-        return OK;
+        launched = result.ok;
+        return result;
       } finally {
         if (!launched) await this.stopRelay();
       }
     });
+  }
+
+  private async launchGame(
+      gameHost: string,
+      gamePort: number,
+      xmppPort: number,
+      key: string,
+      onExit: () => Promise<void>,
+      logSuffix = "",
+  ): Promise<ActionResult> {
+    let prepared: { runtime: LaunchRuntime; configDir: string; runtimeName: string } | null = null;
+
+    if (this.p.prepareGameLaunch) {
+      try {
+        prepared = await this.p.prepareGameLaunch();
+      } catch (e) {
+        log.error(`compatibility runtime preparation failed: ${describeError(e)}`);
+        return this.fail("launch_failed");
+      }
+
+      if (this.hostPlatform === "linux" && prepared === null) return this.fail("compat_runtime_missing");
+    }
+
+    let displayRepaired = false;
+
+    try {
+      const config = await applyGameConfig({
+        host: gameHost,
+        xmppPort,
+        graphics: this.s.graphics,
+        exposure: this.s.exposure,
+        safeWindow: this.s.windowed,
+        configDir: prepared?.configDir ?? this.p.gameConfigDir,
+      });
+
+      displayRepaired = config.displayRepaired;
+
+      if (this.s.exposure !== "game") log.info(`game config: auto exposure ${this.s.exposure}`);
+    } catch (e) {
+      log.error(`could not write the game config: ${describeError(e)}`);
+      return this.fail("config_failed");
+    }
+
+    const args = buildLaunchArgs({
+      host: gameHost,
+      port: gamePort,
+      key,
+      windowed: this.s.windowed || displayRepaired,
+      gameLocale: gameLocale(this.s.gameLanguage, this.p.systemLocale ?? "en-US"),
+    });
+
+    const via = prepared ? ` via ${prepared.runtimeName}` : "";
+    log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${logSuffix}`);
+
+    try {
+      this.endPlayingSession = onExit;
+      await this.game.start(
+          win64Dir(this.installDir),
+          args,
+          prepared?.runtime,
+          this.s.showConsole ? { DR_SHOW_CONSOLE: "1" } : undefined,
+      );
+    } catch (e) {
+      this.endPlayingSession = null;
+      log.error(`launch failed: ${describeError(e)}`);
+      return this.fail("launch_failed");
+    }
+
+    return OK;
   }
 
   private async startRelay(sv: StoredServer): Promise<ActionResult> {
