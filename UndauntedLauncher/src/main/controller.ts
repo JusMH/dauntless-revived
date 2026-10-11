@@ -37,7 +37,7 @@ import type {
   Settings,
   Snapshot,
   TaskProgress,
-  OfflinePlayOutcome,
+  OfflineStatus,
 } from "../shared/types";
 import { EXPOSURE_MODES, GAME_LANGUAGES, GRAPHICS_PRESETS, LANGUAGES } from "../shared/types";
 import type { Endpoint } from "./http";
@@ -104,12 +104,13 @@ export interface Platform {
   openPath(dir: string): Promise<void>;
   emitSnapshot(s: Snapshot): void;
   emitProgress(p: TaskProgress): void;
+  emitOfflineStatus(s: OfflineStatus): void;
   findTailscale(): string | null;
   findRunningClients(): Promise<number[]>;
   prepareGameLaunch?(): Promise<{ runtime: LaunchRuntime; configDir: string; runtimeName: string } | null>;
 
-  // Starts the launcher-owned local services without exposing their Electron implementation here.
-  startOfflineStack?(): Promise<OfflineStackSession | null>;
+// Starts the launcher-owned local services without exposing their Electron implementation here.
+  startOfflineStack?(onPhase: (phase: "starting-metagame" | "starting-deploy") => void,): Promise<OfflineStackSession | null>;
   spawn?: SpawnFn;
   installUpdate?(): void;
 }
@@ -151,6 +152,7 @@ export class Controller {
   private readonly keys: KeyStore;
   private readonly game: GameProcess;
   private endPlayingSession: (()=>Promise<void>) | null = null;
+  private offlineSession: OfflineStackSession | null = null;
   private readonly verified: VerifiedCache;
 
   private reachable: boolean | null = null;
@@ -185,6 +187,7 @@ export class Controller {
   private art = new Map<string, { file: string; type: string }>();
   private relay: Relay | null = null;
   private phase: Phase = "loading";
+  private offline: OfflineStatus = { phase: "stopped" };
 
   constructor(private readonly p: Platform) {
     this.settings = new SettingsStore(p.userDataDir, p.defaultLanguage, p.hostPlatform ?? process.platform);
@@ -331,6 +334,15 @@ export class Controller {
 
   private publish(): void {
     this.p.emitSnapshot(this.snapshot());
+  }
+
+  offlineStatus(): OfflineStatus {
+    return { ...this.offline };
+  }
+
+  private setOfflineStatus(status: OfflineStatus): void {
+    this.offline = status;
+    this.p.emitOfflineStatus(status);
   }
 
   private fail(code: ErrorCode, detail?: string): { ok: false; error: LauncherError } {
@@ -1171,71 +1183,141 @@ export class Controller {
 
   // ------------------------------------------------------------------ play
 
-  async playOffline(username?: unknown): Promise<OfflinePlayOutcome> {
-    if (this.busy || this.task) return { kind: "error", error: { code: "busy" } };
-    if (this.game.running) return { kind: "error", error: { code: "already_running" } };
+  private async releaseOfflineSession(): Promise<void> {
+    const session = this.offlineSession;
+    this.offlineSession = null;
+
+    if (session) {
+      await session.stop();
+    }
+  }
+
+  async startOffline(username?: unknown): Promise<ActionResult> {
+    if (this.busy || this.task) return err("busy");
+    if (this.game.running) return this.fail("already_running");
 
     const startOfflineStack = this.p.startOfflineStack;
     if (!startOfflineStack) {
       const failed = this.fail("offline_unavailable");
-      return { kind: "error", error: failed.error };
+      this.setOfflineStatus({ phase: "error", error: failed.error });
+      return failed;
     }
 
     return this.withBusy(async () => {
+      this.setOfflineStatus({ phase: "preparing" });
+
       const environment = await this.checkGameLaunchEnvironment();
-      if (!environment.ok) return { kind: "error", error: environment.error };
+      if (!environment.ok) {
+        this.setOfflineStatus({ phase: "error", error: environment.error });
+        return environment;
+      }
 
-      let session: OfflineStackSession | null = null;
-      let launched = false;
-
-      try {
+      if (!this.offlineSession) {
         try {
-          session = await startOfflineStack();
+          this.offlineSession = await startOfflineStack((phase) => {
+            this.setOfflineStatus({ phase });
+          });
         } catch (e) {
           log.error(`local stack could not start: ${describeError(e)}`);
           const failed = this.fail("offline_unavailable");
-          return { kind: "error", error: failed.error };
+          this.setOfflineStatus({ phase: "error", error: failed.error });
+          return failed;
         }
 
-        if (!session) {
+        if (!this.offlineSession) {
           const failed = this.fail("offline_unavailable");
-          return { kind: "error", error: failed.error };
+          this.setOfflineStatus({ phase: "error", error: failed.error });
+          return failed;
         }
-
-        const offlineSession = session;
-        let account = await this.offlineAccount(offlineSession.endpoint);
-        if (account.kind === "register") {
-          if (username === undefined) return { kind: "needs_username" };
-          account = await this.registerOfflineAccount(offlineSession.endpoint, username);
-        }
-        if (account.kind === "error") {
-          const failed = this.fail(account.error.code, account.error.detail);
-          return { kind: "error", error: failed.error };
-        }
-
-        const installReady = await this.prepareGameInstall();
-        if (!installReady.ok) return { kind: "error", error: installReady.error };
-
-        const ep = offlineSession.endpoint;
-        const key = account.key;
-        const result = await this.launchGame(
-            ep.host, ep.port, XMPP_PORT, key,
-            async () => {
-              try {
-                await endPlaying(ep, key);
-              } finally {
-                await offlineSession.stop();
-              }
-            },
-            " (offline)",
-        );
-
-        launched = result.ok;
-        return result.ok ? { kind: "started" } : { kind: "error", error: result.error };
-      } finally {
-        if (!launched) await session?.stop().catch(() => undefined);
       }
+
+      const offlineSession = this.offlineSession;
+      let account = await this.offlineAccount(offlineSession.endpoint);
+
+      if (account.kind === "register") {
+        if (username === undefined) {
+          this.setOfflineStatus({ phase: "needs-username" });
+          return OK;
+        }
+
+        account = await this.registerOfflineAccount(
+            offlineSession.endpoint,
+            username,
+        );
+      }
+
+      if (account.kind === "error") {
+        const failed = this.fail(account.error.code, account.error.detail);
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({ phase: "error", error: failed.error });
+        return failed;
+      }
+
+      const installReady = await this.prepareGameInstall();
+
+      if (!installReady.ok) {
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({
+          phase: "error",
+          error: installReady.error,
+        });
+        return installReady;
+      }
+
+      const ep = offlineSession.endpoint;
+      const key = account.key;
+
+      this.setOfflineStatus({ phase: "launching-game" });
+
+      const result = await this.launchGame(
+          ep.host,
+          ep.port,
+          XMPP_PORT,
+          key,
+          async () => {
+            this.setOfflineStatus({ phase: "stopping" });
+
+            try {
+              await endPlaying(ep, key);
+            } finally {
+              await this.releaseOfflineSession();
+              this.setOfflineStatus({ phase: "stopped" });
+            }
+          },
+          " (offline)",
+      );
+
+      if (!result.ok) {
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({ phase: "error", error: result.error });
+        return result;
+      }
+
+      this.setOfflineStatus({ phase: "running" });
+      return OK;
     });
+  }
+
+  async stopOffline(): Promise<ActionResult> {
+    if (this.game.running) return err("busy");
+
+    if (!this.offlineSession) {
+      this.setOfflineStatus({ phase: "stopped" });
+      return OK;
+    }
+
+    this.setOfflineStatus({ phase: "stopping" });
+
+    try {
+      await this.releaseOfflineSession();
+      this.setOfflineStatus({ phase: "stopped" });
+      return OK;
+    } catch (e) {
+      log.error(`local stack could not stop: ${describeError(e)}`);
+      const failed = this.fail("offline_unavailable");
+      this.setOfflineStatus({ phase: "error", error: failed.error });
+      return failed;
+    }
   }
 
   async play(): Promise<ActionResult> {

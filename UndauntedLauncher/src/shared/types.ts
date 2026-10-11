@@ -95,10 +95,23 @@ export interface LauncherError {
   detail?: string;
 }
 
-export type OfflinePlayOutcome =
-    | { kind: "started" }
-    | { kind: "needs_username" }
-    | { kind: "error"; error: LauncherError };
+
+export type OfflinePhase =
+    | "preparing"
+    | "starting-metagame"
+    | "starting-deploy"
+    | "needs-username"
+    | "launching-game"
+    | "running"
+    | "stopping"
+    | "stopped"
+    | "error";
+
+export interface OfflineStatus {
+  phase: OfflinePhase;
+  progress?: number;
+  error?: LauncherError;
+}
 
 export type ActionResult = { ok: true } | { ok: false; error: LauncherError };
 
@@ -257,7 +270,9 @@ export const IPC = {
   cancelTask: "dr:cancel-task",
   repair: "dr:repair",
   play: "dr:play",
-  playOffline: "dr:play-offline",
+  startOffline: "dr:start-offline",
+  stopOffline: "dr:stop-offline",
+  offlineStatus: "dr:offline-status",
   setSettings: "dr:set-settings",
   setStatusPolling: "dr:set-status-polling",
   refreshStatus: "dr:refresh-status",
@@ -278,4 +293,5 @@ export const IPC = {
   snapshot: "dr:snapshot",
   progress: "dr:progress",
   windowState: "dr:window-state",
+  offlineStatusChanged: "dr:offline-status-changed",
 } as const;

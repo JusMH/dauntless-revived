@@ -24,7 +24,7 @@ import { findTailscale } from "./main/system";
 import { describeError, log, logToFile } from "./main/log";
 import { boundedString, externalTarget, isTrustedPageUrl, relayPortOverride, settingsPatch } from "./main/ipc-validate";
 import { INVITE_SCHEME, parseInvite } from "./shared/invite";
-import { IPC, type Snapshot, type TaskProgress } from "./shared/types";
+import { IPC, type Snapshot, type OfflineStatus, type TaskProgress } from "./shared/types";
 import { systemLanguage, translate } from "./shared/i18n";
 import { APP_ID, SQUIRREL_NAME, UPDATE_FEED_URL } from "./main/constants";
 import { LocalStackManager } from "./main/local-stack";
@@ -61,13 +61,13 @@ const RENDERER_INDEX_URL = pathToFileURL(RENDERER_INDEX).toString();
 const CSP =
   "default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' dr-art: data:; font-src 'self'; " +
   "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'";
-
 let mainWindow: BrowserWindow | null = null;
 let controller: Controller | null = null;
 let pendingInviteLink: string | null = null;
 let quitting = false;
 let linuxUpdate: LinuxUpdate | null = null;
 let devLocalStack: LocalStackManager | null = null;
+
 
 function resourcesDir(): string {
   return app.isPackaged ? process.resourcesPath : path.join(app.getAppPath(), "assets");
@@ -140,10 +140,12 @@ function makeDevLocalStack(): LocalStackManager | null {
   return stack;
 }
 
-async function startDevOfflineStack(): Promise<OfflineStackSession | null> {
-  const stack = devLocalStack;
+async function startDevOfflineStack(onPhase: (phase: "starting-metagame" | "starting-deploy") => void,): Promise<OfflineStackSession | null> {const stack = devLocalStack;
   if (!stack) return null;
-  if (stack.snapshot.state === "stopped" || stack.snapshot.state === "failed") {await stack.start();}
+  const unsubscribe = stack.onChange((snapshot) => {
+    if (snapshot.state === "starting-metagame" || snapshot.state === "starting-deploy") {onPhase(snapshot.state);}});
+  try {
+    if (stack.snapshot.state === "stopped" || stack.snapshot.state === "failed") {await stack.start();}} finally {unsubscribe();}
   if (stack.snapshot.state !== "ready") {throw new Error(`local stack is not ready (${stack.snapshot.state})`);}
   return {
     endpoint: {
@@ -407,13 +409,15 @@ function registerIpc(c: Controller): void {
   handle(IPC.cancelTask, () => c.cancelTask());
   handle(IPC.repair, () => c.repair());
   handle(IPC.play, () => c.play());
-  handle(IPC.playOffline, (_e, username) => {
-    if (username === undefined) return c.playOffline();
+  handle(IPC.startOffline, (_e, username) => {
+    if (username === undefined) return c.startOffline();
     const s = boundedString(username, 32);
     return s === null
-        ? { kind: "error", error: { code: "username_invalid" } }
-        : c.playOffline(s);
+        ? { ok: false, error: { code: "username_invalid" } }
+        : c.startOffline(s);
   });
+  handle(IPC.stopOffline, () => c.stopOffline());
+  handle(IPC.offlineStatus, () => c.offlineStatus());
   handle(IPC.setSettings, (_e, patch) => {
     const p = settingsPatch(patch);
     return p === null ? c.setSettings({}) : c.setSettings(p);
@@ -451,7 +455,7 @@ function registerIpc(c: Controller): void {
 // ------------------------------------------------------------------ platform for the controller
 
 function makePlatform(): Platform {
-  const send = (channel: string, payload: Snapshot | TaskProgress) => {
+  const send = (channel: string, payload: Snapshot | TaskProgress | OfflineStatus) => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
   };
   const localAppData = process.env.LOCALAPPDATA ?? path.join(app.getPath("home"), "AppData", "Local");
@@ -509,9 +513,10 @@ function makePlatform(): Platform {
     },
     emitSnapshot: (s) => send(IPC.snapshot, s),
     emitProgress: (p) => send(IPC.progress, p),
+    emitOfflineStatus: (s) => send(IPC.offlineStatusChanged, s),
     findTailscale: () => findTailscale(process.env, existsSync, process.platform),
     findRunningClients: () => findRunningClients(process.platform),
-    startOfflineStack: devLocalStack ? () => startDevOfflineStack() : undefined,
+    startOfflineStack: devLocalStack ? (onPhase) => startDevOfflineStack(onPhase) : undefined,
     prepareGameLaunch:
       process.platform === "linux"
         ? async () => {
