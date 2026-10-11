@@ -20,7 +20,7 @@ const Server = app.listen(PORT, BIND_HOST, (err?: Error) => {
   }
 
   // A failed start is reported, not an unhandled rejection (from github.com/Harmonicrain/Undaunted 895f7c7)
-  void StartupAndReportFailure();
+  Startup = StartupAndReportFailure();
 
   Watchdog = setInterval(RunWatchdog, 60 * 1000);
 
@@ -32,7 +32,14 @@ const Server = app.listen(PORT, BIND_HOST, (err?: Error) => {
 // Used by the Launcher-owned local stack so Deploy can stop its own game processes before exiting.
 export async function shutdown(){
   if(Watchdog) clearInterval(Watchdog);
-  await new Promise<void>(Resolve => Server.close(() => Resolve()));
-  if(Startup) await Startup;
+
+  const Closing = new Promise<void>(Resolve =>
+      Server.close(() => Resolve())
+  );
+
   await ShutdownGameservers();
+
+  if(Startup) await Startup;
+
+  await Closing;
 }

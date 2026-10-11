@@ -253,7 +253,7 @@ function createWindow(): void {
   window.once("closed", () => clearTimeout(showTimer));
   window.webContents.on("render-process-gone", (_event, details) => {
     log.error(`launcher renderer stopped: ${details.reason}`);
-    if (!process.argv.includes("--safe-mode") && !controller?.relayActive) {
+    if (!process.argv.includes("--safe-mode") && !controller?.relayActive && !controller?.offlineGameActive) {
       app.relaunch({args: [...process.argv.slice(1), "--safe-mode"]});
       app.exit(0);
     } else {
@@ -263,25 +263,42 @@ function createWindow(): void {
   mainWindow.on("maximize", () => mainWindow?.webContents.send(IPC.windowState, true));
   mainWindow.on("unmaximize", () => mainWindow?.webContents.send(IPC.windowState, false));
 
-  // In public mode the launcher carries the game's connection. Closing it would cut the game off,
-  // so ask first.
+  // Public relay and offline play both depend on launcher-owned background processes.
+  // Closing the launcher underneath either one would disconnect the running game.
   mainWindow.on("close", (event) => {
-    if (quitting || !controller?.relayActive || !mainWindow) return;
+    if (quitting || !controller || !mainWindow) return;
+
+    const closeReason = controller.offlineGameActive
+        ? "offline"
+        : controller.relayActive
+            ? "relay"
+            : null;
+
+    if (closeReason === null) return;
+
     const lang = controller.snapshot().settings.language;
     const choice = dialog.showMessageBoxSync(mainWindow, {
       type: "warning",
       title: translate(lang, "app_title"),
       message: translate(lang, "close_title"),
-      detail: translate(lang, "close_text"),
-      buttons: [translate(lang, "close_keep"), translate(lang, "close_anyway")],
+      detail: translate(
+          lang,
+          closeReason === "offline" ? "close_text_offline" : "close_text",
+      ),
+      buttons: [
+        translate(lang, "close_keep"),
+        translate(lang, "close_anyway"),
+      ],
       defaultId: 0,
       cancelId: 0,
       noLink: true,
     });
+
     if (choice === 0) {
       event.preventDefault();
       mainWindow.minimize();
-      controller.setNotice("keep_open");
+
+      if (closeReason === "relay") controller.setNotice("keep_open");
     }
   });
   mainWindow.on("closed", () => {

@@ -153,6 +153,9 @@ export class Controller {
   private readonly game: GameProcess;
   private endPlayingSession: (()=>Promise<void>) | null = null;
   private offlineSession: OfflineStackSession | null = null;
+  private offlineStarting = false;
+  private offlineCancelRequested = false;
+  private offlineStartTask: Promise<ActionResult> | null = null;
   private readonly verified: VerifiedCache;
 
   private reachable: boolean | null = null;
@@ -225,6 +228,10 @@ export class Controller {
   // True while the game runs through the local relay: closing the launcher would cut the game off.
   get relayActive(): boolean {
     return this.relay !== null && this.relay.running;
+  }
+
+  get offlineGameActive(): boolean {
+    return (this.offlineSession !== null && (this.game.running || this.offline.phase === "launching-game"));
   }
 
   get gameRunning(): boolean {
@@ -1192,6 +1199,23 @@ export class Controller {
     }
   }
 
+  private async finishOfflineCancellation(): Promise<ActionResult | null> {
+    if (!this.offlineCancelRequested) return null;
+
+    this.offlineCancelRequested = false;
+
+    try {
+      await this.releaseOfflineSession();
+      this.setOfflineStatus({ phase: "stopped" });
+      return OK;
+    } catch (e) {
+      log.error(`local stack could not stop after cancellation: ${describeError(e)}`);
+      const failed = this.fail("offline_unavailable");
+      this.setOfflineStatus({ phase: "error", error: failed.error });
+      return failed;
+    }
+  }
+
   async startOffline(username?: unknown): Promise<ActionResult> {
     if (this.busy || this.task) return err("busy");
     if (this.game.running) return this.fail("already_running");
@@ -1203,10 +1227,15 @@ export class Controller {
       return failed;
     }
 
-    return this.withBusy(async () => {
+    this.offlineStarting = true;
+    this.offlineCancelRequested = false;
+
+    const task = this.withBusy(async () => {
       this.setOfflineStatus({ phase: "preparing" });
 
       const environment = await this.checkGameLaunchEnvironment();
+      const cancelledAfterEnvironment = await this.finishOfflineCancellation();
+      if (cancelledAfterEnvironment) return cancelledAfterEnvironment;
       if (!environment.ok) {
         this.setOfflineStatus({ phase: "error", error: environment.error });
         return environment;
@@ -1215,9 +1244,13 @@ export class Controller {
       if (!this.offlineSession) {
         try {
           this.offlineSession = await startOfflineStack((phase) => {
-            this.setOfflineStatus({ phase });
+            if (!this.offlineCancelRequested) {
+              this.setOfflineStatus({ phase });
+            }
           });
         } catch (e) {
+          const cancelledDuringStart = await this.finishOfflineCancellation();
+          if (cancelledDuringStart) return cancelledDuringStart;
           log.error(`local stack could not start: ${describeError(e)}`);
           const failed = this.fail("offline_unavailable");
           this.setOfflineStatus({ phase: "error", error: failed.error });
@@ -1230,9 +1263,12 @@ export class Controller {
           return failed;
         }
       }
-
+      const cancelledAfterStack = await this.finishOfflineCancellation();
+      if (cancelledAfterStack) return cancelledAfterStack;
       const offlineSession = this.offlineSession;
       let account = await this.offlineAccount(offlineSession.endpoint);
+      const cancelledAfterAccount = await this.finishOfflineCancellation();
+      if (cancelledAfterAccount) return cancelledAfterAccount;
 
       if (account.kind === "register") {
         if (username === undefined) {
@@ -1244,7 +1280,24 @@ export class Controller {
             offlineSession.endpoint,
             username,
         );
+        const cancelledAfterRegistration = await this.finishOfflineCancellation();
+        if (cancelledAfterRegistration) return cancelledAfterRegistration;
       }
+
+        if (
+            account.kind === "error" &&
+            (account.error.code === "username_invalid" ||
+                account.error.code === "username_taken")
+        ) {
+          const failed = err(account.error.code, account.error.detail);
+
+          this.setOfflineStatus({
+            phase: "needs-username",
+            error: failed.error,
+          });
+
+          return failed;
+        }
 
       if (account.kind === "error") {
         const failed = this.fail(account.error.code, account.error.detail);
@@ -1254,6 +1307,9 @@ export class Controller {
       }
 
       const installReady = await this.prepareGameInstall();
+
+      const cancelledAfterInstall = await this.finishOfflineCancellation();
+      if (cancelledAfterInstall) return cancelledAfterInstall;
 
       if (!installReady.ok) {
         await this.releaseOfflineSession();
@@ -1293,13 +1349,35 @@ export class Controller {
         return result;
       }
 
+      if (!this.game.running) {
+        return OK;
+      }
+
       this.setOfflineStatus({ phase: "running" });
       return OK;
     });
+    this.offlineStartTask = task;
+    try {
+      return await task;
+    } finally {
+      if (this.offlineStartTask === task) {
+        this.offlineStartTask = null;
+      }
+
+      this.offlineStarting = false;
+    }
   }
 
   async stopOffline(): Promise<ActionResult> {
-    if (this.game.running) return err("busy");
+    if (this.game.running || this.offline.phase === "launching-game") {
+      return err("busy");
+    }
+
+    if (this.offlineStarting) {
+      this.offlineCancelRequested = true;
+      this.setOfflineStatus({ phase: "stopping" });
+      return OK;
+    }
 
     if (!this.offlineSession) {
       this.setOfflineStatus({ phase: "stopped" });
@@ -1322,6 +1400,7 @@ export class Controller {
 
   async play(): Promise<ActionResult> {
     if (this.busy || this.task) return err("busy");
+    if (this.offlineSession || this.offlineStarting) return err("busy");
     if (this.game.running) return this.fail("already_running");
     const sv = this.s.server;
     const slot = this.slot();
@@ -1569,6 +1648,30 @@ export class Controller {
     this.setStatusPolling(false);
     this.job?.cancel();
     this.taskAbort?.abort();
+
+    const offlineStartTask = this.offlineStartTask;
+
+    if (offlineStartTask) {
+      this.offlineCancelRequested = true;
+
+      if (!this.game.running && this.offline.phase !== "launching-game") {
+        this.setOfflineStatus({ phase: "stopping" });
+      }
+
+      await offlineStartTask.catch(() => undefined);
+    }
+
+    if (this.offlineSession) {
+      this.setOfflineStatus({ phase: "stopping" });
+
+      try {
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({ phase: "stopped" });
+      } catch (e) {
+        log.error(`local stack could not stop during shutdown: ${describeError(e)}`);
+      }
+    }
+
     await this.stopRelay();
   }
 }
