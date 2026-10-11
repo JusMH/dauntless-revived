@@ -49,6 +49,7 @@ const ERROR_CODES: Record<ErrorCode, true> = {
   windows_runtime_missing: true,
   compat_runtime_missing: true,
   config_failed: true,
+  offline_unavailable: true,
   busy: true,
   cancelled: true,
   cert_mismatch: true,
@@ -57,6 +58,7 @@ const ERROR_CODES: Record<ErrorCode, true> = {
   relay_port_busy: true,
   relay_failed: true,
   unknown: true,
+
 };
 const INVITE_ERRORS: Record<InviteError, true> = {
   empty: true,

@@ -28,6 +28,7 @@ const RELAY_PORT = 62441;
 const BUSY_RELAY_PORT = 62442;
 const SWAP_PORT = 62443;
 const PRIVATE_PORT = 62444;
+const OFFLINE_PORT = 62445;
 const ASSETS = path.resolve(__dirname, "..", "..", "assets");
 const EXE = "Archon/Binaries/Win64/Fake-Game.exe";
 
@@ -97,7 +98,7 @@ interface Harness {
 
 // userDataDir: reuse another harness's settings and keys (the launcher opened again).
 // chooseFolder: what the folder dialog answers (default: cancelled).
-function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null): Harness {
+function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"],): Harness {
   let snap: Snapshot | null = null;
   const spawns: Harness["spawns"] = [];
   let child: EventEmitter | null = null;
@@ -140,6 +141,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
     findTailscale: () => null,
     findRunningClients: async () => [],
     runtimeFilesExist: () => true,
+    startOfflineStack,
 
     spawn: fakeSpawn,
   };
@@ -366,6 +368,72 @@ function existingGame(): { base: string; game: string } {
   }
   return { base, game };
 }
+
+function installFakeGame(dir: string): void {
+  for (const f of files) {
+    const target = path.join(dir, ...f.path.split("/"));
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, f.data);
+  }
+}
+
+test("offline play registers once, stores its key and reuses the same account", async () => {
+  const local = new FakeMetagame({ name: "Local", registration: "OPEN", contentPort: null });
+  await local.start(OFFLINE_PORT);
+
+  let starts = 0;
+  let stops = 0;
+
+  const hx = harness(
+      RELAY_PORT,
+      undefined,
+      async () => null,
+      async () => {
+        starts++;
+        return {
+          endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
+          stop: async () => { stops++; },
+        };
+      },
+  );
+
+  try {
+    installFakeGame(hx.installDir);
+    await hx.c.init();
+
+    assert.deepEqual(await hx.c.playOffline(), { kind: "needs_username" });
+    assert.equal(starts, 1);
+    assert.equal(stops, 1, "the local stack is released while waiting for a username");
+    assert.equal(local.registrations.length, 0);
+    assert.equal(hx.spawns.length, 0);
+
+    assert.deepEqual(await hx.c.playOffline("Offline_1"), { kind: "started" });
+    assert.equal(local.registrations.length, 1);
+    assert.equal(local.registrations[0].username, "Offline_1");
+    assert.equal(hx.spawns.length, 1);
+
+    const firstArgs = hx.spawns[0].args;
+    assert.equal(firstArgs[0], `127.0.0.1:${OFFLINE_PORT}`);
+    assert.match(firstArgs[1], /^-AUTH_PASSWORD=UUK_[0-9a-f]{48}$/);
+    const firstKey = firstArgs[1];
+
+    hx.child()!.emit("exit", 0);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(stops, 2, "the local stack stops when the offline game exits");
+
+    assert.deepEqual(await hx.c.playOffline(), { kind: "started" });
+    assert.equal(local.registrations.length, 1, "the saved offline account is reused");
+    assert.equal(hx.spawns.length, 2);
+    assert.equal(hx.spawns[1].args[1], firstKey, "the same offline account key is reused");
+
+    hx.child()!.emit("exit", 0);
+    await new Promise((r) => setTimeout(r, 100));
+    assert.equal(stops, 3);
+  } finally {
+    await hx.c.shutdown();
+    await local.stop();
+  }
+});
 
 test("an existing BaseGame144 folder, pasted, is checked in place and launched from its Dauntless folder", async () => {
   const hx = harness();

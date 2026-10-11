@@ -72,6 +72,7 @@ export type ErrorCode =
   | "launch_failed"
   | "windows_runtime_missing"
 
+
   | "compat_runtime_missing"
   | "config_failed"
   | "busy"
@@ -81,7 +82,9 @@ export type ErrorCode =
   | "rate_limited"
   | "relay_port_busy"
   | "relay_failed"
-  | "unknown";
+  | "unknown"
+  | "offline_unavailable"
+
 
 // Short messages that are not errors.
 export type NoticeCode = "keep_open" | "backup_saved" | "repair_done" | "install_done";
@@ -91,6 +94,11 @@ export interface LauncherError {
   // Extra detail for the message, e.g. a file path or a byte count. Never a key.
   detail?: string;
 }
+
+export type OfflinePlayOutcome =
+    | { kind: "started" }
+    | { kind: "needs_username" }
+    | { kind: "error"; error: LauncherError };
 
 export type ActionResult = { ok: true } | { ok: false; error: LauncherError };
 
