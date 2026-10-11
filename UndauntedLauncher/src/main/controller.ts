@@ -106,8 +106,14 @@ export interface Platform {
   findTailscale(): string | null;
   findRunningClients(): Promise<number[]>;
   prepareGameLaunch?(): Promise<{ runtime: LaunchRuntime; configDir: string; runtimeName: string } | null>;
+  startOfflineStack?(): Promise<OfflineStackSession | null>;
   spawn?: SpawnFn;
   installUpdate?(): void;
+}
+
+export interface OfflineStackSession {
+  endpoint: Endpoint;
+  stop(): Promise<void>;
 }
 
 interface InstallInfo {
@@ -1115,8 +1121,8 @@ export class Controller {
     const slot = this.slot();
     if (!sv || !slot) return this.fail("server_unreachable");
     return this.withBusy(async () => {
-      const missing = [...missingVcRuntime(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform), ...missingDirectX(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform)];
-      if (missing.length) return this.fail('windows_runtime_missing', missing.join(', '));
+      const environment = await this.checkGameLaunchEnvironment();
+      if (!environment.ok) return environment;
 
       const others = await this.p.findRunningClients();
       if (others.length > 0) return this.fail("already_running");
@@ -1137,27 +1143,8 @@ export class Controller {
           if (!await saveHuntRegion(ep,key,chosenRegion)) return this.fail('server_error','The selected hunt region is unavailable. Choose Main in Settings or try again later.');
         } catch { return this.fail('server_unreachable'); }
       }
-      const dir = this.installDir;
-      await this.inspectInstall();
-      if (this.install.missing.length > 0) return this.fail("game_files_invalid", String(this.install.missing.length));
-      // Same checks as play.ps1 on every launch: the exe and both DLLs by hash.
-      const exePin = this.p.exePin ?? { relativePath: EXE_RELATIVE_PATH, sha256: PINNED_EXE_SHA256 };
-      let exeHash = "";
-      try {
-        exeHash = await hashFile(resolveInside(dir, exePin.relativePath));
-      } catch {
-        exeHash = "";
-      }
-      if (exeHash !== exePin.sha256) return this.fail("game_files_invalid", exePin.relativePath);
-      if (!this.install.dllsOk) {
-        try {
-          await installPinnedDlls(this.p.resourcesDir, dir);
-        } catch (e) {
-          log.error(`DLL repair before launch failed: ${describeError(e)}`);
-          return this.fail("dll_failed");
-        }
-      }
-      await this.installMods(dir);
+      const installReady = await this.prepareGameInstall();
+      if (!installReady.ok) return installReady;
 
       // Where the game connects. Public mode: the local relay, started before the game.
       let gameHost = sv.host;
@@ -1189,6 +1176,50 @@ export class Controller {
         if (!launched) await this.stopRelay();
       }
     });
+  }
+
+  private async checkGameLaunchEnvironment(): Promise<ActionResult> {
+    const missing = [
+      ...missingVcRuntime(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform),
+      ...missingDirectX(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform),
+    ];
+    if (missing.length) return this.fail("windows_runtime_missing", missing.join(", "));
+
+    const others = await this.p.findRunningClients();
+    if (others.length > 0) return this.fail("already_running");
+
+    return OK;
+  }
+
+  private async prepareGameInstall(): Promise<ActionResult> {
+    const dir = this.installDir;
+
+    await this.inspectInstall();
+    if (this.install.missing.length > 0) return this.fail("game_files_invalid", String(this.install.missing.length));
+
+    // Same checks as play.ps1 on every launch: the exe and both DLLs by hash.
+    const exePin = this.p.exePin ?? { relativePath: EXE_RELATIVE_PATH, sha256: PINNED_EXE_SHA256 };
+    let exeHash = "";
+
+    try {
+      exeHash = await hashFile(resolveInside(dir, exePin.relativePath));
+    } catch {
+      exeHash = "";
+    }
+
+    if (exeHash !== exePin.sha256) return this.fail("game_files_invalid", exePin.relativePath);
+
+    if (!this.install.dllsOk) {
+      try {
+        await installPinnedDlls(this.p.resourcesDir, dir);
+      } catch (e) {
+        log.error(`DLL repair before launch failed: ${describeError(e)}`);
+        return this.fail("dll_failed");
+      }
+    }
+
+    await this.installMods(dir);
+    return OK;
   }
 
   private async launchGame(

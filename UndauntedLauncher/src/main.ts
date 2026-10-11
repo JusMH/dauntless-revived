@@ -10,7 +10,7 @@ import { existsSync, promises as fsp } from "node:fs";
 import { pathToFileURL } from "node:url";
 import started from "electron-squirrel-startup";
 import { updateElectronApp, UpdateSourceType } from "update-electron-app";
-import { Controller, type Platform } from "./main/controller";
+import { Controller, type Platform, type OfflineStackSession } from "./main/controller";
 import { GAME_MANIFEST, GAME_MANIFEST_FINGERPRINT, GAME_MANIFEST_PROBLEM } from "./main/game-manifest";
 import { findRunningClients } from "./main/launch";
 import { LinuxRuntimeMissingError, prepareLinuxGameLaunch } from "./main/linux-runtime";
@@ -138,6 +138,21 @@ function makeDevLocalStack(): LocalStackManager | null {
   });
 
   return stack;
+}
+
+async function startDevOfflineStack(): Promise<OfflineStackSession | null> {
+  const stack = devLocalStack;
+  if (!stack) return null;
+  if (stack.snapshot.state === "stopped" || stack.snapshot.state === "failed") {await stack.start();}
+  if (stack.snapshot.state !== "ready") {throw new Error(`local stack is not ready (${stack.snapshot.state})`);}
+  return {
+    endpoint: {
+      host: "127.0.0.1",
+      port: 61000,
+      pin: null,
+    },
+    stop: () => stack.stop(),
+  };
 }
 
 async function ensureLinuxSecureStorageDependency(): Promise<boolean> {
@@ -489,6 +504,7 @@ function makePlatform(): Platform {
     emitProgress: (p) => send(IPC.progress, p),
     findTailscale: () => findTailscale(process.env, existsSync, process.platform),
     findRunningClients: () => findRunningClients(process.platform),
+    startOfflineStack: devLocalStack ? () => startDevOfflineStack() : undefined,
     prepareGameLaunch:
       process.platform === "linux"
         ? async () => {
