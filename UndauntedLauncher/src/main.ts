@@ -407,6 +407,13 @@ function registerIpc(c: Controller): void {
   handle(IPC.cancelTask, () => c.cancelTask());
   handle(IPC.repair, () => c.repair());
   handle(IPC.play, () => c.play());
+  handle(IPC.playOffline, (_e, username) => {
+    if (username === undefined) return c.playOffline();
+    const s = boundedString(username, 32);
+    return s === null
+        ? { kind: "error", error: { code: "username_invalid" } }
+        : c.playOffline(s);
+  });
   handle(IPC.setSettings, (_e, patch) => {
     const p = settingsPatch(patch);
     return p === null ? c.setSettings({}) : c.setSettings(p);
@@ -554,10 +561,6 @@ if (!started) {
       logToFile(path.join(app.getPath("userData"), "logs"));
       log.info(`Dauntless Revived Launcher ${app.getVersion()} starting`);
       devLocalStack = makeDevLocalStack();
-
-      if (devLocalStack) {
-        await devLocalStack.start();
-      }
       if (process.platform === "linux") {
         log.info(
           `secure storage backend ${safeStorage.getSelectedStorageBackend()}, encryption ${safeStorage.isEncryptionAvailable() ? "available" : "unavailable"}`,

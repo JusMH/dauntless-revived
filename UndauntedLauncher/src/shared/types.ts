@@ -257,6 +257,7 @@ export const IPC = {
   cancelTask: "dr:cancel-task",
   repair: "dr:repair",
   play: "dr:play",
+  playOffline: "dr:play-offline",
   setSettings: "dr:set-settings",
   setStatusPolling: "dr:set-status-polling",
   refreshStatus: "dr:refresh-status",
