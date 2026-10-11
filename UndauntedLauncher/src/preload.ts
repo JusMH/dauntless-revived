@@ -3,7 +3,7 @@
 // towards the page.
 
 import { contextBridge, ipcRenderer } from "electron";
-import { IPC } from "./shared/types";
+import {IPC, OfflinePlayOutcome} from "./shared/types";
 import type {
   ActionResult,
   Branding,
@@ -40,6 +40,7 @@ const api = {
   cancelTask: (): Promise<void> => ipcRenderer.invoke(IPC.cancelTask),
   repair: (): Promise<ActionResult> => ipcRenderer.invoke(IPC.repair),
   play: (): Promise<ActionResult> => ipcRenderer.invoke(IPC.play),
+  playOffline: (username?: string): Promise<OfflinePlayOutcome> => ipcRenderer.invoke(IPC.playOffline, username === undefined ? undefined : String(username)),
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
     ipcRenderer.invoke(IPC.setSettings, {
       ...(patch.graphics !== undefined ? { graphics: patch.graphics } : {}),
