@@ -150,6 +150,7 @@ export function endpointFor(sv: StoredServer): Endpoint {
 export class Controller {
   private readonly settings: SettingsStore;
   private readonly keys: KeyStore;
+  private readonly offlineKeys: KeyStore;
   private readonly game: GameProcess;
   private endPlayingSession: (()=>Promise<void>) | null = null;
   private offlineSession: OfflineStackSession | null = null;
@@ -195,6 +196,8 @@ export class Controller {
   constructor(private readonly p: Platform) {
     this.settings = new SettingsStore(p.userDataDir, p.defaultLanguage, p.hostPlatform ?? process.platform);
     this.keys = new KeyStore(path.join(p.userDataDir, "keys"), p.encryptor, p.documentsDir ? path.join(p.documentsDir, "Dauntless Revived", "Account Keys") : undefined);
+    // Local identity stays in userData; online account recovery in Documents is unchanged.
+    this.offlineKeys = new KeyStore(path.join(p.userDataDir, "keys"), p.encryptor);
     this.game = new GameProcess(p.spawn);
     this.verified = new VerifiedCache(path.join(p.userDataDir, "verified-files.json"));
     this.game.onChange((running, code) => {
@@ -713,7 +716,7 @@ export class Controller {
   private async offlineAccount(ep: Endpoint): Promise<OfflineAccountResult> {
     let key: string | null;
     try {
-      key = await this.keys.load(OFFLINE_KEY_SLOT);
+      key = await this.offlineKeys.load(OFFLINE_KEY_SLOT);
     } catch (e) {
       log.error(`could not load the offline account key: ${describeError(e)}`);
       return { kind: "error", error: { code: "key_storage_unavailable" } };
@@ -741,7 +744,7 @@ export class Controller {
     }
 
     try {
-      await this.keys.save(OFFLINE_KEY_SLOT, res.key);
+      await this.offlineKeys.save(OFFLINE_KEY_SLOT, res.key);
     } catch (e) {
       log.error(`could not store the offline account key: ${describeError(e)}`);
       return { kind: "error", error: { code: "key_storage_unavailable" } };

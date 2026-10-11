@@ -18,29 +18,17 @@ const path = require("path");
 const crypto = require("crypto");
 const { backupProgress } = require("./backup-policy.cjs");
 
-const [command, metaDir, dbFile, ...rest] = process.argv.slice(2);
-
 function fail(message) {
-    console.error(`dr-db: ${message}`);
-    process.exit(1);
+    throw new Error(message);
 }
 
-if (!command || !metaDir || !dbFile) fail("usage: dr-db.js <command> <metagame dir> <db> [args]");
-
-let Database;
-try {
-    Database = require(path.join(path.resolve(metaDir), "node_modules", "better-sqlite3"));
-} catch (e) {
-    fail(`better-sqlite3 not found under ${metaDir} (run npm ci there first): ${e.message}`);
-}
-
-function open(file, readonly) {
+function open(Database, file, readonly) {
     if (!fs.existsSync(file)) fail(`no database at ${file}`);
     return new Database(file, { readonly, fileMustExist: true });
 }
 
-function check(file) {
-    const db = open(file, true);
+function check(Database, file) {
+    const db = open(Database, file, true);
     try {
         const result = db.pragma("integrity_check", { simple: true });
         if (result !== "ok") fail(`integrity_check says: ${result}`);
@@ -51,10 +39,18 @@ function check(file) {
     }
 }
 
-async function main() {
+async function main(args = process.argv.slice(2)) {
+    const [command, metaDir, dbFile, ...rest] = args;
+    if (!command || !metaDir || !dbFile) fail("usage: dr-db.js <command> <metagame dir> <db> [args]");
+    let Database;
+    try {
+        Database = require(path.join(path.resolve(metaDir), "node_modules", "better-sqlite3"));
+    } catch (e) {
+        fail(`better-sqlite3 not found under ${metaDir} (run npm ci there first): ${e.message}`);
+    }
     switch (command) {
         case "integrity": {
-            console.log(check(dbFile));
+            console.log(check(Database, dbFile));
             return;
         }
         case "backup": {
@@ -73,23 +69,23 @@ async function main() {
                     // may still be copying; do not start another backup in that case.
                     if (error.cause?.code !== 'ECONNREFUSED') throw error;
                 }
-                if (response?.ok) { console.log(`db ${check(dest)}`); return; }
+                if (response?.ok) { console.log(`db ${check(Database, dest)}`); return; }
                 if (response && response.status !== 404) throw new Error(`Live backup failed (${response.status})`);
             }
-            const db = open(dbFile, true);
+            const db = open(Database, dbFile, true);
             try {
                 await db.backup(dest, { progress: backupProgress() });
             } finally {
                 db.close();
             }
-            console.log(`db ${check(dest)}`);
+            console.log(`db ${check(Database, dest)}`);
             return;
         }
         case "add-invite":
         case "del-invite": {
             const code = rest[0];
             if (!code || !/^[A-Za-z0-9-]{4,64}$/.test(code)) fail("bad invite code");
-            const db = open(dbFile, false);
+            const db = open(Database, dbFile, false);
             try {
                 if (command === "add-invite") {
                     db.prepare("INSERT OR REPLACE INTO invitecodes (invitecode, usesRemaining, infiniteUses) VALUES (?, 1, 0)").run(code);
@@ -105,7 +101,7 @@ async function main() {
         case "make-admin": {
             const userId = rest[0];
             if (!userId) fail("make-admin needs a user id");
-            const db = open(dbFile, false);
+            const db = open(Database, dbFile, false);
             try {
                 const r = db.prepare("UPDATE users SET isAdmin = 1 WHERE userId = ?").run(userId);
                 if (r.changes !== 1) fail("no such user");
@@ -121,7 +117,7 @@ async function main() {
             const key = fs.readFileSync(keyFile, "utf8").trim();
             if (key.length < 32) fail("the game-server key file looks empty or truncated");
             const hash = crypto.createHash("sha256").update(key, "utf8").digest("hex");
-            const db = open(dbFile, false);
+            const db = open(Database, dbFile, false);
             try {
                 const present = db.prepare("SELECT count(*) AS n FROM gameserverapikeys WHERE keyHash = ?").get(hash).n > 0;
                 if (present) {
@@ -140,4 +136,8 @@ async function main() {
     }
 }
 
-main().catch((e) => fail(e.message));
+module.exports = main;
+if (require.main === module) main().catch((e) => {
+    console.error(`dr-db: ${e.message}`);
+    process.exitCode = 1;
+});

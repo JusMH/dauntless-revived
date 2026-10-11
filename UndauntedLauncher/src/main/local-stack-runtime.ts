@@ -23,6 +23,8 @@ export interface ElectronLocalStackRuntimeOptions {
     runnerPath: string;
     services: Record<LocalServiceName, LocalServiceSpec>;
     readyTimeoutMs?: number;
+    env?: NodeJS.ProcessEnv;
+    beforeStart?(name: LocalServiceName): Promise<void>;
 }
 
 // Electron implementation of LocalStackRuntime.
@@ -44,6 +46,8 @@ export class ElectronLocalStackRuntime implements LocalStackRuntime {
 
         const spec = this.options.services[name];
 
+        await this.options.beforeStart?.(name);
+
         const child = utilityProcess.fork(
             this.options.runnerPath,
             [spec.serverPath, spec.envPath],
@@ -51,6 +55,7 @@ export class ElectronLocalStackRuntime implements LocalStackRuntime {
                 cwd: spec.cwd,
                 stdio: "inherit",
                 serviceName: `Dauntless Revived local ${name}`,
+                env: this.options.env,
             },
         );
 
