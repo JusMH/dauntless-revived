@@ -416,7 +416,54 @@ describe("shutdown", () => {
             assert.equal(Gameservers.length, 0);
             assert.equal(Spawned.length, SpawnCount, "shutdown must not restart Ramsgate");
         } finally {
-            delete process.env.RAMSGATE_POOL;
+            process.env.RAMSGATE_POOL = "0";
+        }
+    });
+
+    it("shutdown interrupts an in-flight startup and prevents new game servers", async () => {
+        UseProcessFunctionsForTests({
+            Spawn: KillableFakeSpawn,
+            IsAlive,
+            IsPortBound: async () => false
+        });
+
+        process.env.RAMSGATE_POOL = "0";
+
+        const PreviousExitCode = process.exitCode;
+        process.env.GAMESERVER_STARTUP_GRACE_MS = "5000";
+
+        try {
+            const Boot = StartupAndReportFailure();
+
+            await WaitFor(() => Spawned.length === 1);
+
+            const RamsgatePid = Spawned[0].Pid!;
+            assert.ok(Alive.has(RamsgatePid), "Ramsgate is still starting");
+
+            await ShutdownGameservers();
+            await Boot;
+
+            assert.equal(Alive.has(RamsgatePid), false);
+            assert.equal(Gameservers.length, 0);
+            assert.equal(
+                process.exitCode,
+                PreviousExitCode,
+                "an intentional shutdown is not a startup failure",
+            );
+
+            await assert.rejects(
+                StartupGameserverWithArgs(TUTORIAL_ARGS),
+                /Deploy service is shutting down/,
+            );
+
+            assert.equal(
+                Spawned.length,
+                1,
+                "no game server may spawn after shutdown begins",
+            );
+        } finally {
+            process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
+            process.env.RAMSGATE_POOL = "0";
         }
     });
 });

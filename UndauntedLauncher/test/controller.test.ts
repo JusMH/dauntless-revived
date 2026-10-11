@@ -99,7 +99,7 @@ interface Harness {
 
 // userDataDir: reuse another harness's settings and keys (the launcher opened again).
 // chooseFolder: what the folder dialog answers (default: cancelled).
-function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"],): Harness {
+function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"], onChild?: (child: EventEmitter) => void,): Harness {
   let snap: Snapshot | null = null;
   const spawns: Harness["spawns"] = [];
   const offlineStatuses: OfflineStatus[] = [];
@@ -108,6 +108,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
     spawns.push({ exe, args, cwd: opts.cwd, env: opts.env });
     child = new EventEmitter();
     const c = child;
+    onChild?.(c);
     setImmediate(() => c.emit("spawn"));
     return child;
   }) as unknown as SpawnFn;
@@ -523,6 +524,334 @@ test("stopOffline tears down a local stack waiting for a username", async () => 
   } finally {
     await hx.c.shutdown();
     await local.stop();
+  }
+});
+
+test("offline registration keeps the local stack alive after a username error", async () => {
+  const local = new FakeMetagame({
+    name: "Local",
+    registration: "OPEN",
+    contentPort: null,
+    existingUsers: new Map([
+      ["taken", "UUK_existing"],
+    ]),
+  });
+
+  await local.start(OFFLINE_PORT);
+
+  let starts = 0;
+  let stops = 0;
+
+  const hx = harness(
+      RELAY_PORT,
+      undefined,
+      async () => null,
+      async (onPhase) => {
+        starts++;
+        onPhase("starting-metagame");
+        onPhase("starting-deploy");
+
+        return {
+          endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
+          stop: async () => { stops++; },
+        };
+      },
+  );
+
+  try {
+    installFakeGame(hx.installDir);
+    await hx.c.init();
+
+    assert.deepEqual(await hx.c.startOffline(), { ok: true });
+    assert.equal(hx.c.offlineStatus().phase, "needs-username");
+    assert.equal(starts, 1);
+    assert.equal(stops, 0);
+
+    assert.deepEqual(
+        await hx.c.startOffline("Taken"),
+        { ok: false, error: { code: "username_taken" } },
+    );
+
+    assert.deepEqual(
+        hx.c.offlineStatus(),
+        {
+          phase: "needs-username",
+          error: { code: "username_taken" },
+        },
+    );
+
+    assert.equal(starts, 1, "a rejected username must not restart the local stack");
+    assert.equal(stops, 0, "a rejected username must not stop the local stack");
+    assert.equal(hx.spawns.length, 0, "Dauntless must not launch with a rejected username");
+
+    assert.deepEqual(await hx.c.startOffline("FreshSlayer"), { ok: true });
+
+    assert.equal(starts, 1, "the accepted username continues on the same local stack");
+    assert.equal(stops, 0);
+    assert.equal(local.registrations.length, 1);
+    assert.equal(local.registrations[0].username, "FreshSlayer");
+    assert.equal(hx.c.offlineStatus().phase, "running");
+    assert.equal(hx.spawns.length, 1);
+
+    hx.child()!.emit("exit", 0);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    assert.equal(stops, 1);
+    assert.equal(hx.c.offlineStatus().phase, "stopped");
+  } finally {
+    await hx.c.shutdown();
+    await local.stop();
+  }
+});
+
+test("stopOffline cancels a local stack while it is still starting", async () => {
+  let starts = 0;
+  let stops = 0;
+  let releaseStart!: () => void;
+
+  const startGate = new Promise<void>((resolve) => {
+    releaseStart = resolve;
+  });
+
+  const hx = harness(
+      RELAY_PORT,
+      undefined,
+      async () => null,
+      async (onPhase) => {
+        starts++;
+        onPhase("starting-metagame");
+
+        // Keep startup deliberately suspended here so stopOffline can race it.
+        await startGate;
+
+        onPhase("starting-deploy");
+
+        return {
+          endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
+          stop: async () => { stops++; },
+        };
+      },
+  );
+
+  try {
+    await hx.c.init();
+
+    const starting = hx.c.startOffline();
+
+    // Let startOffline reach the deliberately suspended stack startup.
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    assert.equal(hx.c.offlineStatus().phase, "starting-metagame");
+    assert.equal(starts, 1);
+    assert.equal(stops, 0);
+
+    assert.deepEqual(await hx.c.stopOffline(), { ok: true });
+    assert.equal(hx.c.offlineStatus().phase, "stopping");
+    assert.equal(stops, 0, "the stack session does not exist yet");
+
+    // Allow startOfflineStack to finish. startOffline must notice the pending
+    // cancellation before touching the account or launching Dauntless.
+    releaseStart();
+
+    assert.deepEqual(await starting, { ok: true });
+    assert.equal(stops, 1, "the newly created stack is immediately released");
+    assert.equal(hx.c.offlineStatus().phase, "stopped");
+    assert.equal(hx.spawns.length, 0, "Dauntless must never launch after cancellation");
+
+    assert.deepEqual(
+        hx.offlineStatuses.map((status) => status.phase),
+        [
+          "preparing",
+          "starting-metagame",
+          "stopping",
+          "stopped",
+        ],
+    );
+  } finally {
+    releaseStart();
+    await hx.c.shutdown();
+  }
+});
+
+test("shutdown waits for an offline stack that is still starting", async () => {
+  let stops = 0;
+  let releaseStart!: () => void;
+  let reachedStart!: () => void;
+
+  const startGate = new Promise<void>((resolve) => {
+    releaseStart = resolve;
+  });
+
+  const reached = new Promise<void>((resolve) => {
+    reachedStart = resolve;
+  });
+
+  const hx = harness(
+      RELAY_PORT,
+      undefined,
+      async () => null,
+      async (onPhase) => {
+        onPhase("starting-metagame");
+        reachedStart();
+
+        // Keep startup pending while shutdown begins.
+        await startGate;
+
+        onPhase("starting-deploy");
+
+        return {
+          endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
+          stop: async () => { stops++; },
+        };
+      },
+  );
+
+  try {
+    await hx.c.init();
+
+    const starting = hx.c.startOffline();
+    await reached;
+
+    assert.equal(hx.c.offlineStatus().phase, "starting-metagame");
+
+    let shutdownFinished = false;
+    const shuttingDown = hx.c.shutdown().then(() => {
+      shutdownFinished = true;
+    });
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    assert.equal(
+        shutdownFinished,
+        false,
+        "shutdown must wait for the in-flight offline startup",
+    );
+
+    assert.equal(hx.c.offlineStatus().phase, "stopping");
+
+    releaseStart();
+
+    await Promise.all([starting, shuttingDown]);
+
+    assert.equal(stops, 1, "the stack returned during shutdown is stopped exactly once");
+    assert.equal(hx.spawns.length, 0, "Dauntless must never launch during shutdown");
+    assert.equal(hx.c.offlineStatus().phase, "stopped");
+
+    assert.deepEqual(
+        hx.offlineStatuses.map((status) => status.phase),
+        [
+          "preparing",
+          "starting-metagame",
+          "stopping",
+          "stopped",
+        ],
+    );
+  } finally {
+    releaseStart();
+    await hx.c.shutdown();
+  }
+});
+
+test("offline play does not return to running when the game exits during launch", async () => {
+  const local = new FakeMetagame({
+    name: "Local",
+    registration: "OPEN",
+    contentPort: null,
+  });
+
+  await local.start(OFFLINE_PORT);
+
+  let stops = 0;
+
+  const hx = harness(
+      RELAY_PORT,
+      undefined,
+      async () => null,
+      async (onPhase) => {
+        onPhase("starting-metagame");
+        onPhase("starting-deploy");
+
+        return {
+          endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
+          stop: async () => { stops++; },
+        };
+      },
+      (child) => {
+        queueMicrotask(() => {
+          child.once("spawn", () => child.emit("exit", 0));
+        });
+      },
+  );
+
+  try {
+    installFakeGame(hx.installDir);
+    await hx.c.init();
+
+    assert.deepEqual(await hx.c.startOffline(), { ok: true });
+    assert.equal(hx.c.offlineStatus().phase, "needs-username");
+
+    assert.deepEqual(await hx.c.startOffline("QuickExit"), { ok: true });
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    assert.equal(hx.spawns.length, 1);
+    assert.equal(stops, 1);
+    assert.equal(hx.c.offlineStatus().phase, "stopped");
+
+    assert.deepEqual(
+        hx.offlineStatuses.map((status) => status.phase),
+        [
+          "preparing",
+          "starting-metagame",
+          "starting-deploy",
+          "needs-username",
+          "preparing",
+          "launching-game",
+          "stopping",
+          "stopped",
+        ],
+    );
+  } finally {
+    await hx.c.shutdown();
+    await local.stop();
+  }
+});
+
+test("online play is blocked while an offline stack is waiting for a username", async () => {
+  let stops = 0;
+
+  const hx = harness(
+      RELAY_PORT,
+      undefined,
+      async () => null,
+      async (onPhase) => {
+        onPhase("starting-metagame");
+        onPhase("starting-deploy");
+
+        return {
+          endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null },
+          stop: async () => { stops++; },
+        };
+      },
+  );
+
+  try {
+    await hx.c.init();
+
+    assert.deepEqual(await hx.c.startOffline(), { ok: true });
+    assert.equal(hx.c.offlineStatus().phase, "needs-username");
+
+    assert.deepEqual(
+        await hx.c.play(),
+        { ok: false, error: { code: "busy" } },
+    );
+
+    assert.equal(hx.spawns.length, 0);
+    assert.equal(stops, 0, "online play must not tear down the offline stack");
+    assert.equal(hx.c.offlineStatus().phase, "needs-username");
+  } finally {
+    await hx.c.stopOffline();
+    await hx.c.shutdown();
   }
 });
 

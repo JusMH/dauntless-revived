@@ -233,6 +233,7 @@ let NextServerLaunchAt = 0;
 export const huntAdmission = new HuntAdmission(() => Gameservers.filter(server => !server.isRamsgate && !server.isTrainingDojo && ProcessIsAlive(server.processId)).length);
 
 function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId: string | undefined, ExpectedPlayers: ExpectedPlayer[] | undefined, IsRamsgate: boolean, IsTrainingDojo: boolean){
+    if(ShuttingDown) throw new Error("Deploy service is shutting down");
     if(process.env.SERVER_ROLE === "database-only") throw new Error("Game allocation disabled on database-only node");
     if (!IsRamsgate && !IsTrainingDojo) CheckCpuAdmission();
     const ReleaseHunt = !IsRamsgate && !IsTrainingDojo ? huntAdmission.reserve() : () => {};
@@ -240,6 +241,7 @@ function StartServer(Map: string, Behemoth: string | undefined, MatchmakerHuntId
     let ReleaseLaunch!: () => void;
     ServerLaunchQueue = new Promise<void>(Resolve => { ReleaseLaunch = Resolve; });
     return Previous.catch(() => {}).then(async () => {
+        if(ShuttingDown) throw new Error("Deploy service is shutting down");
         if (!IsRamsgate && !IsTrainingDojo && FreePorts.length === 0) throw new CapacityUnavailable('ports');
         const Wait = NextServerLaunchAt - Date.now();
         if (Wait > 0) await setTimeout(Wait);
@@ -294,6 +296,13 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
 
     let Child: ChildProcess;
     await unlink(ReadyFile).catch(() => {});
+
+    // Shutdown may begin during the async setup above; never create a new child after it starts.
+    if(ShuttingDown){
+        ReleaseReservation();
+        if(BorrowedPort) FreePorts.push(Port);
+        throw new Error("Deploy service is shutting down");
+    }
 
     try{
         Child = SpawnProcess(GAMESERVER_BINARY_PATH, [
@@ -727,6 +736,7 @@ export async function Startup(){
 // keeps answering: the next trip to Ramsgate tries to start it again.
 export function StartupAndReportFailure(){
     return Startup().catch((error) => {
+        if(ShuttingDown) return;
         logger.fatal(`Starting the game servers failed: ${error instanceof Error ? error.message : String(error)}`);
         process.exitCode = 1;
     });
