@@ -2,6 +2,7 @@ import {CityPool, CITY_PLAYER_LIMIT} from './citypool';
 import {NativeCityOccupancy} from './nativeoccupancy';
 import {CheckCpuAdmission} from './cpuadmission';
 import { spawn, type ChildProcess, type SpawnOptions } from "node:child_process"
+import { setTimeout as setTimer } from "node:timers";
 import { setTimeout } from "node:timers/promises";
 import { mkdir, unlink } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -44,6 +45,7 @@ type ExpectedPlayer = {
 export let Gameservers: Gameserver[] = [];
 export function CityPoolEnabled() { return process.env.RAMSGATE_POOL !== '0'; }
 const SpawnedChildren = new Map<string,ChildProcess>();
+let ShuttingDown = false;
 export function StopExpiredHunt(server:Gameserver):boolean {
     if(!Gameservers.includes(server)||server.isRamsgate||server.isTrainingDojo)return false;
     const child=SpawnedChildren.get(server.id);
@@ -127,6 +129,20 @@ export async function CleanupServer(ServerToShutdown: Gameserver){
     if (ServerToShutdown.isRamsgate && process.env.GAMESERVER_READY_DIR)
         void unlink(path.join(process.env.GAMESERVER_READY_DIR, `city-occupancy-${ServerToShutdown.processId}.txt`)).catch(() => {});
     Gameservers = Gameservers.filter(Server => Server !== ServerToShutdown);
+
+    // During shutdown, exited game servers must only be forgotten.
+    // Persistent worlds normally restart automatically, which would fight the shutdown.
+    if (ShuttingDown) {
+        if (RamsgateServer === ServerToShutdown) {
+            RamsgateServer = undefined;
+        }
+
+        if (TrainingDojoServer === ServerToShutdown) {
+            TrainingDojoServer = undefined;
+        }
+
+        return;
+    }
 
     if(ServerToShutdown.isRamsgate && CityPoolEnabled()){
         if (RamsgateServer === ServerToShutdown) RamsgateServer = undefined;
@@ -721,6 +737,75 @@ export function IsGameserverAlive(Server: Gameserver){
     return ProcessIsAlive(Server.processId);
 }
 
+export async function ShutdownGameservers(): Promise<void> {
+    ShuttingDown = true;
+
+    const Children = [...SpawnedChildren.values()];
+
+    await Promise.all(
+        Children.map((Child) => StopSpawnedChild(Child))
+    );
+
+    SpawnedChildren.clear();
+    Gameservers = [];
+    RamsgateServer = undefined;
+    TrainingDojoServer = undefined;
+    PersistentWorldLaunches.clear();
+}
+
+function StopSpawnedChild(Child: ChildProcess): Promise<void> {
+    if (Child.exitCode !== null || Child.signalCode !== null) {
+        return Promise.resolve();
+    }
+
+    return new Promise((Resolve) => {
+        let Finished = false;
+        let ForceTimer: NodeJS.Timeout | undefined;
+        let GiveUpTimer: NodeJS.Timeout | undefined;
+
+        const Finish = () => {
+            if (Finished) {
+                return;
+            }
+
+            Finished = true;
+
+            if (ForceTimer !== undefined) {
+                clearTimeout(ForceTimer);
+            }
+
+            if (GiveUpTimer !== undefined) {
+                clearTimeout(GiveUpTimer);
+            }
+
+            Child.removeListener("exit", Finish);
+            Resolve();
+        };
+
+        Child.once("exit", Finish);
+
+        try {
+            Child.kill();
+        } catch {
+            Finish();
+            return;
+        }
+
+        ForceTimer = setTimer(() => {
+            try {
+                Child.kill("SIGKILL");
+            } catch {
+                // It may already have exited.
+            }
+        }, 4_000);
+
+        ForceTimer.unref();
+
+        GiveUpTimer = setTimer(Finish, 5_000);
+        GiveUpTimer.unref();
+    });
+}
+
 // ---- Tests only ----
 
 export function UseProcessFunctionsForTests(Functions: {
@@ -742,6 +827,7 @@ export function ResetGameserversForTests(){
     RamsgateServer = undefined;
     TrainingDojoServer = undefined;
     PersistentWorldLaunches.clear();
+    ShuttingDown = false;
 }
 
 export function GameserverStateForTests(){

@@ -8,7 +8,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
     CleanupServer, GameserverStateForTests, Gameservers, GetRamsgateConnectionDetails, GetTrainingDojoConnectionDetails, ResetGameserversForTests,
-    Startup, StartupAndReportFailure, StartupGameserverWithArgs, UseProcessFunctionsForTests
+    Startup, StartupAndReportFailure, StartupGameserverWithArgs, UseProcessFunctionsForTests, ShutdownGameservers,
 } from "../src/controllers/gameservers";
 import { HandleMatchmakingRequest } from "../src/controllers/matchmaker";
 import { RunWatchdog } from "../src/controllers/watchdog";
@@ -38,6 +38,28 @@ function FakeSpawn(Command: string, Args: string[]): ChildProcess {
     Spawned.push({ Command, Args, Pid: Child.pid });
     return Child as ChildProcess;
 }
+
+function KillableFakeSpawn(Command: string, Args: string[]): ChildProcess {
+    const Child = new EventEmitter() as any;
+    Child.pid = NextPid++;
+    Child.exitCode = null;
+    Child.signalCode = null;
+    Child.killed = false;
+    Child.unref = () => {};
+    Child.kill = (Signal = "SIGTERM") => {
+        if(Child.exitCode !== null || Child.signalCode !== null)return false;
+        Child.killed = true;
+        Child.signalCode = Signal;
+        Alive.delete(Child.pid);
+        process.nextTick(() => Child.emit("exit", null, Signal));
+        return true;
+    };
+    Alive.add(Child.pid);
+    Spawned.push({ Command, Args, Pid: Child.pid });
+    return Child as ChildProcess;
+}
+
+
 
 // What Node does for a binary that is not there: no pid, and an "error" event right after
 function FailingSpawn(Command: string, Args: string[]): ChildProcess {
@@ -367,6 +389,34 @@ describe("a game binary that cannot be started", () => {
         finally{
             Listening.closeAllConnections();
             await new Promise<void>((Resolve) => Listening.close(() => Resolve()));
+        }
+    });
+
+});
+
+describe("shutdown", () => {
+    it("shutdown stops Deploy-owned game servers without restarting Ramsgate", async () => {
+        UseProcessFunctionsForTests({ Spawn: KillableFakeSpawn, IsAlive, IsPortBound: async () => false });
+        process.env.RAMSGATE_POOL = "1";
+
+        try {
+            await Startup();
+            await GetRamsgateConnectionDetails();
+            await StartupGameserverWithArgs(TUTORIAL_ARGS);
+
+            const Pids = Gameservers.map(Server => Server.processId);
+            const SpawnCount = Spawned.length;
+
+            assert.equal(Pids.length, 2);
+            assert.ok(Pids.every(Pid => Alive.has(Pid)));
+
+            await ShutdownGameservers();
+
+            assert.ok(Pids.every(Pid => !Alive.has(Pid)));
+            assert.equal(Gameservers.length, 0);
+            assert.equal(Spawned.length, SpawnCount, "shutdown must not restart Ramsgate");
+        } finally {
+            delete process.env.RAMSGATE_POOL;
         }
     });
 });
