@@ -151,6 +151,8 @@ export class ElectronLocalStackRuntime implements LocalStackRuntime {
 function stopUtilityProcess(child: UtilityChild): Promise<void> {
     return new Promise((resolve) => {
         let finished = false;
+        let fallbackTimer: NodeJS.Timeout | undefined;
+        let giveUpTimer: NodeJS.Timeout | undefined;
 
         const finish = () => {
             if (finished) {
@@ -158,18 +160,41 @@ function stopUtilityProcess(child: UtilityChild): Promise<void> {
             }
 
             finished = true;
-            clearTimeout(timer);
+
+            if (fallbackTimer !== undefined) {
+                clearTimeout(fallbackTimer);
+            }
+
+            if (giveUpTimer !== undefined) {
+                clearTimeout(giveUpTimer);
+            }
+
             child.removeListener("exit", finish);
             resolve();
         };
 
         child.once("exit", finish);
 
-        const timer = setTimeout(finish, 5_000);
-        timer.unref();
-
-        if (!child.kill()) {
+        if (child.pid === undefined) {
             finish();
+            return;
         }
+
+        try {
+            child.postMessage({ type: "shutdown" });
+        } catch {
+            child.kill();
+        }
+
+        fallbackTimer = setTimeout(() => {
+            if (child.pid !== undefined) {
+                child.kill();
+            }
+        }, 7_000);
+
+        fallbackTimer.unref();
+
+        giveUpTimer = setTimeout(finish, 10_000);
+        giveUpTimer.unref();
     });
 }
