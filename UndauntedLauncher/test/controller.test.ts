@@ -99,7 +99,7 @@ interface Harness {
 
 // userDataDir: reuse another harness's settings and keys (the launcher opened again).
 // chooseFolder: what the folder dialog answers (default: cancelled).
-function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"], onChild?: (child: EventEmitter) => void,): Harness {
+function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"], onChild?: (child: EventEmitter) => void, documentsDir?: string,): Harness {
   let snap: Snapshot | null = null;
   const spawns: Harness["spawns"] = [];
   const offlineStatuses: OfflineStatus[] = [];
@@ -118,6 +118,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
   const p: Platform = {
     collectDeviceSignals: async () => ({}),
     userDataDir: userData,
+    documentsDir,
     resourcesDir: ASSETS,
     defaultInstallDir: installDir,
     appVersion: "0.0.0-test",
@@ -382,6 +383,7 @@ function installFakeGame(dir: string): void {
 }
 
 test("offline play registers once, stores its key and reuses the same account", async () => {
+  const documents = temp("dr-offline-documents-");
   const local = new FakeMetagame({ name: "Local", registration: "OPEN", contentPort: null });
   await local.start(OFFLINE_PORT);
 
@@ -402,6 +404,8 @@ test("offline play registers once, stores its key and reuses the same account", 
           stop: async () => { stops++; },
         };
       },
+      undefined,
+      documents,
   );
 
   try {
@@ -420,6 +424,7 @@ test("offline play registers once, stores its key and reuses the same account", 
     assert.equal(hx.c.offlineStatus().phase, "running");
     assert.equal(local.registrations.length, 1);
     assert.equal(local.registrations[0].username, "Offline_1");
+    assert.equal(existsSync(path.join(documents, "Dauntless Revived", "Account Keys")), false, "offline keys stay in encrypted userData storage");
     assert.equal(hx.spawns.length, 1);
 
     const firstArgs = hx.spawns[0].args;

@@ -136,7 +136,8 @@ test("every package the launcher bundles is credited and its license text ships"
 
 test("THIRD-PARTY-NOTICES.txt ships with the launcher and has the Octicons, MinHook and Electron notices", () => {
   const forge = readFileSync(path.join(ROOT, "forge.config.ts"), "utf8");
-  assert.match(forge, /extraResource:\s*\[[^\]]*"THIRD-PARTY-NOTICES\.txt"/);
+  assert.match(forge, /const launcherResources\s*=\s*\[[^\]]*"THIRD-PARTY-NOTICES\.txt"/);
+  assert.match(forge, /extraResource:\s*launcherResources/);
   assert.match(NOTICES, /^\d+\. GitHub Octicons$/m);
   assert.match(NOTICES, /https:\/\/github\.com\/primer\/octicons/);
   assert.match(NOTICES, /Copyright \(c\) \d{4} GitHub Inc\.\n\nPermission is hereby granted, free of charge/);
