@@ -54,6 +54,7 @@ async function main() {
             "--user-data-dir=" + profile, "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--safe-mode",
         ], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: {
             ...process.env, LOCALAPPDATA: local, APPDATA: path.join(root, "roaming"),
+            DAUNTLESS_REVIVED_LOCAL_SERVER_CONSOLE: "0",
             BIND_HOST: "0.0.0.0", AUTH_MODE: "NONE", CHAT_BIND_HOST: "0.0.0.0",
         } });
         child.once("exit", (code) => { childExited = true; exitCode = code; });
@@ -88,6 +89,7 @@ async function main() {
         await waitFor(async () => evaluate('typeof window.launcher === "object"'));
         await fs.access(path.join(profile, "logs", "launcher.log"));
         const snapshot = await evaluate("window.launcher.getSnapshot()");
+        assert.equal(snapshot.settings.showConsole, false, "Fresh profiles must not enable client consoles");
         assert.ok(snapshot.install.dir.startsWith(local), "Selected game path must belong to the isolated profile");
         await evaluate('window.smokePhases=[]; window.launcher.onOfflineStatus(s=>window.smokePhases.push(s.phase)); true');
         console.log("Packaged launcher started with isolated userData and game config profile");
@@ -97,6 +99,20 @@ async function main() {
             // A second launch uses the same profile, including DPAPI storage and DB.
             // The empty game install deliberately stops at real game validation.
             const result = await evaluate("window.launcher.startOffline()");
+            if (result.error?.code === "offline_insufficient_memory") {
+                assert.equal(await evaluate("window.smokePhases.at(-1)"), "error");
+                assert.ok(!(await evaluate("window.smokePhases")).includes("starting-metagame"));
+                if (cycle === 0) await assert.rejects(fs.access(path.join(profile, "offline")));
+                assert.equal(listeners(), "");
+                assert.deepEqual(await evaluate("window.launcher.stopOffline()"), { ok: true });
+                console.log("Packaged memory preflight rejected before starting services; full runtime smoke blocked by available RAM");
+                socket.send(JSON.stringify({ id: ++nextId, method: "Runtime.evaluate", params: { expression: "window.close()" } }));
+                await waitFor(() => childExited, 15000);
+                assert.equal(exitCode, 0);
+                successful = true;
+                process.exitCode = 2;
+                return;
+            }
             if (cycle === 0) {
                 assert.deepEqual(result, { ok: true });
                 assert.equal(await evaluate("window.smokePhases.at(-1)"), "needs-username");
@@ -114,6 +130,12 @@ async function main() {
             assert.equal(active, "", "Game validation failure must release the owned local stack");
             assert.ok(!active.includes("0.0.0.0"));
             const secrets = await fs.readFile(secretsFile, "utf8");
+            const deployConfig = require("node:util").parseEnv(await fs.readFile(path.join(profile, "offline", "runtime", "deploy.env"), "utf8"));
+            const { OFFLINE_MEMORY_POLICY } = require("jiti")(__filename)("../src/main/offline-memory.ts");
+            assert.equal(deployConfig.DR_SHOW_CONSOLE, "0");
+            assert.equal(deployConfig.GAMESERVER_MIN_FREE_MB, String(OFFLINE_MEMORY_POLICY.minFreeMiB));
+            assert.equal(deployConfig.GAMESERVER_STARTUP_MB, String(OFFLINE_MEMORY_POLICY.serverStartupMiB));
+            assert.equal(deployConfig.GAMESERVER_HUNT_STARTUP_MB, String(OFFLINE_MEMORY_POLICY.serverStartupMiB));
             if (initialSecrets) assert.ok(secrets === initialSecrets, "Runtime secrets must survive restart");
             else initialSecrets = secrets;
             const verification = `const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto"); assert.equal(process.versions.modules,"149"); const state=${JSON.stringify(path.join(profile, "offline"))}; const runtime=${JSON.stringify(runtime)}; const key=JSON.parse(fs.readFileSync(path.join(state,"secrets.json"),"utf8")).gameserverKey; let identity; for(const name of ["metagame","deploy"]){const Database=require(path.join(runtime,name,"node_modules","better-sqlite3"));const memory=new Database(":memory:");memory.exec("CREATE TABLE test(id INTEGER)");memory.close(); if(name==="metagame"){const db=new Database(path.join(state,"undaunted.db"),{readonly:true,fileMustExist:true}); try {assert.equal(db.prepare("SELECT count(*) AS n FROM gameserverapikeys WHERE keyHash = ?").get(crypto.createHash("sha256").update(key).digest("hex")).n,1); const users=db.prepare("SELECT userId,name,notes FROM users ORDER BY userId").all(); assert.equal(users.length,1); assert.equal(users[0].name,"OfflineSmoke_1"); assert.equal(db.prepare("SELECT count(*) AS n FROM userapikeys").get().n,1); identity=crypto.createHash("sha256").update(JSON.stringify([users,db.prepare("SELECT * FROM characters ORDER BY characterId").all(),db.prepare("SELECT * FROM userapikeys ORDER BY userId").all()])).digest("hex");}finally{db.close();}}} console.log(JSON.stringify({abi:process.versions.modules,identity}));`;
@@ -133,7 +155,7 @@ async function main() {
                 // Relaunch the actual packaged exe; reuse only mutable player state.
                 childExited = false;
                 await fs.rm(path.join(profile, "DevToolsActivePort"), { force: true });
-                child = spawn(path.join(packageRoot, "DauntlessRevivedLauncher.exe"), ["--user-data-dir=" + profile, "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--safe-mode"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, LOCALAPPDATA: local, APPDATA: path.join(root, "roaming") } });
+                child = spawn(path.join(packageRoot, "DauntlessRevivedLauncher.exe"), ["--user-data-dir=" + profile, "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--safe-mode"], { windowsHide: true, stdio: ["ignore", "pipe", "pipe"], env: { ...process.env, LOCALAPPDATA: local, APPDATA: path.join(root, "roaming"), DAUNTLESS_REVIVED_LOCAL_SERVER_CONSOLE: "0" } });
                 child.once("exit", code => { childExited = true; exitCode = code; });
                 child.stderr.on("data", data => { capturedOutput += data; });
                 child.stdout.on("data", data => { capturedOutput += data; });

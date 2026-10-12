@@ -27,15 +27,15 @@ const HUNT_POOL = [8770, 8771, 8772, 8773, 8774, 8775];
 
 let NextPid = 41000;
 const Alive = new Set<number>();
-const Spawned: { Command: string, Args: string[], Pid: number | undefined }[] = [];
+const Spawned: { Command: string, Args: string[], Pid: number | undefined, windowsHide?: boolean, console?: string }[] = [];
 
 // A game process that starts and runs until the test "kills" it (takes its pid out of Alive)
-function FakeSpawn(Command: string, Args: string[]): ChildProcess {
+function FakeSpawn(Command: string, Args: string[], Options?: { windowsHide?: boolean, env?: NodeJS.ProcessEnv }): ChildProcess {
     const Child = new EventEmitter() as any;
     Child.pid = NextPid++;
     Child.unref = () => {};
     Alive.add(Child.pid);
-    Spawned.push({ Command, Args, Pid: Child.pid });
+    Spawned.push({ Command, Args, Pid: Child.pid, windowsHide: Options?.windowsHide, console: Options?.env?.DR_SHOW_CONSOLE });
     return Child as ChildProcess;
 }
 
@@ -111,6 +111,29 @@ after(() => {
 });
 
 describe("Ramsgate", () => {
+    it('preserves legacy server visibility unless Deploy explicitly hides or shows consoles', async () => {
+        const original = process.env.DR_SHOW_CONSOLE;
+        try {
+            for (const diagnostic of [undefined, '0', '1', 'invalid']) {
+                if (diagnostic === undefined) delete process.env.DR_SHOW_CONSOLE;
+                else process.env.DR_SHOW_CONSOLE = diagnostic;
+                ResetGameserversForTests();
+                Spawned.length = 0;
+                await Startup();
+                await GetTrainingDojoConnectionDetails();
+                await StartupGameserverWithArgs(TUTORIAL_ARGS);
+                assert.equal(Spawned.length, 3);
+                for (const [index, child] of Spawned.entries()) {
+                    const expected = diagnostic === '0' ? true : diagnostic === '1' ? false : index === 2;
+                    assert.equal(child.windowsHide, expected);
+                    assert.equal(child.console, diagnostic);
+                }
+            }
+        } finally {
+            if (original === undefined) delete process.env.DR_SHOW_CONSOLE;
+            else process.env.DR_SHOW_CONSOLE = original;
+        }
+    });
     it('hard primary capacity excludes Ramsgate and dojo and admits only one concurrent last slot', async()=>{
         await Startup(); await GetTrainingDojoConnectionDetails();
         process.env.MAX_LOCAL_HUNTS='1';

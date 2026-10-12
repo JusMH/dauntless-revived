@@ -50,6 +50,7 @@ const ERROR_CODES: Record<ErrorCode, true> = {
   compat_runtime_missing: true,
   config_failed: true,
   offline_unavailable: true,
+  offline_insufficient_memory: true,
   busy: true,
   cancelled: true,
   cert_mismatch: true,

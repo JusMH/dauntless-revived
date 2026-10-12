@@ -3,6 +3,7 @@ import { promises as fsp } from "node:fs";
 import path from "node:path";
 import type { OfflineLayout } from "./offline-layout";
 import { XMPP_PORT } from "./constants";
+import { OFFLINE_MEMORY_POLICY } from "./offline-memory";
 
 export interface OfflineSecrets {
     signingPrivateKey: string;
@@ -74,7 +75,7 @@ export function serializeRuntimeEnv(values: Record<string, string>): string {
     }).join("");
 }
 
-export function offlineServiceConfig(layout: OfflineLayout, gameExecutable: string, secrets: OfflineSecrets) {
+export function offlineServiceConfig(layout: OfflineLayout, gameExecutable: string, secrets: OfflineSecrets, serverConsole = false) {
     if (!path.isAbsolute(gameExecutable) || !path.isAbsolute(layout.databasePath)) throw new Error("Offline runtime paths must be absolute");
     const absolute = (value: string) => value.replace(/\\/g, "/");
     return {
@@ -96,6 +97,10 @@ export function offlineServiceConfig(layout: OfflineLayout, gameExecutable: stri
             RAMSGATE_POOL: "1", ENABLE_DOJO: "0", SERVER_ROLE: "game",
             SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP: "10",
             GAMESERVER_READY_DIR: absolute(layout.readyDir),
+            GAMESERVER_MIN_FREE_MB: String(OFFLINE_MEMORY_POLICY.minFreeMiB),
+            GAMESERVER_STARTUP_MB: String(OFFLINE_MEMORY_POLICY.serverStartupMiB),
+            GAMESERVER_HUNT_STARTUP_MB: String(OFFLINE_MEMORY_POLICY.serverStartupMiB),
+            DR_SHOW_CONSOLE: serverConsole ? "1" : "0",
         },
     };
 }
@@ -106,9 +111,9 @@ async function writeRuntimeFile(file: string, contents: string): Promise<void> {
     await fsp.rename(temporary, file);
 }
 
-export async function prepareOfflineState(layout: OfflineLayout, gameExecutable: string): Promise<string> {
+export async function prepareOfflineState(layout: OfflineLayout, gameExecutable: string, serverConsole = false): Promise<string> {
     const secrets = await loadOfflineSecrets(layout.stateRoot);
-    const config = offlineServiceConfig(layout, gameExecutable, secrets);
+    const config = offlineServiceConfig(layout, gameExecutable, secrets, serverConsole);
     await fsp.mkdir(layout.runtimeStateDir, { recursive: true });
     await fsp.mkdir(layout.readyDir, { recursive: true });
     await writeRuntimeFile(layout.metagameEnvPath, serializeRuntimeEnv(config.metagame));

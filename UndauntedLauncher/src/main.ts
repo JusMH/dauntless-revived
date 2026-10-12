@@ -6,6 +6,7 @@
 
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from "electron";
 import path from "node:path";
+import { freemem } from "node:os";
 import { existsSync, promises as fsp } from "node:fs";
 import { pathToFileURL } from "node:url";
 import started from "electron-squirrel-startup";
@@ -488,6 +489,8 @@ function makePlatform(): Platform {
     findTailscale: () => findTailscale(process.env, existsSync, process.platform),
     findRunningClients: () => findRunningClients(process.platform),
     startOfflineStack: localStack ? (onPhase) => startLocalOfflineStack(onPhase) : undefined,
+    // Development stacks retain their own configured admission policy.
+    offlineFreeMemory: app.isPackaged && process.platform === "win32" ? freemem : undefined,
     prepareGameLaunch:
       process.platform === "linux"
         ? async () => {
