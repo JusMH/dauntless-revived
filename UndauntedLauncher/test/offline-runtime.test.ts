@@ -10,12 +10,19 @@ import { offlineLayout } from "../src/main/offline-layout";
 import { generateOfflineSecrets, loadOfflineSecrets, offlineServiceConfig, prepareOfflineState, serializeRuntimeEnv } from "../src/main/offline-state";
 import { mergeIniKeys, offlineEndpointEntries, prepareOfflineGameConfig } from "../src/main/offline-game-config";
 import { decodeIni, encodeIni, splitLines } from "../src/main/engineini";
+import { OFFLINE_MEMORY_POLICY, OFFLINE_REQUIRED_AVAILABLE_BYTES, hasOfflineMemory } from "../src/main/offline-memory";
 
 const options = {
     packaged: true, platform: "win32" as NodeJS.Platform,
     resourcesPath: path.resolve("packaged-resources"), userDataDir: path.resolve("player-state"),
     appPath: path.resolve("launcher"), env: {},
 };
+
+test("Offline memory gate fails closed for invalid readings and accepts the exact byte threshold", () => {
+    for (const value of [NaN, Infinity, -1, OFFLINE_REQUIRED_AVAILABLE_BYTES - 1]) assert.equal(hasOfflineMemory(value), false);
+    assert.equal(hasOfflineMemory(OFFLINE_REQUIRED_AVAILABLE_BYTES), true);
+    assert.equal(hasOfflineMemory(OFFLINE_REQUIRED_AVAILABLE_BYTES + 1), true);
+});
 
 test("packaged Windows runtime resolves external code and userData state independently", () => {
     const result = resolveLocalStackPaths(options)!;
@@ -82,6 +89,11 @@ test("offline config uses loopback, a persistent DB, selected executable and Dep
     assert.equal(config.deploy.PORT_RANGE_BEGIN, "8770");
     assert.equal(config.deploy.PORT_RANGE_END, "8777");
     assert.ok(!("GAMESERVER_MEMORY_GUARD" in config.deploy));
+    assert.equal(config.deploy.GAMESERVER_MIN_FREE_MB, String(OFFLINE_MEMORY_POLICY.minFreeMiB));
+    assert.equal(config.deploy.GAMESERVER_STARTUP_MB, String(OFFLINE_MEMORY_POLICY.serverStartupMiB));
+    assert.equal(config.deploy.GAMESERVER_HUNT_STARTUP_MB, String(OFFLINE_MEMORY_POLICY.serverStartupMiB));
+    assert.equal(config.deploy.DR_SHOW_CONSOLE, "0");
+    assert.equal(offlineServiceConfig(layout, exe, secrets, true).deploy.DR_SHOW_CONSOLE, "1");
     const message = Buffer.from("local-session");
     const signature = sign("sha256", message, createPrivateKey(Buffer.from(secrets.signingPrivateKey, "base64")));
     assert.ok(verify("sha256", message, createPublicKey(Buffer.from(secrets.signingPublicKey, "base64")), signature));

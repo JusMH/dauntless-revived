@@ -21,7 +21,9 @@ export function makeLocalStack(options: PathOptions & { gameRoot(): string }): L
         env,
         beforeStart: layout ? async (name) => {
             if (name === "metagame") {
-                keyFile = await prepareOfflineState(layout, path.join(options.gameRoot(), EXE_RELATIVE_PATH));
+                // Server diagnostics are opt-in separately from the client showConsole setting.
+                keyFile = await prepareOfflineState(layout, path.join(options.gameRoot(), EXE_RELATIVE_PATH),
+                    options.env.DAUNTLESS_REVIVED_LOCAL_SERVER_CONSOLE === "1");
                 await prepareOfflineGameConfig(defaultConfigDir(options.env), path.join(layout.runtimeRoot, "game-endpoints.json"));
             } else {
                 if (!keyFile) throw new Error("Offline state has not been prepared");

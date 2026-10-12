@@ -315,9 +315,8 @@ async function StartServerNow(Map: string, Behemoth: string | undefined, Matchma
             MY_IP + ":" + Port.toString(),
             ...STANDARD_GAMESERVER_ARGS
         ], {
-            // Keep the long-running Ramsgate and Dojo diagnostic windows visible,
-            // but do not flash a new command window for every temporary hunt.
-            windowsHide: IsHunt,
+            // Explicit Offline/diagnostic policy; unset deployments keep legacy visibility.
+            windowsHide: process.env.DR_SHOW_CONSOLE === '0' ? true : process.env.DR_SHOW_CONSOLE === '1' ? false : IsHunt,
             env: { ...process.env, GAMESERVER_READY_DIR: ReadyDir, DR_SERVER_READY_FILE: ReadyFile, DR_RAMSGATE_POOL: CityPoolEnabled() ? '1' : '0' }
         });
     }

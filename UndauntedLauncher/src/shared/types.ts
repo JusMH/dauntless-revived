@@ -84,6 +84,7 @@ export type ErrorCode =
   | "relay_failed"
   | "unknown"
   | "offline_unavailable"
+  | "offline_insufficient_memory"
 
 
 // Short messages that are not errors.

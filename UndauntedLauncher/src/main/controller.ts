@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { promises as fsp, existsSync } from "node:fs";
 import path from "node:path";
 import { missingDirectX, gameExitDetail } from './windows-runtime';
+import { hasOfflineMemory, OFFLINE_REQUIRED_AVAILABLE_MIB } from "./offline-memory";
 
 import { parseInvite, isLoopbackHost, type Invite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
@@ -84,6 +85,7 @@ export interface Platform {
   documentsDir?: string;
   resourcesDir: string;
   runtimeFilesExist?: (file: string) => boolean;
+  offlineFreeMemory?(): number;
 
   defaultInstallDir: string;
   hostPlatform?: NodeJS.Platform;
@@ -1248,6 +1250,16 @@ export class Controller {
       }
 
       if (!this.offlineSession) {
+        if (this.p.offlineFreeMemory) {
+          let available = NaN;
+          try { available = this.p.offlineFreeMemory(); }
+          catch { log.warn("Offline free memory could not be queried"); }
+          if (!hasOfflineMemory(available)) {
+            const failed = this.fail("offline_insufficient_memory", String(OFFLINE_REQUIRED_AVAILABLE_MIB));
+            this.setOfflineStatus({ phase: "error", error: failed.error });
+            return failed;
+          }
+        }
         try {
           this.offlineSession = await startOfflineStack((phase) => {
             if (!this.offlineCancelRequested) {

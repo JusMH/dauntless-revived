@@ -13,6 +13,7 @@ import { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { OFFLINE_REQUIRED_AVAILABLE_BYTES } from "../src/main/offline-memory";
 import { Controller, type Platform } from "../src/main/controller";
 import { validateManifest, type GameManifest } from "../src/main/manifest";
 import { formatInvite } from "../src/shared/invite";
@@ -99,7 +100,7 @@ interface Harness {
 
 // userDataDir: reuse another harness's settings and keys (the launcher opened again).
 // chooseFolder: what the folder dialog answers (default: cancelled).
-function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"], onChild?: (child: EventEmitter) => void, documentsDir?: string,): Harness {
+function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"], onChild?: (child: EventEmitter) => void, documentsDir?: string, offlineFreeMemory?: () => number,): Harness {
   let snap: Snapshot | null = null;
   const spawns: Harness["spawns"] = [];
   const offlineStatuses: OfflineStatus[] = [];
@@ -147,6 +148,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
     findRunningClients: async () => [],
     runtimeFilesExist: () => true,
     startOfflineStack,
+    offlineFreeMemory,
 
     spawn: fakeSpawn,
   };
@@ -171,7 +173,7 @@ function get(port: number, p: string): Promise<{ status: number; body: string }>
 }
 
 test("public mode end to end: join, register, install, play through the relay, game exit", async () => {
-  const hx = harness();
+  const hx = harness(RELAY_PORT, undefined, undefined, undefined, undefined, undefined, () => { throw new Error("Online must not query Offline memory"); });
   await hx.c.init();
   assert.equal(hx.last().phase, "join");
 
@@ -406,6 +408,7 @@ test("offline play registers once, stores its key and reuses the same account", 
       },
       undefined,
       documents,
+      () => OFFLINE_REQUIRED_AVAILABLE_BYTES,
   );
 
   try {
@@ -485,6 +488,46 @@ test("offline play registers once, stores its key and reuses the same account", 
     await hx.c.shutdown();
     await local.stop();
   }
+});
+
+test("packaged Offline memory admission rejects early, accepts the boundary, and permits retry", async () => {
+  const local = new FakeMetagame({ name: "Local", registration: "OPEN", contentPort: null });
+  await local.start(OFFLINE_PORT);
+  let available = OFFLINE_REQUIRED_AVAILABLE_BYTES - 1;
+  let queryFails = false;
+  let starts = 0;
+  let stops = 0;
+  const hx = harness(RELAY_PORT, undefined, undefined, async () => {
+    starts++;
+    return { endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null }, stop: async () => { stops++; } };
+  }, undefined, undefined, () => { if (queryFails) throw new Error("query failed"); return available; });
+  try {
+    await hx.c.init();
+    const rejected = await hx.c.startOffline();
+    assert.deepEqual(rejected, { ok: false, error: { code: "offline_insufficient_memory", detail: "4608" } });
+    assert.equal(hx.c.offlineStatus().phase, "error");
+    assert.equal(hx.c.offlineStatus().error?.code, "offline_insufficient_memory");
+    assert.equal(starts, 0);
+    assert.equal(stops, 0);
+    assert.equal(hx.spawns.length, 0);
+    queryFails = true;
+    assert.equal((await hx.c.startOffline()).ok, false);
+    assert.equal(starts, 0);
+    queryFails = false;
+    for (const free of [OFFLINE_REQUIRED_AVAILABLE_BYTES, OFFLINE_REQUIRED_AVAILABLE_BYTES + 1]) {
+      available = free;
+      assert.deepEqual(await hx.c.startOffline(), { ok: true });
+      assert.equal(hx.c.offlineStatus().phase, "needs-username");
+      assert.deepEqual(await hx.c.stopOffline(), { ok: true });
+      assert.equal(hx.c.offlineStatus().phase, "stopped");
+    }
+    assert.equal(starts, 2);
+    assert.equal(stops, 2);
+  } finally {
+    await hx.c.shutdown();
+    await local.stop();
+  }
+  assert.equal(stops, 2, "shutdown must not find an orphan session");
 });
 
 test("stopOffline tears down a local stack waiting for a username", async () => {
