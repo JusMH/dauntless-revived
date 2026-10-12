@@ -11,6 +11,9 @@ const resources = path.join(packageRoot, "resources");
 const runtime = path.join(resources, "offline-runtime");
 const gameDirIndex = process.argv.indexOf("--game-dir");
 const selectedGame = gameDirIndex === -1 ? null : process.argv[gameDirIndex + 1];
+const restoredIndex = process.argv.indexOf("--restored-profile");
+const restoredProfile = restoredIndex === -1 ? null : path.resolve(process.argv[restoredIndex + 1]);
+const expectedUsername = restoredProfile ? "PortableSmoke" : "OfflineSmoke_1";
 const listenerScript = 'Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -in 61000,61001,61099 } | Select-Object LocalAddress,LocalPort | ConvertTo-Json -Compress; Get-NetUDPEndpoint -ErrorAction SilentlyContinue | Where-Object { $_.LocalPort -ge 8770 -and $_.LocalPort -le 8777 } | Select-Object LocalAddress,LocalPort | ConvertTo-Json -Compress';
 function listeners() {
     return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", listenerScript], { encoding: "utf8", windowsHide: true }).trim();
@@ -35,11 +38,13 @@ async function main() {
     for (const file of ["dxgi.dll", "UndauntedInternalServer.dll", "icon.png", "THIRD-PARTY-NOTICES.txt", "client-mods", "app.asar"]) await fs.access(path.join(resources, file));
     console.log("Physical packaged runtime, both native addons and existing resources verified");
     assert.equal(listeners(), "", "Required local ports were occupied before this test");
-    const root = await fs.mkdtemp(path.join(os.tmpdir(), "dr-packaged-offline-"));
-    const profile = path.join(root, "profile");
+    const root = restoredProfile ? path.dirname(restoredProfile) : await fs.mkdtemp(path.join(os.tmpdir(), "dr-packaged-offline-"));
+    // Only the disposable profile handed off by portable-save-smoke may be removed here.
+    if (restoredProfile) assert.ok(path.basename(root).startsWith("dr-portable-smoke-") && path.dirname(root).toLowerCase() === os.tmpdir().toLowerCase() && path.basename(restoredProfile) === "historical-destination");
+    const profile = restoredProfile || path.join(root, "profile");
     const local = path.join(root, "local");
-    await fs.mkdir(profile);
-    await fs.mkdir(local);
+    await fs.mkdir(profile, { recursive: true });
+    await fs.mkdir(local, { recursive: true });
     let socket, child, evaluate;
     let childExited = false;
     let successful = false;
@@ -49,6 +54,7 @@ async function main() {
     let initialIdentity, encryptedKey;
     const keySlot = createHash("sha256").update("offline-local:61000").digest("hex").slice(0, 24);
     const keyFile = path.join(profile, "keys", keySlot + ".key");
+    if (restoredProfile) encryptedKey = await fs.readFile(keyFile);
     try {
         child = spawn(path.join(packageRoot, "DauntlessRevivedLauncher.exe"), [
             "--user-data-dir=" + profile, "--remote-debugging-port=0", "--remote-debugging-address=127.0.0.1", "--safe-mode",
@@ -102,7 +108,7 @@ async function main() {
             if (result.error?.code === "offline_insufficient_memory") {
                 assert.equal(await evaluate("window.smokePhases.at(-1)"), "error");
                 assert.ok(!(await evaluate("window.smokePhases")).includes("starting-metagame"));
-                if (cycle === 0) await assert.rejects(fs.access(path.join(profile, "offline")));
+                if (cycle === 0 && !restoredProfile) await assert.rejects(fs.access(path.join(profile, "offline")));
                 assert.equal(listeners(), "");
                 assert.deepEqual(await evaluate("window.launcher.stopOffline()"), { ok: true });
                 console.log("Packaged memory preflight rejected before starting services; full runtime smoke blocked by available RAM");
@@ -113,7 +119,7 @@ async function main() {
                 process.exitCode = 2;
                 return;
             }
-            if (cycle === 0) {
+            if (cycle === 0 && !restoredProfile) {
                 assert.deepEqual(result, { ok: true });
                 assert.equal(await evaluate("window.smokePhases.at(-1)"), "needs-username");
                 assert.equal((await evaluate('window.launcher.startOffline("!")')).error.code, "username_invalid");
@@ -138,7 +144,7 @@ async function main() {
             assert.equal(deployConfig.GAMESERVER_HUNT_STARTUP_MB, String(OFFLINE_MEMORY_POLICY.serverStartupMiB));
             if (initialSecrets) assert.ok(secrets === initialSecrets, "Runtime secrets must survive restart");
             else initialSecrets = secrets;
-            const verification = `const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto"); assert.equal(process.versions.modules,"149"); const state=${JSON.stringify(path.join(profile, "offline"))}; const runtime=${JSON.stringify(runtime)}; const key=JSON.parse(fs.readFileSync(path.join(state,"secrets.json"),"utf8")).gameserverKey; let identity; for(const name of ["metagame","deploy"]){const Database=require(path.join(runtime,name,"node_modules","better-sqlite3"));const memory=new Database(":memory:");memory.exec("CREATE TABLE test(id INTEGER)");memory.close(); if(name==="metagame"){const db=new Database(path.join(state,"undaunted.db"),{readonly:true,fileMustExist:true}); try {assert.equal(db.prepare("SELECT count(*) AS n FROM gameserverapikeys WHERE keyHash = ?").get(crypto.createHash("sha256").update(key).digest("hex")).n,1); const users=db.prepare("SELECT userId,name,notes FROM users ORDER BY userId").all(); assert.equal(users.length,1); assert.equal(users[0].name,"OfflineSmoke_1"); assert.equal(db.prepare("SELECT count(*) AS n FROM userapikeys").get().n,1); identity=crypto.createHash("sha256").update(JSON.stringify([users,db.prepare("SELECT * FROM characters ORDER BY characterId").all(),db.prepare("SELECT * FROM userapikeys ORDER BY userId").all()])).digest("hex");}finally{db.close();}}} console.log(JSON.stringify({abi:process.versions.modules,identity}));`;
+            const verification = `const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("node:path"),crypto=require("node:crypto"); assert.equal(process.versions.modules,"149"); const state=${JSON.stringify(path.join(profile, "offline"))}; const runtime=${JSON.stringify(runtime)}; const key=JSON.parse(fs.readFileSync(path.join(state,"secrets.json"),"utf8")).gameserverKey; let identity; for(const name of ["metagame","deploy"]){const Database=require(path.join(runtime,name,"node_modules","better-sqlite3"));const memory=new Database(":memory:");memory.exec("CREATE TABLE test(id INTEGER)");memory.close(); if(name==="metagame"){const db=new Database(path.join(state,"undaunted.db"),{readonly:true,fileMustExist:true}); try {assert.equal(db.prepare("SELECT count(*) AS n FROM gameserverapikeys WHERE keyHash = ?").get(crypto.createHash("sha256").update(key).digest("hex")).n,1); const users=db.prepare("SELECT userId,name,notes FROM users ORDER BY userId").all(); assert.equal(users.length,1); assert.equal(users[0].name,${JSON.stringify(expectedUsername)}); assert.equal(db.prepare("SELECT count(*) AS n FROM userapikeys").get().n,1); identity=crypto.createHash("sha256").update(JSON.stringify([users,db.prepare("SELECT * FROM characters ORDER BY characterId").all(),db.prepare("SELECT * FROM userapikeys ORDER BY userId").all()])).digest("hex");}finally{db.close();}}} console.log(JSON.stringify({abi:process.versions.modules,identity}));`;
             const native = spawnSync(require("electron"), ["-e", verification], { encoding: "utf8", env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" } });
             assert.equal(native.status, 0, "Native addon and credential verification failed");
             const identity = JSON.parse(native.stdout.trim());
@@ -211,7 +217,7 @@ async function main() {
             }
             else assert.ok(listeners().includes('"LocalPort":' + JSON.parse(probe.stdout.trim()).port), "Allocated native UDP listener missing");
             // Close only this launcher's client, gracefully. Never kill by image name.
-            const closeScript = `$ownedClients = Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq ${child.pid} -and $_.Name -eq 'Dauntless-Win64-Shipping.exe' -and $_.CommandLine -notmatch '(^|\\s)-server(\\s|$)' }; foreach ($ownedClient in $ownedClients) { $ownedProcess = Get-Process -Id $ownedClient.ProcessId -ErrorAction SilentlyContinue; if ($ownedProcess) { [void]$ownedProcess.CloseMainWindow() } }`;
+            const closeScript = `$ownedClients = Get-CimInstance Win32_Process -ErrorAction Stop | Where-Object { $_.ParentProcessId -eq ${child.pid} -and $_.Name -eq 'Dauntless-Win64-Shipping.exe' -and $_.CommandLine -notmatch '(^|\\s)-server(\\s|$)' }; foreach ($ownedClient in $ownedClients) { $ownedProcess = Get-Process -Id $ownedClient.ProcessId -ErrorAction SilentlyContinue; if ($ownedProcess) { [void]$ownedProcess.CloseMainWindow() } }; exit 0`;
             await waitFor(async () => {
                 if ((await evaluate("window.smokePhases.at(-1)")) === "stopped") return true;
                 execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", closeScript], { windowsHide: true });

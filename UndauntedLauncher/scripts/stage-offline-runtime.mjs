@@ -104,7 +104,7 @@ console.log("Staging Deploy...");
 await copyServiceBase(deploySource, deployOutput);
 await installServiceDependencies(deployOutput);
 
-for (const file of ["local-service-runner.cjs", "register-gameserver-key.cjs"]) {
+for (const file of ["local-service-runner.cjs", "register-gameserver-key.cjs", "offline-save-db.cjs"]) {
     await cp(path.join(launcherDir, "runtime", file), path.join(outputDir, file));
 }
 

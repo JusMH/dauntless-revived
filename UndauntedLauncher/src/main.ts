@@ -7,6 +7,10 @@
 import { app, autoUpdater, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, protocol, safeStorage, screen, session, shell, type IpcMainInvokeEvent } from "electron";
 import path from "node:path";
 import { freemem } from "node:os";
+import { PortableOfflineSave } from "./main/offline-save";
+import { electronSaveDatabase } from "./main/offline-save-runtime";
+import { offlineLayout } from "./main/offline-layout";
+import { KeyStore, type Encryptor } from "./main/keystore";
 import { existsSync, promises as fsp } from "node:fs";
 import { pathToFileURL } from "node:url";
 import started from "electron-squirrel-startup";
@@ -435,6 +439,12 @@ function makePlatform(): Platform {
     process.platform === "linux" ? path.join(app.getPath("home"), "Games", "DauntlessRevived") : path.join(localAppData, "DauntlessRevived", "Game");
   const relayPort = relayPortOverride(process.env.DAUNTLESS_REVIVED_RELAY_PORT);
   if (relayPort !== undefined) log.warn(`relay port overridden to ${relayPort}`);
+  const encryptor: Encryptor = {
+    isAvailable: () => safeStorage.isEncryptionAvailable(),
+    encrypt: plain => safeStorage.encryptString(plain),
+    decrypt: data => safeStorage.decryptString(data),
+  };
+  const layout = offlineLayout(process.resourcesPath, app.getPath("userData"));
   return {
     userDataDir: app.getPath("userData"),
     documentsDir: app.getPath("documents"),
@@ -446,11 +456,14 @@ function makePlatform(): Platform {
     defaultLanguage: systemLanguage(app.getLocale()),
     systemLocale: app.getLocale(),
     relayPort,
-    encryptor: {
-      isAvailable: () => safeStorage.isEncryptionAvailable(),
-      encrypt: (plain) => safeStorage.encryptString(plain),
-      decrypt: (data) => safeStorage.decryptString(data),
-    },
+    encryptor,
+    offlineSave: app.isPackaged && process.platform === "win32" ? new PortableOfflineSave({
+      layout, userData: app.getPath("userData"),
+      keys: new KeyStore(path.join(app.getPath("userData"), "keys"), encryptor),
+      database: electronSaveDatabase(layout.runtimeRoot, layout.metagameDir),
+      isActive: () => (!!localStack && !["stopped", "failed"].includes(localStack.snapshot.state)) ||
+        !!controller?.snapshot().game.running || !!controller?.snapshot().task || controller?.offlineStatus().phase === "stopping",
+    }) : undefined,
     manifest: GAME_MANIFEST,
     chooseFolder: async (purpose, defaultPath) => {
       if (!mainWindow) return null;

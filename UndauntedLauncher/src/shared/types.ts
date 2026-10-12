@@ -85,6 +85,7 @@ export type ErrorCode =
   | "unknown"
   | "offline_unavailable"
   | "offline_insufficient_memory"
+  | "offline_save_invalid"
 
 
 // Short messages that are not errors.

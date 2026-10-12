@@ -16,6 +16,7 @@ import { promises as fsp, existsSync } from "node:fs";
 import path from "node:path";
 import { missingDirectX, gameExitDetail } from './windows-runtime';
 import { hasOfflineMemory, OFFLINE_REQUIRED_AVAILABLE_MIB } from "./offline-memory";
+import { OFFLINE_KEY_SLOT, type OfflineSaveRuntime } from "./offline-save";
 
 import { parseInvite, isLoopbackHost, type Invite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
@@ -86,6 +87,7 @@ export interface Platform {
   resourcesDir: string;
   runtimeFilesExist?: (file: string) => boolean;
   offlineFreeMemory?(): number;
+  offlineSave?: OfflineSaveRuntime;
 
   defaultInstallDir: string;
   hostPlatform?: NodeJS.Platform;
@@ -145,8 +147,6 @@ type OfflineRegistrationResult =
 
 const err = (code: ErrorCode, detail?: string): { ok: false; error: LauncherError } => ({ ok: false, error: detail ? { code, detail } : { code } });
 const OK: ActionResult = { ok: true };
-// Stable KeyStore namespace for the local profile; this is never used as a network host.
-const OFFLINE_KEY_SLOT: KeySlot = { host: "offline-local", port: 61000, mode: "private", fp: null };
 
 export function endpointFor(sv: StoredServer): Endpoint {
   return { host: sv.host, port: sv.port, pin: sv.mode === "public" ? sv.fp : null };
@@ -162,6 +162,8 @@ export class Controller {
   private offlineStarting = false;
   private offlineCancelRequested = false;
   private offlineStartTask: Promise<ActionResult> | null = null;
+  private saveTask: Promise<ActionResult> | null = null;
+  private shuttingDown = false;
   private readonly verified: VerifiedCache;
 
   private reachable: boolean | null = null;
@@ -272,6 +274,7 @@ export class Controller {
   }
 
   async init(): Promise<void> {
+    if (this.p.offlineSave) await this.withBusy(() => this.p.offlineSave!.recover());
     await this.refreshKeyFlag();
     await this.inspectInstall();
     this.publish();
@@ -1225,7 +1228,7 @@ export class Controller {
   }
 
   async startOffline(username?: unknown): Promise<ActionResult> {
-    if (this.busy || this.task) return err("busy");
+    if (this.busy || this.task || this.shuttingDown) return err("busy");
     if (this.game.running) return this.fail("already_running");
 
     const startOfflineStack = this.p.startOfflineStack;
@@ -1240,6 +1243,13 @@ export class Controller {
 
     const task = this.withBusy(async () => {
       this.setOfflineStatus({ phase: "preparing" });
+
+      try { if (!this.offlineSession) await this.p.offlineSave?.recover(); }
+      catch {
+        const failed = this.fail("offline_unavailable");
+        this.setOfflineStatus({ phase: "error", error: failed.error });
+        return failed;
+      }
 
       const environment = await this.checkGameLaunchEnvironment();
       const cancelledAfterEnvironment = await this.finishOfflineCancellation();
@@ -1417,7 +1427,7 @@ export class Controller {
   }
 
   async play(): Promise<ActionResult> {
-    if (this.busy || this.task) return err("busy");
+    if (this.busy || this.task || this.shuttingDown) return err("busy");
     if (this.offlineSession || this.offlineStarting) return err("busy");
     if (this.game.running) return this.fail("already_running");
     const sv = this.s.server;
@@ -1665,6 +1675,8 @@ export class Controller {
   }
 
   async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    await this.saveTask?.catch(() => undefined);
     this.setStatusPolling(false);
     this.job?.cancel();
     this.taskAbort?.abort();
@@ -1693,5 +1705,30 @@ export class Controller {
     }
 
     await this.stopRelay();
+  }
+
+  exportOfflineSave(file: string): Promise<ActionResult> {
+    return this.offlineSaveOperation("exportSave", file);
+  }
+
+  importOfflineSave(file: string): Promise<ActionResult> {
+    return this.offlineSaveOperation("importSave", file);
+  }
+
+  private async offlineSaveOperation(method: "exportSave" | "importSave", file: string): Promise<ActionResult> {
+    if (this.busy || this.task || this.game.running || this.offlineSession || this.offlineStarting ||
+        this.offline.phase === "stopping" || this.shuttingDown) return err("busy");
+    if (!this.p.offlineSave) return err("offline_unavailable");
+    const task = this.withBusy(async () => {
+      // Protect against another launcher-owned game and interrupted restore journals.
+      try {
+        if ((await this.p.findRunningClients()).length) return err("busy");
+        return await this.p.offlineSave![method](file);
+      }
+      catch { return err("unknown"); }
+    });
+    this.saveTask = task;
+    try { return await task; }
+    finally { this.saveTask = null; }
   }
 }
