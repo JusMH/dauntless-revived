@@ -54,6 +54,8 @@ export function resolveLocalStackPaths(options: {
                 envPath: metagameEnv,
                 port: 61000,
                 healthPath: "/undaunted/api/RegistrationStatus",
+                // Clean installations may need time to create and migrate the database.
+                readyTimeoutMs: options.packaged ? 90_000 : undefined,
             },
             deploy: {
                 serverPath: path.join(deployDir, "dist", "server.js"),
@@ -61,6 +63,7 @@ export function resolveLocalStackPaths(options: {
                 envPath: deployEnv,
                 port: 61001,
                 healthPath: "/gameservers",
+                readyTimeoutMs: options.packaged ? 20_000 : undefined,
             },
         },
     };
