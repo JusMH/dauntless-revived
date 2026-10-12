@@ -19,6 +19,9 @@ import { validateManifest, type GameManifest } from "../src/main/manifest";
 import { formatInvite } from "../src/shared/invite";
 import { setSink } from "../src/main/log";
 import { KeyStore } from "../src/main/keystore";
+import { PortableOfflineSave, OFFLINE_KEY_SLOT } from "../src/main/offline-save";
+import { offlineLayout } from "../src/main/offline-layout";
+import { type OfflineSaveRuntime } from "../src/main/offline-save";
 import type { SpawnFn } from "../src/main/launch";
 import type { OfflineStatus, Snapshot } from "../src/shared/types";
 import { FakeContentServer, FakeMetagame, makeFiles, manifestFor, sha256, TEST_BUILD } from "./fakes";
@@ -95,7 +98,7 @@ interface Harness {
 
 // userDataDir: reuse another harness's settings and keys (the launcher opened again).
 // chooseFolder: what the folder dialog answers (default: cancelled).
-function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"], onChild?: (child: EventEmitter) => void, documentsDir?: string, offlineFreeMemory?: () => number,): Harness {
+function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Platform["chooseFolder"] = async () => null, startOfflineStack?: Platform["startOfflineStack"], onChild?: (child: EventEmitter) => void, documentsDir?: string, offlineFreeMemory?: () => number, offlineSave?: OfflineSaveRuntime,): Harness {
   let snap: Snapshot | null = null;
   const spawns: Harness["spawns"] = [];
   const offlineStatuses: OfflineStatus[] = [];
@@ -143,6 +146,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
     runtimeFilesExist: () => true,
     startOfflineStack,
     offlineFreeMemory,
+    offlineSave,
 
     spawn: fakeSpawn,
   };
@@ -515,6 +519,94 @@ test("packaged Offline memory admission rejects early, accepts the boundary, and
     await local.stop();
   }
   assert.equal(stops, 2, "shutdown must not find an orphan session");
+});
+
+test("portable-save operations own the normal Controller lock and shutdown waits for them", async () => {
+  let finish!: () => void;
+  let started!: () => void;
+  const arrived = new Promise<void>(resolve => { started = resolve; });
+  const gate = new Promise<void>(resolve => { finish = resolve; });
+  const runtime: OfflineSaveRuntime = {
+    recover: async () => {},
+    exportSave: async () => { started(); await gate; return { ok: true }; },
+    importSave: async () => ({ ok: true }),
+  };
+  const hx = harness(RELAY_PORT, undefined, undefined, undefined, undefined, undefined, undefined, runtime);
+  await hx.c.init();
+  const exporting = hx.c.exportOfflineSave("trusted-main-path.drsave");
+  await arrived;
+  for (const action of [hx.c.importOfflineSave("trusted-main-path.drsave"), hx.c.startOffline(), hx.c.play(), hx.c.repair()]) {
+    assert.deepEqual(await action, { ok: false, error: { code: "busy" } });
+  }
+  let closed = false;
+  const shutdown = hx.c.shutdown().then(() => { closed = true; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(closed, false);
+  finish();
+  assert.deepEqual(await exporting, { ok: true });
+  await shutdown;
+  assert.deepEqual(await hx.c.exportOfflineSave("trusted-main-path.drsave"), { ok: false, error: { code: "busy" } });
+});
+
+test("restored portable identity starts twice without registration; active game and stack refuse saves", async () => {
+  const fixtures = require(path.resolve("test/offline-save-fixture.cjs"));
+  const root = temp("dr-controller-portable-");
+  const source = path.join(root, "source"), destination = path.join(root, "destination"), resources = path.join(root, "resources");
+  mkdirSync(resources, { recursive: true }); mkdirSync(destination, { recursive: true });
+  const crypto = {
+    isAvailable: () => true,
+    encrypt: (plain: string) => Buffer.from("enc:" + Buffer.from(plain).toString("base64")),
+    decrypt: (data: Buffer) => Buffer.from(data.toString().slice(4), "base64").toString(),
+  };
+  const sourceLayout = offlineLayout(resources, source);
+  const identity = fixtures.fixture(sourceLayout.databasePath);
+  const sourceKeys = new KeyStore(path.join(source, "keys"), crypto);
+  await sourceKeys.save(OFFLINE_KEY_SLOT, identity.key);
+  const sourceSave = new PortableOfflineSave({ layout: sourceLayout, userData: source, keys: sourceKeys, database: fixtures.driver });
+  const archive = path.join(root, "save.drsave");
+  assert.deepEqual(await sourceSave.exportSave(archive), { ok: true });
+  const keys = new KeyStore(path.join(destination, "keys"), crypto);
+  const save = new PortableOfflineSave({ layout: offlineLayout(resources, destination), userData: destination, keys, database: fixtures.driver });
+  const local = new FakeMetagame({ name: "Local", registration: "OPEN", contentPort: null });
+  await local.start(OFFLINE_PORT);
+  const hx = harness(RELAY_PORT, destination, undefined, async () => ({ endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null }, stop: async () => {} }), undefined, undefined, undefined, save);
+  try {
+    installFakeGame(hx.installDir);
+    await hx.c.init();
+    assert.deepEqual(await hx.c.importOfflineSave(archive), { ok: true });
+    const key = await keys.load(OFFLINE_KEY_SLOT);
+    assert.ok(key);
+    local.users.set(key, { username: identity.username, id: identity.userId });
+    for (let cycle = 0; cycle < 2; cycle++) {
+      assert.deepEqual(await hx.c.startOffline(), { ok: true });
+      assert.equal(hx.c.offlineStatus().phase, "running");
+      assert.equal(local.registrations.length, 0);
+      assert.deepEqual(await hx.c.exportOfflineSave(archive), { ok: false, error: { code: "busy" } });
+      assert.deepEqual(await hx.c.importOfflineSave(archive), { ok: false, error: { code: "busy" } });
+      hx.child()!.emit("exit", 0);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  } finally { await hx.c.shutdown(); await local.stop(); }
+});
+
+test("starting and stopping Offline refuse save operations", async () => {
+  let continueStart!: () => void;
+  let continueStop!: () => void;
+  let started!: () => void;
+  const arrived = new Promise<void>(resolve => { started = resolve; });
+  const gate = new Promise<void>(resolve => { continueStart = resolve; });
+  const stopped = new Promise<void>(resolve => { continueStop = resolve; });
+  const fake: OfflineSaveRuntime = { recover: async () => {}, exportSave: async () => ({ ok: true }), importSave: async () => ({ ok: true }) };
+  const hx = harness(RELAY_PORT, undefined, undefined, async phase => {
+    phase("starting-metagame"); started(); await gate;
+    return { endpoint: { host: "127.0.0.1", port: OFFLINE_PORT, pin: null }, stop: () => stopped };
+  }, undefined, undefined, undefined, fake);
+  const start = hx.c.startOffline(); await arrived;
+  assert.deepEqual(await hx.c.exportOfflineSave("save.drsave"), { ok: false, error: { code: "busy" } });
+  await hx.c.stopOffline(); continueStart();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.deepEqual(await hx.c.importOfflineSave("save.drsave"), { ok: false, error: { code: "busy" } });
+  continueStop(); await start; await hx.c.shutdown();
 });
 
 test("stopOffline tears down a local stack waiting for a username", async () => {
