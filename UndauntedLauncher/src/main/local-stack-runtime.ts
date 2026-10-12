@@ -17,6 +17,7 @@ export interface LocalServiceSpec {
     cwd: string;
     port: number;
     healthPath: string;
+    readyTimeoutMs?: number;
 }
 
 export interface ElectronLocalStackRuntimeOptions {
@@ -110,7 +111,8 @@ export class ElectronLocalStackRuntime implements LocalStackRuntime {
 
     async waitUntilReady(name: LocalServiceName): Promise<void> {
         const spec = this.options.services[name];
-        const deadline = Date.now() + this.readyTimeoutMs;
+        const readyTimeoutMs = spec.readyTimeoutMs ?? this.readyTimeoutMs;
+        const deadline = Date.now() + readyTimeoutMs;
 
         while (Date.now() < deadline) {
             // An exit listener removes the child from the map, so fail immediately instead
@@ -145,7 +147,7 @@ export class ElectronLocalStackRuntime implements LocalStackRuntime {
         }
 
         throw new Error(
-            `${name} did not become ready within ${this.readyTimeoutMs} ms`,
+            `${name} did not become ready within ${readyTimeoutMs} ms`,
         );
     }
 }

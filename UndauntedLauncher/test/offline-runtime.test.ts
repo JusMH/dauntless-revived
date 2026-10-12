@@ -37,6 +37,8 @@ test("packaged Windows runtime resolves external code and userData state indepen
     assert.equal(layout.databasePath, path.join(options.userDataDir, "offline", "undaunted.db"));
     assert.equal(result.services.metagame.healthPath, "/undaunted/api/RegistrationStatus");
     assert.equal(result.services.deploy.healthPath, "/gameservers");
+    assert.equal(result.services.metagame.readyTimeoutMs, 90_000);
+    assert.equal(result.services.deploy.readyTimeoutMs, 20_000);
 });
 
 test("packaged unsupported platforms reject local stacks even with development opt-in", () => {
@@ -56,6 +58,8 @@ test("ordinary development remains online-only; explicit local paths still work"
     };
     const result = resolveLocalStackPaths({ ...options, packaged: false, env })!;
     assert.equal(result.layout, undefined);
+    assert.equal(result.services.metagame.readyTimeoutMs, undefined);
+    assert.equal(result.services.deploy.readyTimeoutMs, undefined);
     assert.equal(result.services.metagame.cwd, env.DAUNTLESS_REVIVED_LOCAL_METAGAME_DIR);
     assert.equal(result.services.deploy.envPath, env.DAUNTLESS_REVIVED_LOCAL_DEPLOY_ENV);
     assert.equal(result.runnerPath, path.join(options.appPath, "runtime", "local-service-runner.cjs"));
