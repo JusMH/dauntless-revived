@@ -1,7 +1,7 @@
 import './setup';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryAdmission, CapacityUnavailable, HuntAdmission, HuntLimit, PendingHuntLimit } from '../src/controllers/capacity';
+import { MemoryAdmission, CapacityUnavailable, HuntAdmission, HuntLimit, PendingHuntLimit, HuntsDraining } from '../src/controllers/capacity';
 
 test('hard hunt slots include pending allocations and release exactly once',()=>{
     let running=4;
@@ -118,5 +118,25 @@ test('MAX_PENDING_HUNTS raises the launch backlog only as far as the pacing allo
     } finally {
         for(const [name,value] of [['MAX_PENDING_HUNTS',saved.max],['SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP',saved.pace]] as const)
             value===undefined?delete process.env[name]:process.env[name]=value;
+    }
+});
+
+test('a drain file stops new hunts and lets running ones finish',()=>{
+    const fs=require('node:fs'), path=require('node:path'), os=require('node:os');
+    const file=path.join(fs.mkdtempSync(path.join(os.tmpdir(),'drain-')),'drain.flag');
+    const saved=process.env.DRAIN_FILE;
+    process.env.DRAIN_FILE=file;
+    try{
+        const slots=new HuntAdmission(()=>3,()=>96);
+        const held=slots.reserve();
+        assert.equal(HuntsDraining(),false);
+        fs.writeFileSync(file,'');
+        assert.equal(HuntsDraining(),true);
+        assert.throws(()=>slots.reserve(),CapacityUnavailable);
+        held();
+        fs.unlinkSync(file);
+        slots.reserve()();
+    } finally {
+        saved===undefined?delete process.env.DRAIN_FILE:process.env.DRAIN_FILE=saved;
     }
 });
