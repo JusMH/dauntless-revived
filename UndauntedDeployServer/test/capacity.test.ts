@@ -84,14 +84,20 @@ test('hunt estimates keep the full floor and correctly sum mixed reservations', 
 });
 
 test('launch backlog is bounded independently of free hunt slots',()=>{
-    const slots=new HuntAdmission(()=>0,()=>96);
-    const first=slots.reserve(), second=slots.reserve();
-    assert.throws(()=>slots.reserve(),CapacityUnavailable);
-    first(); first();
-    const third=slots.reserve();
-    assert.equal(slots.pending,2);
-    second(); third();
-    assert.equal(slots.pending,0);
+    const saved=process.env.MAX_PENDING_HUNTS;
+    process.env.MAX_PENDING_HUNTS='2';
+    try{
+        const slots=new HuntAdmission(()=>0,()=>96);
+        const first=slots.reserve(), second=slots.reserve();
+        assert.throws(()=>slots.reserve(),CapacityUnavailable);
+        first(); first();
+        const third=slots.reserve();
+        assert.equal(slots.pending,2);
+        second(); third();
+        assert.equal(slots.pending,0);
+    } finally {
+        saved===undefined?delete process.env.MAX_PENDING_HUNTS:process.env.MAX_PENDING_HUNTS=saved;
+    }
 });
 
 test('MAX_PENDING_HUNTS raises the launch backlog only as far as the pacing allows',()=>{
@@ -106,7 +112,9 @@ test('MAX_PENDING_HUNTS raises the launch backlog only as far as the pacing allo
         process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP='10';
         assert.equal(PendingHuntLimit(),6);
         delete process.env.MAX_PENDING_HUNTS;
-        assert.equal(PendingHuntLimit(),2);
+        assert.equal(PendingHuntLimit(),6);
+        process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP='2';
+        assert.equal(PendingHuntLimit(),8);
     } finally {
         for(const [name,value] of [['MAX_PENDING_HUNTS',saved.max],['SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP',saved.pace]] as const)
             value===undefined?delete process.env[name]:process.env[name]=value;

@@ -23,7 +23,7 @@ export function HuntLimit() {
 const PENDING_BUDGET_SECONDS = 60;
 
 export function PendingHuntLimit() {
-    const wanted = process.env.MAX_PENDING_HUNTS === undefined ? 2 : setting('MAX_PENDING_HUNTS', 2);
+    const wanted = process.env.MAX_PENDING_HUNTS === undefined ? 8 : setting('MAX_PENDING_HUNTS', 8);
     const pacing = Math.max(1, Number(process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP) || 1);
     return Math.max(1, Math.min(wanted, Math.floor(PENDING_BUDGET_SECONDS / pacing)));
 }
