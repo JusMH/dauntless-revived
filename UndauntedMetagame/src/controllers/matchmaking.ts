@@ -19,12 +19,16 @@ const PARTY_JOIN_WAIT_MS = 2500;
 export const REJOIN_PARK_MS = 20 * 1000;
 const SOLO_REJOIN_WINDOW_MS = 60 * 1000;
 const SOLO_JOIN_DEDUPE_MS = 30 * 1000;
-// A hunt queue goes to the deploy server this long after its last join (checked when a queued
-// player polls), or at once when it reaches QUEUE_FULL_PLAYERS
+// A hunt queue goes to the deploy server this long after its first join (checked when a queued
+// player polls), or at once when it reaches QUEUE_FULL_PLAYERS. Counting from the last join let
+// every new joiner restart the wait, so a steady trickle of players kept a queue waiting forever.
 const QUEUE_WAIT_MS = 20 * 1000;
 const QUEUE_FULL_PLAYERS = 4;
 // Capacity is not an endless queue. End the attempt promptly when the host stays full.
 export const CAPACITY_WAIT_MS = 60 * 1000;
+// The deploy server answers "capacity" whenever two launches are already waiting to spawn, so a
+// retry usually fits a few seconds later; ten seconds between tries left most of the minute unused
+const CAPACITY_RETRY_MS = 3 * 1000;
 
 type MatchmakingQueueData = {
     Region: HuntRegion,
@@ -87,7 +91,7 @@ function ParkCapacity(CandidateId: string, retry: () => Promise<boolean>) {
         if (wait.deadline < PartyNow() || entries.length === 0) CapacityWaits.delete(id);
     }
     if (CapacityWaits.size >= 1000) return false;
-    CapacityWaits.set(CandidateId, {next: PartyNow() + 10000, deadline: PartyNow() + CAPACITY_WAIT_MS, busy: false, retry});
+    CapacityWaits.set(CandidateId, {next: PartyNow() + CAPACITY_RETRY_MS, deadline: PartyNow() + CAPACITY_WAIT_MS, busy: false, retry});
     return true;
 }
 
@@ -220,7 +224,30 @@ async function PopQueue(HuntId: string, MatchmakingQueue: MatchmakingQueueData |
         MatchmakingQueue.CapacityDeadline ??= PartyNow() + CAPACITY_WAIT_MS;
         if (PartyNow() < MatchmakingQueue.CapacityDeadline && MatchmakingQueue.Players.length > 0) {
             MatchmakingQueue.Resolved = false;
-            MatchmakingQueue.RetryAfter = PartyNow() + 10000;
+            MatchmakingQueue.RetryAfter = PartyNow() + CAPACITY_RETRY_MS;
+            // Keep taking joiners while waiting: dropped from the map, every new player for this hunt
+            // opened a queue of its own, asked for another server and made the capacity wait worse
+            const QueueKey = RegionQueueKey(HuntId, MatchmakingQueue.Region);
+            const Newer = MatchmakingQueueMap.get(QueueKey);
+            // Players who joined while the launch request was out opened a fresh queue under this
+            // key. Fold them in if they fit and that queue has not asked for a server yet
+            if(Newer !== undefined && Newer !== MatchmakingQueue && !Newer.Resolved && Newer.RetryAfter === undefined
+                && MatchmakingQueue.Players.length + Newer.Players.length <= QUEUE_FULL_PLAYERS){
+                for(const Player of Newer.Players){
+                    const CandidateId = Newer.CandidateIds.get(Player);
+                    if(CandidateId === undefined || MatchmakingQueue.Players.includes(Player)) continue;
+                    MatchmakingQueue.Players.push(Player);
+                    MatchmakingQueue.CandidateIds.set(Player, CandidateId);
+                    if(PlayerQueueMap.get(Player) === Newer) PlayerQueueMap.set(Player, MatchmakingQueue);
+                }
+                Newer.Players = [];
+                Newer.CandidateIds.clear();
+                Newer.Resolved = true;
+                MatchmakingQueueMap.set(QueueKey, MatchmakingQueue);
+            }
+            else if(Newer === undefined){
+                MatchmakingQueueMap.set(QueueKey, MatchmakingQueue);
+            }
             return;
         }
     }
@@ -266,7 +293,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
             if (party) ClearPartyCandidate(party, PlayerMatchmakingResult.CandidateId, 'capacity wait expired');
         } else if (!waiting.busy && PartyNow() >= waiting.next) {
             waiting.busy = true;
-            waiting.next = PartyNow() + 10000;
+            waiting.next = PartyNow() + CAPACITY_RETRY_MS;
             await WaitBriefly(waiting.retry().then(Done => { if (Done) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }).finally(() => { waiting.busy = false; }));
         }
         return PlayerMatchmakingResult;
@@ -358,7 +385,6 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
 
     Queue.Players.push(PlayerId);
     Queue.CandidateIds.set(PlayerId, CandidateId);
-    Queue.LastPlayerAddedTime = PartyNow();
     PlayerQueueMap.set(PlayerId, Queue);
 
     if(Private || Queue.Players.length >= QUEUE_FULL_PLAYERS){
@@ -446,8 +472,8 @@ export function CancelMatchmaking(PlayerId: string){
         MatchmakingQueue.Players = MatchmakingQueue.Players.filter((Player) => Player !== PlayerId);
         MatchmakingQueue.CandidateIds.delete(PlayerId);
 
-        if(MatchmakingQueue.Players.length === 0 && MatchmakingQueueMap.get(MatchmakingQueue.HuntId) === MatchmakingQueue){
-            MatchmakingQueueMap.delete(MatchmakingQueue.HuntId);
+        if(MatchmakingQueue.Players.length === 0 && MatchmakingQueueMap.get(RegionQueueKey(MatchmakingQueue.HuntId, MatchmakingQueue.Region)) === MatchmakingQueue){
+            MatchmakingQueueMap.delete(RegionQueueKey(MatchmakingQueue.HuntId, MatchmakingQueue.Region));
         }
     }
 

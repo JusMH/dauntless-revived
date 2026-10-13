@@ -246,6 +246,46 @@ describe("matchmaking when the deploy server starts no game server", () => {
             }
         } finally { SetPartyClockForTests(); }
     });
+    it('a steady trickle of joins still sends the queue 20 seconds after the first join', async () => {
+        const { SetPartyClockForTests } = await import('../src/controllers/party');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            const body = {gameMode: 'ISLAND', gameArgs: '', playerHuntId: `CR19_PlayerHunt_Trickle_${++Hunts}`};
+            const players = [NewPlayer(), NewPlayer(), NewPlayer()];
+            for (const player of players) {
+                await Call('POST', '/candidate/join', player.Token, body);
+                now += 9000;
+                await Call('GET', '/candidate/status', players[0].Token);
+            }
+            await WaitForCalls(1);
+            assert.deepEqual([...Calls[0].ExpectedPlayers].sort(), players.map(p => p.UserId).sort());
+            for (const player of players) await WaitForStatus(player.Token, 'IN_PROGRESS');
+        } finally { SetPartyClockForTests(); }
+    });
+    it('players who join while a launch is out share its capacity wait and its server', async () => {
+        const { SetPartyClockForTests } = await import('../src/controllers/party');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            const body = {gameMode: 'ISLAND', gameArgs: '', playerHuntId: `CR19_PlayerHunt_MidLaunch_${++Hunts}`};
+            const first = NewPlayer(), late = NewPlayer();
+            let Release!: () => void;
+            CurrentMode = {Name: 'slow and full', Reply: res => { Release = () => Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))(res); }};
+            await Call('POST', '/candidate/join', first.Token, body);
+            now += 20001;
+            await Call('GET', '/candidate/status', first.Token);
+            await WaitForCalls(1);
+            await Call('POST', '/candidate/join', late.Token, body);
+            Release();
+            await new Promise<void>(resolve => setTimeout(resolve, 50));
+            CurrentMode = WORKING;
+            now += 3001;
+            for (const player of [first, late]) await WaitForStatus(player.Token, 'IN_PROGRESS');
+            assert.equal(Calls.length, 2, 'one server for both, not one each');
+            assert.deepEqual([...Calls[1].ExpectedPlayers].sort(), [first.UserId, late.UserId].sort());
+        } finally { SetPartyClockForTests(); }
+    });
     it('a waiting solo candidate can be cancelled without launching when capacity returns', async () => {
         const { CancelMatchmaking } = await import('../src/controllers/matchmaking');
         CurrentMode = {Name: 'ports full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'ports'}))};
