@@ -1,7 +1,7 @@
 import './setup';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MemoryAdmission, CapacityUnavailable, HuntAdmission, HuntLimit } from '../src/controllers/capacity';
+import { MemoryAdmission, CapacityUnavailable, HuntAdmission, HuntLimit, PendingHuntLimit } from '../src/controllers/capacity';
 
 test('hard hunt slots include pending allocations and release exactly once',()=>{
     let running=4;
@@ -92,4 +92,23 @@ test('launch backlog is bounded independently of free hunt slots',()=>{
     assert.equal(slots.pending,2);
     second(); third();
     assert.equal(slots.pending,0);
+});
+
+test('MAX_PENDING_HUNTS raises the launch backlog only as far as the pacing allows',()=>{
+    const saved={max:process.env.MAX_PENDING_HUNTS,pace:process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP};
+    try{
+        process.env.MAX_PENDING_HUNTS='8'; process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP='2';
+        assert.equal(PendingHuntLimit(),8);
+        const slots=new HuntAdmission(()=>0,()=>96);
+        const held=Array.from({length:8},()=>slots.reserve());
+        assert.throws(()=>slots.reserve(),CapacityUnavailable);
+        held.forEach(release=>release());
+        process.env.SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP='10';
+        assert.equal(PendingHuntLimit(),6);
+        delete process.env.MAX_PENDING_HUNTS;
+        assert.equal(PendingHuntLimit(),2);
+    } finally {
+        for(const [name,value] of [['MAX_PENDING_HUNTS',saved.max],['SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP',saved.pace]] as const)
+            value===undefined?delete process.env[name]:process.env[name]=value;
+    }
 });
