@@ -1,12 +1,42 @@
 import { sql } from "drizzle-orm";
 import { check, index, integer, primaryKey, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+export const recoveryproofs = sqliteTable('recoveryproofs', {
+    discordId: text('discordId').primaryKey().notNull(),
+    userId: text('userId').unique().notNull(),
+    keyHash: text('keyHash').notNull()
+});
+export const recoverychallenges = sqliteTable('recoverychallenges', {
+    tokenHash: text('tokenHash').primaryKey().notNull(), discordId: text('discordId').notNull(),
+    userId: text('userId'), keyHash: text('keyHash'), expiresAt: integer('expiresAt').notNull(),
+    used: integer('used').notNull().default(0)
+});
+export const authepochs = sqliteTable('authepochs', {
+    userId: text('userId').primaryKey().notNull(), epoch: integer('epoch').notNull().default(0)
+});
+export const recoveryevents = sqliteTable('recoveryevents', {
+    id: integer('id').primaryKey({autoIncrement:true}), discordId: text('discordId').notNull(),
+    action: text('action').notNull(), createdAt: integer('createdAt').notNull()
+}, table=>[index('recoveryevents_actor_time').on(table.discordId,table.createdAt)]);
+
 export const users = sqliteTable("users", {
     userId: text("userId").notNull().primaryKey(),
     name: text("name").notNull(),
     notes: integer("notes").notNull(),
     isAdmin: integer("isAdmin", {mode: "boolean"}).notNull().default(false)
 })
+
+export const playeraddresses = sqliteTable('player_addresses', {
+    accountId:text('account_id').notNull(), address:text('address').notNull(), lastSeen:integer('last_seen').notNull()
+},t=>[primaryKey({columns:[t.accountId,t.address]})]);
+export const accountbans = sqliteTable('account_bans', {
+    accountId:text('account_id').notNull().primaryKey(),reason:text('reason').notNull(),address:text('address'),
+    active:integer('active').notNull(),updatedAt:integer('updated_at').notNull(),actor:text('actor').notNull()
+},t=>[index('active_ban_address').on(t.address,t.active)]);
+export const moderationevents = sqliteTable('moderation_events', {
+    id:integer('id').primaryKey({autoIncrement:true}),accountId:text('account_id').notNull(),reason:text('reason').notNull(),
+    address:text('address'),active:integer('active').notNull(),createdAt:integer('created_at').notNull(),actor:text('actor').notNull()
+});
 
 export const discordlinks = sqliteTable('discordlinks', {
     discordId: text('discordId').notNull().primaryKey(),
@@ -16,8 +46,8 @@ export const discordlinks = sqliteTable('discordlinks', {
 
 export const huntregions = sqliteTable('huntregions', {
     userId: text('userId').notNull().primaryKey().references(() => users.userId),
-    region: text('region', {enum:['main','aus','ger']}).notNull()
-}, table => [check('huntregions_region', sql`${table.region} IN ('main', 'aus', 'ger')`)]);
+    region: text('region', {enum:['main','aus','ger','us']}).notNull()
+}, table => [check('huntregions_region', sql`${table.region} IN ('main', 'aus', 'ger', 'us')`)]);
 
 
 export const characters = sqliteTable("characters", {
@@ -94,7 +124,8 @@ export const inventorytransactions = sqliteTable("inventorytransactions", {
     response: text("response").notNull(),
     createdDate: text("createdDate").notNull()
 }, (table) => [
-    uniqueIndex("inventorytransactions_character_transaction_request").on(table.characterId, table.transactionId, table.requestHash)
+    uniqueIndex("inventorytransactions_character_transaction_request").on(table.characterId, table.transactionId, table.requestHash),
+    index("inventorytransactions_created_date").on(table.createdDate)
 ]);
 
 // Append-only log of every item change (triggers in the migration refuse UPDATE and DELETE)
@@ -451,4 +482,10 @@ export const slayerlinks = sqliteTable("slayerlinks", {
 export const onetimejobs = sqliteTable("onetimejobs", {
     jobId: text("jobId").notNull().primaryKey(),
     doneDate: text("doneDate").notNull()
+});
+
+export const accountkeyrecovery = sqliteTable("accountkeyrecovery", {
+    userId: text("userId").notNull().primaryKey(),
+    keyHash: text("keyHash").notNull(),
+    ciphertext: text("ciphertext").notNull()
 });

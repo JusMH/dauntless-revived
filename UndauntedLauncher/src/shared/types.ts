@@ -6,7 +6,8 @@ import type { ServerMode } from "./invite";
 
 export type { ServerMode };
 
-export type Language = "en" | "fi";
+export type Language = "en" | "fi" | "es";
+export const LANGUAGES: readonly Language[] = ["en", "fi", "es"];
 
 // -1 = leave graphics to the in-game menu, 0..4 = Low, Medium, High, Epic, Cinematic.
 export type GraphicsPreset = -1 | 0 | 1 | 2 | 3 | 4;
@@ -17,6 +18,11 @@ export const DEFAULT_GRAPHICS: GraphicsPreset = 4;
 // and is an opt-in experiment for the blown-out pre-hunt airship.
 export type ExposureMode = "game" | "basic";
 export const EXPOSURE_MODES: readonly ExposureMode[] = ["game", "basic"];
+
+// The game's own text language, sent to it as -epiclocale. The 1.4.4 client ships text for exactly
+// these cultures (Archon/Content/Localization/Game/<culture>); "auto" follows the operating system.
+export type GameLanguage = "auto" | "en-US" | "de-DE" | "es-ES" | "fr-FR" | "it-IT" | "ja-JP" | "pt-BR" | "ru-RU";
+export const GAME_LANGUAGES: readonly GameLanguage[] = ["auto", "en-US", "de-DE", "es-ES", "fr-FR", "it-IT", "ja-JP", "pt-BR", "ru-RU"];
 
 export type Phase =
   | "loading"
@@ -37,6 +43,7 @@ export type ConnectProblem =
   | null;
 
 export type ErrorCode =
+  | "account_banned"
   | "invite_invalid_format"
   | "invite_invalid"
   | "username_invalid"
@@ -118,18 +125,33 @@ export interface ServerInfo {
   fingerprint: string | null; // public mode: the pinned certificate fingerprint (not secret)
 }
 
+// A server joined before, for switching back to it without the invite.
+export interface SavedServerInfo {
+  id: string; // the account key slot id (not secret)
+  mode: ServerMode;
+  host: string;
+  port: number;
+  name: string;
+  current: boolean;
+  username: string | null;
+}
+
 export interface Settings {
-  huntRegion?: 'main' | 'aus' | 'ger';
+  huntRegion?: 'auto' | 'main' | 'aus' | 'ger' | 'us';
   graphics: GraphicsPreset;
   exposure: ExposureMode;
   windowed: boolean;
   language: Language;
+  gameLanguage: GameLanguage;
+  showConsole: boolean; // the DLL's log window, normally hidden (DR_SHOW_CONSOLE=1)
+  streamerMode?: boolean; // hide addresses, fingerprints, paths and player names on screen
 }
 
 export interface Snapshot {
   phase: Phase;
   busy: boolean;
   server: ServerInfo | null;
+  savedServers: SavedServerInfo[];
   connect: {
     checking: boolean;
     problem: ConnectProblem;
@@ -211,6 +233,8 @@ export const IPC = {
   submitInvite: "dr:submit-invite",
   retryConnect: "dr:retry-connect",
   forgetServer: "dr:forget-server",
+  switchServer: "dr:switch-server",
+  removeSavedServer: "dr:remove-saved-server",
   register: "dr:register",
   useExistingKey: "dr:use-existing-key",
   importKeyFile: "dr:import-key-file",

@@ -606,7 +606,7 @@ describe("one queued join per player", () => {
         assert.equal(await HandlePlayerMatchmaking("ISLAND", "", HUNT, V), true);
         Advance(17);
         assert.equal(await HandlePlayerMatchmaking("ISLAND", "", HUNT, O), true);
-        assert.equal(Deploy.Calls.length, 0, "the queue waits 20 s after its last join");
+        assert.equal(Deploy.Calls.length, 0, "allocation waits for a queued player to poll");
 
         Advance(21);
         const SentO = await DecideCandidateStatus(O);

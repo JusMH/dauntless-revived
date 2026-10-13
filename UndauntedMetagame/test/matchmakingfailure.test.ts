@@ -246,7 +246,7 @@ describe("matchmaking when the deploy server starts no game server", () => {
             }
         } finally { SetPartyClockForTests(); }
     });
-    it('a steady trickle of joins still sends the queue 20 seconds after the first join', async () => {
+    it('a steady trickle of joins still sends the queue 5 seconds after the first join', async () => {
         const { SetPartyClockForTests } = await import('../src/controllers/party');
         let now = Date.now();
         SetPartyClockForTests(() => now);
@@ -255,7 +255,7 @@ describe("matchmaking when the deploy server starts no game server", () => {
             const players = [NewPlayer(), NewPlayer(), NewPlayer()];
             for (const player of players) {
                 await Call('POST', '/candidate/join', player.Token, body);
-                now += 9000;
+                now += 2000;
                 await Call('GET', '/candidate/status', players[0].Token);
             }
             await WaitForCalls(1);

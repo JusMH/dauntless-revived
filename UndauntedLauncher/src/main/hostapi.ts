@@ -13,7 +13,7 @@ import { isPrivateModeHost } from "../shared/invite";
 
 const KEY_HEADER = "x-undaunted-user-api-key";
 
-export async function saveHuntRegion(ep: Endpoint, key: string, region: 'main' | 'aus' | 'ger'): Promise<boolean> {
+export async function saveHuntRegion(ep: Endpoint, key: string, region: 'main' | 'aus' | 'ger' | 'us'): Promise<boolean> {
   const res = await request(ep, '/undaunted/api/HuntRegion', {
     method:'POST', headers:statusHeaders(ep,key), body:JSON.stringify({region}), timeoutMs:10000,maxBytes:4096
   });
@@ -129,7 +129,7 @@ export interface UserInfo {
 
 export type UserInfoResult =
   | { ok: true; info: UserInfo }
-  | { ok: false; error: "key_rejected" | "server_unreachable" | "server_error" | "cert_mismatch" | "rate_limited" };
+  | { ok: false; error: "account_banned" | "key_rejected" | "server_unreachable" | "server_error" | "cert_mismatch" | "rate_limited"; detail?: string };
 
 export async function fetchUserInfo(ep: Endpoint, key: string): Promise<UserInfoResult> {
   if (!isPlausibleAccountKey(key)) return { ok: false, error: "key_rejected" };
@@ -138,6 +138,10 @@ export async function fetchUserInfo(ep: Endpoint, key: string): Promise<UserInfo
     res = await request(ep, "/undaunted/api/GetUserInfo", { headers: { [KEY_HEADER]: key }, timeoutMs: 10000, maxBytes: 64 * 1024 });
   } catch (e) {
     return { ok: false, error: isPin(e) ? "cert_mismatch" : "server_unreachable" };
+  }
+  if (res.status === 403) {
+    const body = parseJsonBody(res);
+    if(isObject(body) && body.error === 'account_banned') return {ok:false,error:'account_banned',detail:cleanText(body.reason,500) ?? 'Contact support for details.'};
   }
   if (res.status === 401 || res.status === 403) return { ok: false, error: "key_rejected" };
   if (res.status === 429) return { ok: false, error: "rate_limited" };
@@ -256,4 +260,8 @@ export async function fetchBrandingImage(ep: Endpoint, urlPath: string): Promise
   } catch {
     return null;
   }
+}
+
+export async function endPlaying(ep:Endpoint,key:string):Promise<void> {
+  await request(ep,'/undaunted/api/PlayingEnded',{method:'POST',headers:statusHeaders(ep,key),timeoutMs:5000,maxBytes:4096});
 }

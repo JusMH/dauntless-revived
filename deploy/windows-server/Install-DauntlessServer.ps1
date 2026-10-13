@@ -1028,6 +1028,7 @@ try {
     $deploy['GAMESERVER_BINARY_PATH'] = & $fwd $exe
     $deploy['METAGAME_API_KEY'] = $gsKey
     if (-not $deploy['SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP']) { $deploy['SECONDS_TO_WAIT_BETWEEN_GAMESERVER_STARTUP'] = '10' }
+    if (-not $deploy.Contains('RAMSGATE_POOL')) { $deploy['RAMSGATE_POOL'] = '1' }
     if (-not $deploy.Contains('ENABLE_DOJO')) { $deploy['ENABLE_DOJO'] = '0' }
     $deploy['NODE_ENV'] = 'production'
 

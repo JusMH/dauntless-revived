@@ -28,11 +28,11 @@ export function backend(base, key, request = fetch) {
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Metagame must use loopback HTTP');
   async function api(path, body) {
     const response = await request(new URL(`/undaunted/api/${path}`, url), {
-      method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(5000),
+      method: body ? 'POST' : 'GET', redirect: 'error', signal: AbortSignal.timeout(15000),
       headers: {'x-undaunted-user-api-key': key, 'content-type': 'application/json'},
       body: body ? JSON.stringify(body) : undefined,
     });
-    if (!response.ok) throw new Error('Metagame request failed');
+    if (!response.ok) throw Object.assign(new Error('Metagame request failed'), {status: response.status});
     return path === 'RegisterInviteCode' ? undefined : response.json();
   }
   return {
@@ -108,19 +108,28 @@ export class Keys {
       const result = await this.handle(user, true);
       if (result.status !== 'ready') return result;
       const entry = this.state.users[user];
+      // Previous private replies were dismissible; deliver that same invite once by DM.
+      if (entry.deliveryChannel === 'ephemeral') entry.delivery = 'unsent';
       if (entry.delivery === 'sent') return {status: 'already_sent'};
       if (entry.delivery !== 'unsent') {
         if (!reconcile) return {status: entry.delivery === 'reserved' ? 'delivery_uncertain' : 'already_sent'};
-        const previous = await reconcile(result.code);
+        let previous;
+        try { previous = await reconcile(result.code); }
+        catch (error) {
+          if (error.code === 50007) return {status:'dm_disabled'};
+          if (error.code === 50278) return {status:'no_mutual_guild'};
+          return {status:'delivery_uncertain'};
+        }
         if (previous === undefined) return {status: 'delivery_uncertain'};
         if (previous) {
-          entry.delivery = 'sent'; entry.messageId = previous.id; entry.sentAt = previous.createdAt;
+          entry.delivery = 'sent'; entry.deliveryChannel = 'dm'; entry.messageId = previous.id; entry.sentAt = previous.createdAt;
           await this.save(this.state);
           return {status: 'already_sent'};
         }
       }
       // Reserve durably before Discord: an ambiguous timeout must never send twice.
       entry.delivery = 'reserved';
+      entry.deliveryChannel = 'dm';
       entry.attemptedAt = new Date().toISOString();
       try { await this.save(this.state); }
       catch (error) { entry.delivery = 'unsent'; throw error; }

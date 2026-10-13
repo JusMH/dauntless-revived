@@ -25,7 +25,7 @@ import { describeError, log, logToFile } from "./main/log";
 import { boundedString, externalTarget, isTrustedPageUrl, relayPortOverride, settingsPatch } from "./main/ipc-validate";
 import { INVITE_SCHEME, parseInvite } from "./shared/invite";
 import { IPC, type Snapshot, type TaskProgress } from "./shared/types";
-import { translate } from "./shared/i18n";
+import { systemLanguage, translate } from "./shared/i18n";
 import { APP_ID, SQUIRREL_NAME, UPDATE_FEED_URL } from "./main/constants";
 
 // Squirrel install / update / uninstall events: create or remove shortcuts, then quit.
@@ -44,6 +44,7 @@ if (
 
 // Every renderer runs in the Chromium sandbox, whatever a window's own options say.
 app.enableSandbox();
+if (process.argv.includes("--safe-mode")) app.disableHardwareAcceleration();
 nativeTheme.themeSource = "dark";
 app.setAppUserModelId(process.platform === "win32" && app.isPackaged ? `com.squirrel.${SQUIRREL_NAME}.${SQUIRREL_NAME}` : APP_ID);
 
@@ -160,6 +161,18 @@ function createWindow(): void {
   });
   mainWindow.removeMenu();
   mainWindow.once("ready-to-show", () => mainWindow?.show());
+  const window = mainWindow;
+  const showTimer = setTimeout(() => { if (!window.isDestroyed()) window.show(); }, 10000);
+  window.once("closed", () => clearTimeout(showTimer));
+  window.webContents.on("render-process-gone", (_event, details) => {
+    log.error(`launcher renderer stopped: ${details.reason}`);
+    if (!process.argv.includes("--safe-mode") && !controller?.relayActive) {
+      app.relaunch({args: [...process.argv.slice(1), "--safe-mode"]});
+      app.exit(0);
+    } else {
+      dialog.showErrorBox("Dauntless Revived could not open", "The launcher renderer stopped. Reinstall the latest launcher and send the launcher logs to support.");
+    }
+  });
   mainWindow.on("maximize", () => mainWindow?.webContents.send(IPC.windowState, true));
   mainWindow.on("unmaximize", () => mainWindow?.webContents.send(IPC.windowState, false));
 
@@ -188,8 +201,11 @@ function createWindow(): void {
     mainWindow = null;
   });
 
-  if (DEV_SERVER_URL) void mainWindow.loadURL(DEV_SERVER_URL);
-  else void mainWindow.loadFile(RENDERER_INDEX);
+  const loaded = DEV_SERVER_URL ? mainWindow.loadURL(DEV_SERVER_URL) : mainWindow.loadFile(RENDERER_INDEX);
+  void loaded.catch((error) => {
+    log.error(`launcher page failed: ${describeError(error)}`);
+    dialog.showErrorBox("Dauntless Revived could not open", "The launcher page could not load. Reinstall the latest launcher. Your account and game files are kept.");
+  });
 }
 
 function hardenSessions(): void {
@@ -281,6 +297,8 @@ function registerIpc(c: Controller): void {
   });
   handle(IPC.retryConnect, () => c.connect());
   handle(IPC.forgetServer, () => c.forgetServer());
+  handle(IPC.switchServer, (_e, id) => (typeof id === "string" && /^[0-9a-f]{24}$/.test(id) ? c.switchServer(id) : { ok: false, error: { code: "invite_invalid_format" } }));
+  handle(IPC.removeSavedServer, (_e, id) => (typeof id === "string" && /^[0-9a-f]{24}$/.test(id) ? c.removeSavedServer(id) : { ok: false, error: { code: "invite_invalid_format" } }));
   handle(IPC.register, (_e, username) => {
     const s = boundedString(username, 32);
     return s === null ? { ok: false, error: { code: "username_invalid" } } : c.register(s);
@@ -351,12 +369,14 @@ function makePlatform(): Platform {
   if (relayPort !== undefined) log.warn(`relay port overridden to ${relayPort}`);
   return {
     userDataDir: app.getPath("userData"),
+    documentsDir: app.getPath("documents"),
     resourcesDir: resourcesDir(),
     defaultInstallDir,
     hostPlatform: process.platform,
     appVersion: app.getVersion(),
     packaged: app.isPackaged,
-    defaultLanguage: app.getLocale().toLowerCase().startsWith("fi") ? "fi" : "en",
+    defaultLanguage: systemLanguage(app.getLocale()),
+    systemLocale: app.getLocale(),
     relayPort,
     encryptor: {
       isAvailable: () => safeStorage.isEncryptionAvailable(),
@@ -485,6 +505,10 @@ if (!started) {
           logger: { log: (m) => log.info(`update: ${m}`), info: (m) => log.info(`update: ${m}`), warn: (m) => log.warn(`update: ${m}`), error: (m) => log.error(`update: ${m}`) },
         });
       }
+    }).catch((error) => {
+      log.error(`launcher startup failed: ${describeError(error)}`);
+      dialog.showErrorBox("Dauntless Revived could not open", `Startup failed. Send the launcher logs to support.\n${describeError(error)}`);
+      app.exit(1);
     });
 
     app.on("before-quit", () => {

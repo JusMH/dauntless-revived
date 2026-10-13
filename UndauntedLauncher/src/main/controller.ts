@@ -1,3 +1,4 @@
+import {chooseClosestRegion} from './autoregion';
 // The launcher's state machine. It owns every piece of state; the renderer draws Snapshots and
 // sends intents. Nothing in here imports Electron: main.ts passes the platform pieces in, which
 // keeps this testable with plain Node.
@@ -16,7 +17,7 @@ import { missingDirectX, gameExitDetail } from './windows-runtime';
 import { parseInvite, isLoopbackHost, type Invite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
 import { limitedView, type ServerStatus } from "../shared/status";
-import { saveHuntRegion } from './hostapi';
+import { saveHuntRegion, endPlaying } from './hostapi';
 import type {
   ActionResult,
   Branding,
@@ -24,6 +25,7 @@ import type {
   ErrorCode,
   ExposureMode,
   ExternalTarget,
+  GameLanguage,
   GraphicsPreset,
   InviteCheck,
   Language,
@@ -36,7 +38,7 @@ import type {
   Snapshot,
   TaskProgress,
 } from "../shared/types";
-import { EXPOSURE_MODES, GRAPHICS_PRESETS } from "../shared/types";
+import { EXPOSURE_MODES, GAME_LANGUAGES, GRAPHICS_PRESETS, LANGUAGES } from "../shared/types";
 import type { Endpoint } from "./http";
 import {
   fetchBrandingImage,
@@ -56,7 +58,7 @@ import { dllStatus, installPinnedDlls, DllError, win64Dir } from "./dlls";
 import { installClientMods } from "./client-mods";
 import { applyGameConfig } from "./engineini";
 import { locateExistingGame } from "./game-folder";
-import { buildLaunchArgs, describeLaunch, GameProcess, type LaunchRuntime, type SpawnFn } from "./launch";
+import { buildLaunchArgs, describeLaunch, GameProcess, gameLocale, type LaunchRuntime, type SpawnFn } from "./launch";
 import { backupFileText, KeyStore, KeyStoreError, serverId, type Encryptor, type KeySlot } from "./keystore";
 import { SettingsStore, type StoredServer, type StoredSettings } from "./settings";
 import { freeBytes, missingVcRuntime } from "./system";
@@ -75,6 +77,7 @@ import {
 
 export interface Platform {
   userDataDir: string;
+  documentsDir?: string;
   resourcesDir: string;
   runtimeFilesExist?: (file: string) => boolean;
 
@@ -83,6 +86,8 @@ export interface Platform {
   appVersion: string;
   packaged: boolean;
   defaultLanguage: Language;
+  // The operating system's locale ("es-ES"), for the game language "auto".
+  systemLocale?: string;
   encryptor: Encryptor;
   manifest: GameManifest | null;
   gameConfigDir?: string;
@@ -123,6 +128,7 @@ export class Controller {
   private readonly settings: SettingsStore;
   private readonly keys: KeyStore;
   private readonly game: GameProcess;
+  private endPlayingSession: (()=>Promise<void>) | null = null;
   private readonly verified: VerifiedCache;
 
   private reachable: boolean | null = null;
@@ -160,12 +166,14 @@ export class Controller {
 
   constructor(private readonly p: Platform) {
     this.settings = new SettingsStore(p.userDataDir, p.defaultLanguage, p.hostPlatform ?? process.platform);
-    this.keys = new KeyStore(path.join(p.userDataDir, "keys"), p.encryptor);
+    this.keys = new KeyStore(path.join(p.userDataDir, "keys"), p.encryptor, p.documentsDir ? path.join(p.documentsDir, "Dauntless Revived", "Account Keys") : undefined);
     this.game = new GameProcess(p.spawn);
     this.verified = new VerifiedCache(path.join(p.userDataDir, "verified-files.json"));
     this.game.onChange((running, code) => {
       log.info(running ? "game started" : `game exited (code ${code ?? "none"})`);
       if (!running) {
+        const end=this.endPlayingSession; this.endPlayingSession=null;
+        if(end) void end().catch(()=>{});
         if (code !== null && code !== 0) this.lastError = {code:'launch_failed',detail:gameExitDetail(code)};
 
         void this.stopRelay().then(() => this.publish());
@@ -251,6 +259,10 @@ export class Controller {
     return {
       phase: this.phase,
       busy: this.busy,
+      savedServers: this.s.savedServers.map((o) => {
+        const id = serverId(o.host, o.port, o.mode);
+        return { id, mode: o.mode, host: o.host, port: o.port, name: o.name, current: sid === id, username: this.s.usernames[id] ?? null };
+      }),
       server: sv
         ? {
             mode: sv.mode,
@@ -286,7 +298,7 @@ export class Controller {
       },
       task: this.task,
       game: { running: this.game.running, relayPort: this.relay?.port ?? null },
-      settings: { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language, ...(this.s.huntRegion ? {huntRegion:this.s.huntRegion} : {}) },
+      settings: { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language, gameLanguage: this.s.gameLanguage, streamerMode: this.s.streamerMode, showConsole: this.s.showConsole, ...(this.s.huntRegion ? {huntRegion:this.s.huntRegion} : {}) },
       app: { version: this.p.appVersion, packaged: this.p.packaged, updateReady: this.updateReady },
       status: this.status,
       statusUnsupported: this.statusUnsupported,
@@ -352,7 +364,7 @@ export class Controller {
     return { ok: true, certificateChanged: change !== null, previousFingerprint: change?.fp ?? null };
   }
 
-  private async certificateChange(inv: Invite): Promise<{ fp: string | null } | null> {
+  private async certificateChange(inv: Pick<Invite, "mode" | "host" | "port" | "fp">): Promise<{ fp: string | null } | null> {
     if (inv.mode !== "public") return null;
     const bound = await this.keys.certificateOf({ host: inv.host, port: inv.port, mode: "public", fp: inv.fp });
     return bound && bound.fp !== inv.fp ? bound : null;
@@ -366,7 +378,29 @@ export class Controller {
     if (this.game.running) return this.fail("already_running");
     const parsed = parseInvite(text);
     if (!parsed.ok) return this.fail("invite_invalid_format", parsed.error);
-    const inv = parsed.invite;
+    return this.join(parsed.invite, opts);
+  }
+
+  // Back to a server joined before, with what its invite said then: no invite to paste again.
+  async switchServer(id: string): Promise<ActionResult> {
+    if (this.busy || this.task) return err("busy");
+    if (this.game.running) return this.fail("already_running");
+    const saved = this.s.savedServers.find((sv) => serverId(sv.host, sv.port, sv.mode) === id);
+    if (!saved) return this.fail("invite_invalid_format");
+    return this.join({ ...saved });
+  }
+
+  async removeSavedServer(id: string): Promise<ActionResult> {
+    const cur = this.sid();
+    if (id === cur) return err("busy"); // the current server stays in the list
+    await this.settings.update((s) => {
+      s.savedServers = s.savedServers.filter((sv) => serverId(sv.host, sv.port, sv.mode) !== id);
+    });
+    this.publish();
+    return OK;
+  }
+
+  private async join(inv: Omit<Invite, "code"> & { code: string | null }, opts: { acceptNewCertificate?: boolean } = {}): Promise<ActionResult> {
     const change = await this.certificateChange(inv);
     if (change) {
       if (opts.acceptNewCertificate !== true) {
@@ -519,6 +553,9 @@ export class Controller {
           s.usernames[sid] = info.info.username;
         });
       }
+    } else if (info.error === "account_banned") {
+      this.keyRejected = true;
+      this.lastError = {code:'account_banned',detail:info.detail};
     } else if (info.error === "key_rejected") {
       this.keyRejected = true;
       this.lastError = { code: "key_rejected" };
@@ -703,8 +740,8 @@ export class Controller {
     if (!ep || !slot || !sid) return err("server_unreachable");
     const info = await fetchUserInfo(ep, key);
     if (!info.ok) {
-      this.lastError = { code: info.error };
-      return err(info.error);
+      this.lastError = { code: info.error, detail: info.detail };
+      return {ok:false,error:this.lastError};
     }
     try {
       await this.keys.save(slot, key);
@@ -1089,13 +1126,15 @@ export class Controller {
       if (!ep) return this.fail('server_unreachable');
       const account = await fetchUserInfo(ep, key);
       if (!account.ok) {
-        this.keyRejected = account.error === 'key_rejected';
-        return this.fail(account.error);
+        this.keyRejected = account.error === 'key_rejected' || account.error === 'account_banned';
+        return this.fail(account.error, account.detail);
       }
       this.keyRejected = false;
-      if (this.s.huntRegion) {
+      const chosenRegion = !this.s.huntRegion || this.s.huntRegion === 'auto'
+        ? await chooseClosestRegion(ep, key) : this.s.huntRegion;
+      if (chosenRegion) {
         try {
-          if (!await saveHuntRegion(ep,key,this.s.huntRegion)) return this.fail('server_error','The selected hunt region is unavailable. Choose Main in Settings or try again later.');
+          if (!await saveHuntRegion(ep,key,chosenRegion)) return this.fail('server_error','The selected hunt region is unavailable. Choose Main in Settings or try again later.');
         } catch { return this.fail('server_unreachable'); }
       }
       const dir = this.installDir;
@@ -1163,12 +1202,14 @@ export class Controller {
           log.error(`could not write the game config: ${describeError(e)}`);
           return this.fail("config_failed");
         }
-        const args = buildLaunchArgs({ host: gameHost, port: gamePort, key, windowed: this.s.windowed || displayRepaired });
+        const args = buildLaunchArgs({ host: gameHost, port: gamePort, key, windowed: this.s.windowed || displayRepaired, gameLocale: gameLocale(this.s.gameLanguage, this.p.systemLocale ?? "en-US") });
         const via = prepared ? ` via ${prepared.runtimeName}` : "";
         log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : ""}`);
         try {
-          await this.game.start(win64Dir(dir), args, prepared?.runtime);
+          this.endPlayingSession=()=>endPlaying(ep,key);
+          await this.game.start(win64Dir(dir), args, prepared?.runtime, this.s.showConsole ? { DR_SHOW_CONSOLE: "1" } : undefined);
         } catch (e) {
+          this.endPlayingSession=null;
           log.error(`launch failed: ${describeError(e)}`);
           return this.fail("launch_failed");
         }
@@ -1221,12 +1262,15 @@ export class Controller {
         if (GRAPHICS_PRESETS.includes(p.graphics as GraphicsPreset)) s.graphics = p.graphics as GraphicsPreset;
         if (EXPOSURE_MODES.includes(p.exposure as ExposureMode)) s.exposure = p.exposure as ExposureMode;
         if (typeof p.windowed === "boolean") s.windowed = p.windowed;
-        if (p.huntRegion === 'main' || p.huntRegion === 'aus' || p.huntRegion === 'ger') s.huntRegion = p.huntRegion;
-        if (p.language === "en" || p.language === "fi") s.language = p.language;
+        if (typeof p.streamerMode === "boolean") s.streamerMode = p.streamerMode;
+        if (typeof p.showConsole === "boolean") s.showConsole = p.showConsole;
+        if (p.huntRegion === 'auto' || p.huntRegion === 'main' || p.huntRegion === 'aus' || p.huntRegion === 'ger' || p.huntRegion === 'us') s.huntRegion = p.huntRegion;
+        if (LANGUAGES.includes(p.language as Language)) s.language = p.language as Language;
+        if (GAME_LANGUAGES.includes(p.gameLanguage as GameLanguage)) s.gameLanguage = p.gameLanguage as GameLanguage;
       });
     }
     this.publish();
-    return { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language, ...(this.s.huntRegion ? {huntRegion:this.s.huntRegion} : {}) };
+    return { graphics: this.s.graphics, exposure: this.s.exposure, windowed: this.s.windowed, language: this.s.language, gameLanguage: this.s.gameLanguage, streamerMode: this.s.streamerMode, showConsole: this.s.showConsole, ...(this.s.huntRegion ? {huntRegion:this.s.huntRegion} : {}) };
   }
 
   async openExternal(target: ExternalTarget): Promise<ActionResult> {

@@ -37,7 +37,7 @@ const EXPECTED: Record<FixedTarget, string> = {
   eugamehost_game3: "https://www.eugamehost.com/clients/cart.php?a=add&pid=240&promocode=SIGNUP6MONTH&skipconfig=1",
   eugamehost_game5: "https://www.eugamehost.com/clients/cart.php?a=add&pid=242&promocode=SIGNUP6MONTH&skipconfig=1",
   eugamehost_5800x: "https://www.eugamehost.com/clients/cart.php?a=add&pid=500",
-  discord: "https://discord.gg/ZJRprHzsgu",
+  discord: "https://discord.gg/dauntlessrevived",
   patreon: "https://patreon.com/DauntlessRevived",
 };
 
@@ -112,7 +112,7 @@ const BAD_URLS = [
   "https://www.eugamehost.com/clients/cart.php?a=add&pid=999",
   "https://eugamehost.com/",
   "https://discord.gg.evil.example/ZJRprHzsgu",
-  "https://discord.gg/ZJRprHzsgu/extra",
+  "https://discord.gg/dauntlessrevived/extra",
   "https://discord.com/invite/ZJRprHzsgu",
   "https://evil.example/",
   "",
