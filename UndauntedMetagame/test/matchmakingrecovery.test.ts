@@ -389,7 +389,7 @@ it('a rejected party restoration preserves the current usable city candidate', a
 });
 
 for (const kind of ['private', 'direct', 'party'] as const) {
-    it(`a ${kind} capacity retry cannot revive an attempt after the capacity deadline`, async t => {
+    it(`a ${kind} capacity retry cannot revive an attempt after its renewed idle lease`, async t => {
         t.mock.timers.enable({apis: ['setTimeout']});
         deploy = async () => full();
         if (kind === 'party') await formParty();
@@ -408,7 +408,8 @@ for (const kind of ['private', 'direct', 'party'] as const) {
         await retry;
         TouchPlayer(A);
         TouchPlayer(B);
-        await advance(t, 48500);
+        // The retry poll at 10 seconds renews the lease to 70 seconds.
+        await advance(t, 58500);
         assert.equal((await DecideCandidateStatus(A)).Kind, 'failed');
         response.resolve(ready());
         await flush();

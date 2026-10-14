@@ -295,6 +295,28 @@ describe("matchmaking when the deploy server starts no game server", () => {
         assert.equal(await CheckAndUpdateQueueStatus(player.UserId), undefined);
         assert.equal(Calls.length, 1);
     });
+    it('active capacity waiters remain queued beyond a minute and enter when capacity returns', async () => {
+        const { SetPartyClockForTests } = await import('../src/controllers/party');
+        const { ResetMatchmakingForTests } = await import('../src/controllers/matchmaking');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            for (const path of PATHS) {
+                ResetMatchmakingForTests();
+                Calls.length = 0;
+                CurrentMode = {Name: 'full', Reply: Json(503, JSON.stringify({error:'capacity_unavailable', reason:'hunts'}))};
+                const players = await JoinAll(path);
+                await WaitForCalls(1);
+                for (let poll = 0; poll < 6; poll++) {
+                    now += 20000;
+                    for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'MATCHING');
+                }
+                CurrentMode = WORKING;
+                now += 4000;
+                for (const player of players) assert.equal((await WaitForStatus(player.Token, 'IN_PROGRESS')).json.status, 'IN_PROGRESS');
+            }
+        } finally { ResetMatchmakingForTests(); SetPartyClockForTests(); }
+    });
     it('capacity waiting fails after one minute on every path without another allocation', async () => {
         const { SetPartyClockForTests } = await import('../src/controllers/party');
         let now = Date.now();

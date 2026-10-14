@@ -8,6 +8,18 @@ const body={GameMode:'ISLAND',GameArgs:'',HuntId:'hunt',ExpectedPlayers:['one','
 const main={host:'main',port:8762}, aus={host:'aus',port:8700};
 const load=async()=>({running:10,pending:1,limit:22});
 
+test('retired OCE is replaced by US overflow without redirecting explicit OCE requests',async()=>{
+ delete process.env.AUS_DEPLOYSERVER_URL;
+ process.env.US_DEPLOYSERVER_URL='http://127.0.0.1:61041';
+ try {
+  const router=new RegionalRouter(load,async(url,request)=>{
+   assert.equal(url.port,'61041');assert.equal(request.Overflow,true);return {host:'us',port:8700};
+  });
+  assert.equal((await router.launch(body,'main',async()=>{throw new CapacityUnavailable('cpu');})).host,'us');
+  await assert.rejects(router.launch(body,'aus',async()=>main),CapacityUnavailable);
+ }finally{delete process.env.US_DEPLOYSERVER_URL;process.env.AUS_DEPLOYSERVER_URL='http://127.0.0.1:61021';}
+});
+
 test('US stays regional for city, training and hunts, including failures',async()=>{
  process.env.US_DEPLOYSERVER_URL='http://127.0.0.1:61041';
  process.env.US_PUBLIC_HOST='us';

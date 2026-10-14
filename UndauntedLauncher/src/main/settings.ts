@@ -3,7 +3,7 @@
 import { promises as fsp, readFileSync } from "node:fs";
 import path from "node:path";
 import { isPrivateModeHost, isValidFingerprint, isValidHost, isValidInviteCode, isValidShareUrl, cleanServerName, type ServerMode } from "../shared/invite";
-import { isValidUsername } from "../shared/username";
+import { cleanText } from "../shared/status";
 import { DEFAULT_GRAPHICS, EXPOSURE_MODES, GAME_LANGUAGES, GRAPHICS_PRESETS, LANGUAGES, type ExposureMode, type GameLanguage, type GraphicsPreset, type Language } from "../shared/types";
 
 export interface StoredServer {
@@ -121,7 +121,12 @@ export function sanitizeSettings(raw: unknown, language: Language, platform: Nod
   if (LANGUAGES.includes(raw.language as Language)) s.language = raw.language as Language;
   if (GAME_LANGUAGES.includes(raw.gameLanguage as GameLanguage)) s.gameLanguage = raw.gameLanguage as GameLanguage;
   if (isObject(raw.usernames)) {
-    for (const [k, v] of Object.entries(raw.usernames)) if (/^[0-9a-f]{24}$/.test(k) && isValidUsername(v)) s.usernames[k] = v;
+    // Authenticated display names may predate registration rules or be renamed by
+    // an admin. Match GetUserInfo's safe display-text contract, not its signup form.
+    for (const [k, v] of Object.entries(raw.usernames)) {
+      const name = cleanText(v, 32);
+      if (/^[0-9a-f]{24}$/.test(k) && name !== null && name === v) s.usernames[k] = name;
+    }
   }
   if (isObject(raw.backupOffered)) {
     for (const [k, v] of Object.entries(raw.backupOffered)) if (/^[0-9a-f]{24}$/.test(k) && v === true) s.backupOffered[k] = true;

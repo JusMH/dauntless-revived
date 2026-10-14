@@ -55,7 +55,9 @@ export class RegionalRouter {
                 throw error;
             }
         };
-        const url = AusUrl();
+        const oce = AusUrl();
+        if (choice === 'aus' && !oce) throw new CapacityUnavailable('hunts');
+        const url = oce ?? AusUrl('us');
         if (!['ISLAND','CITY','SHARED'].includes(body.GameMode)) return main();
         if (!url) { if (choice === 'aus') throw new CapacityUnavailable('hunts'); return main(); }
         let ausFirst = choice === 'aus';
@@ -79,7 +81,7 @@ export class RegionalRouter {
         catch (error) {
             if (!(error instanceof CapacityUnavailable)) throw error;
             // EU overflow must leave slots for players who explicitly selected OCE.
-            const reserve=Number(process.env.AUS_RESERVED_HUNTS??0);
+            const reserve=Number(process.env[oce ? 'AUS_RESERVED_HUNTS' : 'US_RESERVED_HUNTS']??0);
             if(!Number.isSafeInteger(reserve)||reserve<0)throw new Error('Invalid AUS_RESERVED_HUNTS');
             if(reserve>0 && body.GameMode==='ISLAND') {
                 try {const load=await this.ausLoad(url);if(load.limit===null||load.limit-load.running-load.pending<=reserve)throw error;}

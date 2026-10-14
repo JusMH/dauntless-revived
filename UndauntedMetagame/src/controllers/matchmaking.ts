@@ -1,4 +1,5 @@
 import { PlayerRegion, RegionQueueKey, HuntRegion, RegionChoice } from './huntregion';
+import { CapacityTurns } from './capacityturns';
 import { logger } from "../logger";
 import crypto from "node:crypto";
 import { MatchmakingRoster } from './matchmakingroster';
@@ -30,8 +31,9 @@ const HEALTH_CACHE_MS = 5000;
 // player polls), or at once when it reaches QUEUE_FULL_PLAYERS
 const QUEUE_WAIT_MS = 5 * 1000;
 const QUEUE_FULL_PLAYERS = 4;
-// Capacity is not an endless queue. End the attempt promptly when the host stays full.
+// A live player's polls renew this lease; disconnected waiters expire.
 export const CAPACITY_WAIT_MS = 60 * 1000;
+const CapacityOrder = new CapacityTurns(CAPACITY_WAIT_MS);
 // The deploy server answers "capacity" whenever two launches are already waiting to spawn, so a
 // retry usually fits a few seconds later; ten seconds between tries left most of the minute unused
 const CAPACITY_RETRY_MS = 3 * 1000;
@@ -155,6 +157,7 @@ async function AllocationHealth(entry: MatchmakingResult): Promise<boolean | und
 
 function FailCandidate(candidateId: string, reason: string) {
     CapacityWaits.delete(candidateId);
+    CapacityOrder.remove(candidateId);
     MatchmakingRoster.cancelCandidate(candidateId);
     for (const [playerId, entry] of MatchmakingResultMap) {
         if (entry.CandidateId !== candidateId) continue;
@@ -257,6 +260,21 @@ export function DistinctPlayers(PlayerIds: string[]): string[] {
 
 // Never throws: an unreachable deploy server or an unusable answer is a failed launch
 async function LaunchGameOnDeployserver(GameMode: string, GameArgs: string, HuntId: string, AskedPlayers: string[] | undefined, Region: RegionChoice = 'main'): Promise<LaunchResult> {
+    const candidate = GameMode === 'ISLAND' && AskedPlayers?.length
+        ? MatchmakingResultMap.get(AskedPlayers[0])?.CandidateId : undefined;
+    if (!candidate) return LaunchGameOnDeployserverNow(GameMode, GameArgs, HuntId, AskedPlayers, Region);
+    const active = new Set([...MatchmakingResultMap.values()].filter(e=>!e.Ready && !e.Failed).map(e=>e.CandidateId));
+    if (!CapacityOrder.start(candidate, Region, PartyNow(), active))
+        return {succeeded:false,readyNow:false,host:'',port:0,capacity:true};
+    let capacity = false;
+    try {
+        const result = await LaunchGameOnDeployserverNow(GameMode, GameArgs, HuntId, AskedPlayers, Region);
+        capacity = result.capacity === true;
+        return result;
+    } finally { CapacityOrder.finish(candidate, capacity, PartyNow()); }
+}
+
+async function LaunchGameOnDeployserverNow(GameMode: string, GameArgs: string, HuntId: string, AskedPlayers: string[] | undefined, Region: RegionChoice = 'main'): Promise<LaunchResult> {
     const ExpectedPlayers = AskedPlayers === undefined ? undefined : DistinctPlayers(AskedPlayers);
 
     if(AskedPlayers !== undefined && ExpectedPlayers!.length !== AskedPlayers.length){
@@ -448,13 +466,18 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
     }
 
     const waiting = CapacityWaits.get(PlayerMatchmakingResult.CandidateId);
+    const queueCandidate = PlayerQueueMap.get(PlayerId)?.CandidateIds.values().next().value;
+    CapacityOrder.touch(queueCandidate ?? PlayerMatchmakingResult.CandidateId, PartyNow());
     if (waiting) {
         if (PartyNow() >= waiting.deadline) {
             FailCandidate(PlayerMatchmakingResult.CandidateId, 'capacity wait expired');
-        } else if (!waiting.busy && PartyNow() >= waiting.next) {
-            waiting.busy = true;
-            waiting.next = PartyNow() + CAPACITY_RETRY_MS;
-            await WaitBriefly(waiting.retry().then(Done => { if (Done) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }).finally(() => { waiting.busy = false; }));
+        } else {
+            waiting.deadline = PartyNow() + CAPACITY_WAIT_MS;
+            if (!waiting.busy && PartyNow() >= waiting.next) {
+                waiting.busy = true;
+                waiting.next = PartyNow() + CAPACITY_RETRY_MS;
+                await WaitBriefly(waiting.retry().then(Done => { if (Done) CapacityWaits.delete(PlayerMatchmakingResult.CandidateId); }).finally(() => { waiting.busy = false; }));
+            }
         }
         return MatchmakingResultMap.get(PlayerId);
     }
@@ -473,6 +496,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
             for (const candidateId of MatchmakingQueue.CandidateIds.values()) FailCandidate(candidateId, 'capacity wait expired');
             return MatchmakingResultMap.get(PlayerId);
         }
+        if (MatchmakingQueue.CapacityDeadline !== undefined) MatchmakingQueue.CapacityDeadline = PartyNow() + CAPACITY_WAIT_MS;
 
         if(PartyNow() - MatchmakingQueue.FirstPlayerAddedTime >= QUEUE_WAIT_MS || (MatchmakingQueue.RetryAfter !== undefined && PartyNow() >= MatchmakingQueue.RetryAfter)){
             await WaitBriefly(PopQueue(PlayerMatchmakingResult.HuntId, MatchmakingQueue));
@@ -1176,6 +1200,7 @@ export function ResetMatchmakingForTests(){
     HealthCache = undefined;
     HealthRequest = undefined;
     CapacityWaits.clear();
+    CapacityOrder.clear();
     MatchmakingQueueMap.clear();
     MatchmakingResultMap.clear();
     PlayerQueueMap.clear();
