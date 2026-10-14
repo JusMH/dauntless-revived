@@ -100,7 +100,7 @@ describe("Ramsgate", () => {
         } finally {delete process.env.MAX_LOCAL_HUNTS;}
     });
     it('worker limits pending launches to two and running hunts to three',async()=>{
-        process.env.HUNT_WORKER='1'; process.env.MAX_HUNTS='3';
+        process.env.HUNT_WORKER='1'; process.env.MAX_HUNTS='3'; process.env.MAX_PENDING_HUNTS='2';
         try {
             await Startup();
             const results=await Promise.allSettled(Array.from({length:8},()=>StartupGameserverWithArgs(TUTORIAL_ARGS)));
@@ -115,7 +115,7 @@ describe("Ramsgate", () => {
             assert.equal(Spawned.length,3);
             await assert.rejects(StartupGameserverWithArgs(TUTORIAL_ARGS), /capacity unavailable: hunts/);
             assert.equal(Spawned.length,3, 'a full worker must not spawn a fourth hunt');
-        } finally {delete process.env.HUNT_WORKER;delete process.env.MAX_HUNTS;}
+        } finally {delete process.env.HUNT_WORKER;delete process.env.MAX_HUNTS;delete process.env.MAX_PENDING_HUNTS;}
     });
     it('low memory blocks new worlds before spawn without consuming hunt ports or stopping Ramsgate', async () => {
         await Startup();
