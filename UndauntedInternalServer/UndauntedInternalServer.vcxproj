@@ -145,6 +145,8 @@
     <ClInclude Include="TrialsSchedule.h" />
     <ClInclude Include="AutoPressStart.h" />
     <ClInclude Include="CellFusionTime.h" />
+    <ClInclude Include="DualSense.h" />
+    <ClInclude Include="DualSenseIcons.h" />
     <ClInclude Include="NoPlatinumPrice.h" />
     <ClInclude Include="DataTables.h" />
     <ClInclude Include="FallRecoveryPolicy.h" />

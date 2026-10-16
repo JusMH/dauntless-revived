@@ -36,6 +36,8 @@
 #include "CellFusionTime.h"
 #include "NoPlatinumPrice.h"
 #include "DeveloperStyle.h"
+#include "DualSense.h"
+#include "DualSenseIcons.h"
 
 #include "SDK/GameplayAbilities_parameters.hpp"
 #include "SDK/Archon_parameters.hpp"
@@ -817,6 +819,7 @@ void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
     TrialsSchedule::Tick();
     CellFusionTime::Tick();
     AutoPressStart::OnProcessEvent(Object, Function);
+    DualSenseIcons::OnProcessEvent();
     NoPlatinumPrice::OnProcessEvent(Object);
     DeveloperStyle::OnProcessEvent(Object, Function);
 
@@ -959,6 +962,9 @@ void EACClientInitHook(void* a1) {
 
 void InitClientHooks() {
     MH_Initialize();
+
+    DualSense::Install();
+    DualSenseIcons::Install(Globals::BaseAddress);
 
 #if DR_SKIP_EAC_CLIENT_INIT
     MH_CreateHook((void*)(Globals::BaseAddress + 0xEF2440), EACClientInitHook, &OrigEACClientInit);
