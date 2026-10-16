@@ -1,4 +1,5 @@
 import {GetDb} from '../db';
+import {DeviceSignalInfo,SnapshotDeviceBan} from './devicesignals';
 import {ClientAddressOf, IsLoopbackAddress, NormalizeAddress} from '../middleware/RequestOrigin';
 import type {Request, Response} from 'express';
 
@@ -28,9 +29,10 @@ export function ModerationInfo(accountId:string){
     ExpirePlayingAddresses();
     const user=db.prepare('SELECT name FROM users WHERE userId=?').get(accountId) as {name:string}|undefined;
     return {username:user?.name ?? null,ban:db.prepare('SELECT reason,address,CASE WHEN expires_at<=? THEN 0 ELSE active END AS active,updated_at,expires_at FROM account_bans WHERE account_id=?').get(Date.now(),accountId) ?? null,
-        addresses:playingAddresses.has(accountId)?[playingAddresses.get(accountId)!]:[]};
+        devices:DeviceSignalInfo(accountId),addresses:playingAddresses.has(accountId)?[playingAddresses.get(accountId)!]:[]};
 }
-export function SetAccountBan(accountId:unknown,reason:unknown,active:unknown,address:unknown,actor:string,durationHours?:unknown){
+export function SetAccountBan(accountId:unknown,reason:unknown,active:unknown,address:unknown,actor:string,durationHours?:unknown,includeDevice:unknown=false){
+    if(typeof includeDevice!=='boolean')throw Error('invalid_device_scope');
     if(typeof accountId!=='string' || typeof reason!=='string' || !reason.trim() || reason.length>500 || typeof active!=='boolean') throw Error('invalid_ban');
     const ip=address == null || address==='' ? null : NormalizeAddress(address);
     if(address && (!ip || IsLoopbackAddress(ip))) throw Error('invalid_address');
@@ -43,6 +45,7 @@ export function SetAccountBan(accountId:unknown,reason:unknown,active:unknown,ad
         if(user.isAdmin)throw Error('admin_account_protected');
         ExpirePlayingAddresses();
         if(ip && playingAddresses.get(accountId)?.address!==ip)throw Error('address_not_observed');
+        SnapshotDeviceBan(accountId,active && includeDevice);
         const args=[accountId,reason.trim(),ip,Number(active),Date.now(),actor];
         db.prepare(`INSERT INTO account_bans(account_id,reason,address,active,updated_at,actor,expires_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(account_id) DO UPDATE SET
             reason=excluded.reason,address=excluded.address,active=excluded.active,updated_at=excluded.updated_at,actor=excluded.actor,expires_at=excluded.expires_at`).run(...args,expiresAt);

@@ -1,3 +1,5 @@
+import {collectDeviceSignals} from './device-signals';
+import {checkDeviceSignals} from './hostapi';
 import {chooseClosestRegion} from './autoregion';
 // The launcher's state machine. It owns every piece of state; the renderer draws Snapshots and
 // sends intents. Nothing in here imports Electron: main.ts passes the platform pieces in, which
@@ -76,6 +78,7 @@ import {
 } from "./constants";
 
 export interface Platform {
+  collectDeviceSignals?: () => Promise<import('./device-signals').DeviceSignals>;
   userDataDir: string;
   documentsDir?: string;
   resourcesDir: string;
@@ -1129,6 +1132,8 @@ export class Controller {
         this.keyRejected = account.error === 'key_rejected' || account.error === 'account_banned';
         return this.fail(account.error, account.detail);
       }
+    const deviceCheck=await checkDeviceSignals(ep,key,await (this.p.collectDeviceSignals?.() ?? collectDeviceSignals(this.hostPlatform)));
+      if(!deviceCheck.ok)return this.fail(deviceCheck.error,deviceCheck.detail);
       this.keyRejected = false;
       const chosenRegion = !this.s.huntRegion || this.s.huntRegion === 'auto'
         ? await chooseClosestRegion(ep, key) : this.s.huntRegion;

@@ -37,6 +37,7 @@ let gateway: https.Server;
 let meta: FakeMetagame;
 let content: FakeContentServer;
 let gatewayRequests: string[] = [];
+let deviceBlocked = false;
 const files = makeFiles();
 const manifest: GameManifest = (() => {
   const r = validateManifest(manifestFor(files), TEST_BUILD, false);
@@ -59,6 +60,10 @@ before(async () => {
   content = new FakeContentServer({ key: "unused", files });
   gateway = https.createServer({ cert: cert.certPem, key: cert.keyPem }, (req, res) => {
     gatewayRequests.push(`${req.method} ${req.url}`);
+    if (req.url === '/undaunted/api/DeviceSignals' && deviceBlocked) {
+      req.resume(); res.writeHead(403, {'content-type':'application/json'});
+      res.end(JSON.stringify({error:'device_banned',reason:'Test restriction'})); return;
+    }
     if ((req.url ?? "").startsWith("/content/")) {
       // The content server accepts any key the metagame knows.
       const key = req.headers["x-undaunted-user-api-key"];
@@ -107,6 +112,7 @@ function harness(relayPort = RELAY_PORT, userDataDir?: string, chooseFolder: Pla
   const installDir = temp("dr-ctl-game-");
   const configDir = temp("dr-ctl-cfg-");
   const p: Platform = {
+    collectDeviceSignals: async () => ({}),
     userDataDir: userData,
     resourcesDir: ASSETS,
     defaultInstallDir: installDir,
@@ -192,6 +198,13 @@ test("public mode end to end: join, register, install, play through the relay, g
   for (const dll of ["dxgi.dll", "UndauntedInternalServer.dll"]) assert.ok(existsSync(path.join(hx.installDir, "Archon", "Binaries", "Win64", dll)), dll);
   assert.ok(gatewayRequests.some((r) => r.startsWith("GET /content/v1/files/")), "files came through the gateway");
 
+  deviceBlocked = true;
+  try {
+    const denied = await hx.c.play();
+    assert.equal(denied.ok, false);
+    assert.equal(hx.spawns.length, 0);
+    assert.equal(hx.c.relayActive, false);
+  } finally { deviceBlocked = false; }
   const played = await hx.c.play();
   assert.deepEqual(played, { ok: true });
   s = hx.last();

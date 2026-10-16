@@ -13,6 +13,18 @@ import { isPrivateModeHost } from "../shared/invite";
 
 const KEY_HEADER = "x-undaunted-user-api-key";
 
+// Reported identifiers are an optional launcher check, not hardware attestation.
+export async function checkDeviceSignals(ep: Endpoint,key:string,signals:import('./device-signals').DeviceSignals):Promise<{ok:true}|{ok:false,error:'account_banned'|'server_error'|'rate_limited',detail?:string}>{
+  try {
+    const res=await request(ep,'/undaunted/api/DeviceSignals',{method:'POST',headers:{[KEY_HEADER]:key,'content-type':'application/json'},body:JSON.stringify(signals),timeoutMs:8000,maxBytes:4096});
+    if(res.status===204 || res.status===404)return {ok:true};
+    const body=parseJsonBody(res);
+    if(res.status===503 && isObject(body) && body.error==='device_signals_unavailable')return {ok:true};
+    if(res.status===403 && isObject(body) && body.error==='device_banned')return {ok:false,error:'account_banned',detail:'Device restriction: '+(cleanText(body.reason,500)??'Contact support to appeal.')};
+    return {ok:false,error:res.status===429?'rate_limited':'server_error'};
+  } catch {return {ok:false,error:'server_error'};}
+}
+
 export async function saveHuntRegion(ep: Endpoint, key: string, region: 'main' | 'ger' | 'us'): Promise<boolean> {
   const res = await request(ep, '/undaunted/api/HuntRegion', {
     method:'POST', headers:statusHeaders(ep,key), body:JSON.stringify({region}), timeoutMs:10000,maxBytes:4096

@@ -1,3 +1,5 @@
+import {ReportDeviceSignals} from '../controllers/devicesignals';
+import {rateLimit} from 'express-rate-limit';
 import {RecoverAccountKey} from "../controllers/accountrecovery";
 import {RegionProbes} from '../controllers/regionprobes';
 import { DiscordKeyStats } from '../controllers/discordstats';
@@ -33,6 +35,19 @@ import { userapikeys, users } from '../db/schema';
 import { eq, sql } from 'drizzle-orm';
 
 export const undauntedApiRouter = Router();
+
+const DeviceSignalRateLimit=rateLimit({keyGenerator:req=>'device:'+((req as any).UndauntedUserInfo.UserId),windowMs:60000,limit:10,standardHeaders:'draft-8',legacyHeaders:false,message:{error:'rate_limited'}});
+undauntedApiRouter.post('/DeviceSignals',HasUndauntedUserApiKey,DeviceSignalRateLimit,(req:any,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    try {
+        const result=ReportDeviceSignals(req.UndauntedUserInfo.UserId,req.body);
+        if(result.blocked){res.status(403).json({error:'device_banned',reason:result.reason});return;}
+        res.status(204).end();
+    } catch(e){
+        const unavailable=e instanceof Error && e.message==='device_signals_unavailable';
+        res.status(unavailable?503:400).json({error:unavailable?'device_signals_unavailable':'invalid_device_signals'});
+    }
+});
 
 undauntedApiRouter.get('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -105,8 +120,8 @@ undauntedApiRouter.get('/ModerationLog', HasUndauntedAdminApiKey, (req,res)=>{
     catch {res.status(400).json({error:'invalid_offset'});}
 });
 undauntedApiRouter.post('/Moderation', HasUndauntedAdminApiKey, (req:any,res)=>{
-    try {res.json(SetAccountBan(req.body.accountId,req.body.reason,req.body.active,req.body.address,req.UndauntedUserInfo.UserId,req.body.durationHours));}
-    catch(e){const message=e instanceof Error?e.message:'';res.status(400).json({error:['invalid_ban','invalid_address','invalid_duration','account_not_found','admin_account_protected','address_not_observed'].includes(message)?message:'moderation_failed'});}
+    try {res.json(SetAccountBan(req.body.accountId,req.body.reason,req.body.active,req.body.address,req.UndauntedUserInfo.UserId,req.body.durationHours,req.body.includeDevice??false));}
+    catch(e){const message=e instanceof Error?e.message:'';res.status(400).json({error:['invalid_ban','invalid_address','invalid_duration','account_not_found','admin_account_protected','address_not_observed','device_not_observed','invalid_device_scope'].includes(message)?message:'moderation_failed'});}
 });
 
 function StatusForRollbackError(Error: RollbackError){

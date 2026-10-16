@@ -1551,7 +1551,7 @@ function renderSettings(): void {
     const panels: Record<SettingsTab, (HTMLElement | null)[]> = {
       game: [game],
       graphics: [graphics],
-      account: [account, otherServers],
+      account: [account, h("p", {}, "On Windows, Play reports your motherboard UUID and available TPM public-key hash to the selected server for optional moderator device restrictions. The server stores keyed hashes. These identifiers are not verified hardware attestation; a TPM is not required."), otherServers],
       launcher: [language, troubleshooting, streaming, about],
     };
     const tabs = h("div", { class: "settings-tabs", role: "tablist", "aria-label": t("set_title") });

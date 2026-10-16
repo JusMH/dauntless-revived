@@ -31,6 +31,18 @@ const A = "UID-real-a", B = "UID-real-b", C = "UID-stub-c", ADMIN = "UID-admin";
 type Player = { UserId: string, Key: string, Token: string, CharacterId: string };
 const Players: Record<string, Player> = {};
 
+it('device reports require an account key, reject supplied identities and limit requests', async () => {
+    process.env.DEVICE_SIGNAL_HMAC_KEY='cd'.repeat(32);
+    try {
+        assert.equal((await Call('POST','/undaunted/api/DeviceSignals',{body:{}})).status,401);
+        assert.equal((await Call('POST','/undaunted/api/DeviceSignals',{key:Players[A].Key,body:{accountId:B}})).status,400);
+        assert.equal((await Call('POST','/undaunted/api/DeviceSignals',{key:Players[A].Key,body:{smbiosUuid:'12345678-1234-5678-9abc-123456789abc'}})).status,204);
+        assert.equal((GetDb().$client.prepare('SELECT count(*) n FROM account_device_signals WHERE account_id=?').get(B) as any).n,0);
+        for(let i=0;i<8;i++)assert.equal((await Call('POST','/undaunted/api/DeviceSignals',{key:Players[A].Key,body:{}})).status,204);
+        assert.equal((await Call('POST','/undaunted/api/DeviceSignals',{key:Players[A].Key,body:{}})).status,429);
+    } finally { delete process.env.DEVICE_SIGNAL_HMAC_KEY; }
+});
+
 it('hunt region changes require the account key and cannot target another account', async () => {
     process.env.US_REGION='1';
     try {
@@ -310,6 +322,7 @@ const EXPECTED_ROUTES = [
     "POST /loadout/:userId/:characterId/active/:index [RealProgressionOnly, HasUndauntedMetagameAuth]",
     "GET /loadout/:userId/:characterId/all [HasUndauntedMetagameAuth]",
     "POST /loadout/:userId/:characterId/:index [HasUndauntedMetagameAuth]",
+    "POST /undaunted/api/DeviceSignals [HasUndauntedUserApiKey]",
     "GET /undaunted/api/HuntRegion [HasUndauntedUserApiKey]",
     "POST /undaunted/api/HuntRegion [HasUndauntedUserApiKey]",
     "GET /undaunted/api/DiscordKeyStats [HasUndauntedAdminApiKey]",

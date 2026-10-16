@@ -33,6 +33,12 @@ export const accountbans = sqliteTable('account_bans', {
     accountId:text('account_id').notNull().primaryKey(),reason:text('reason').notNull(),address:text('address'),
     active:integer('active').notNull(),updatedAt:integer('updated_at').notNull(),actor:text('actor').notNull(),expiresAt:integer('expires_at')
 },t=>[index('active_ban_address').on(t.address,t.active)]);
+export const accountdevicesignals = sqliteTable('account_device_signals', {
+    accountId:text('account_id').notNull(),kind:text('kind').notNull(),signalHash:text('signal_hash').notNull(),observedAt:integer('observed_at').notNull()
+},t=>[primaryKey({columns:[t.accountId,t.kind]})]);
+export const devicebansignals = sqliteTable('device_ban_signals', {
+    accountId:text('account_id').notNull(),kind:text('kind').notNull(),signalHash:text('signal_hash').notNull()
+},t=>[primaryKey({columns:[t.accountId,t.kind]}),index('device_ban_signal_match').on(t.kind,t.signalHash)]);
 export const moderationevents = sqliteTable('moderation_events', {
     id:integer('id').primaryKey({autoIncrement:true}),accountId:text('account_id').notNull(),reason:text('reason').notNull(),
     address:text('address'),active:integer('active').notNull(),createdAt:integer('created_at').notNull(),actor:text('actor').notNull(),expiresAt:integer('expires_at')

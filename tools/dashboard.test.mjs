@@ -16,7 +16,7 @@ test('optional IP bans use backend observations, ignore submitted IPs, and fail 
   try{
     const base=`http://127.0.0.1:${server.address().port}`;
     const send=body=>fetch(base+'/api/moderation',{method:'POST',headers:{'x-dashboard-key':key,'content-type':'application/json',origin:base},body:JSON.stringify({accountId:'UID-test',reason:'verified test',active:true,address:'198.51.100.99',...body})});
-    assert.equal((await send({})).status,200);assert.equal(writes.at(-1).address,null);
+    assert.equal((await send({includeDevice:true})).status,200);assert.equal(writes.at(-1).address,null);assert.equal(writes.at(-1).includeDevice,true);
     assert.equal((await send({includeIp:true})).status,200);assert.equal(writes.at(-1).address,address);assert.equal(writes.at(-1).durationHours,168);assert.equal(writes.at(-1).includeIp,undefined);
     address=null;assert.equal((await send({includeIp:true})).status,409);assert.equal(writes.length,2);
     assert.equal((await send({includeIp:true,active:false})).status,200);assert.equal(writes.at(-1).address,null);
