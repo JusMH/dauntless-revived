@@ -34,7 +34,6 @@
 #include "TrialsSchedule.h"
 #include "AutoPressStart.h"
 #include "CellFusionTime.h"
-#include "VendorTabs.h"
 #include "NoPlatinumPrice.h"
 #include "DeveloperStyle.h"
 
@@ -818,7 +817,6 @@ void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
     TrialsSchedule::Tick();
     CellFusionTime::Tick();
     AutoPressStart::OnProcessEvent(Object, Function);
-    VendorTabs::OnProcessEvent(Object);
     NoPlatinumPrice::OnProcessEvent(Object);
     DeveloperStyle::OnProcessEvent(Object, Function);
 
