@@ -17,6 +17,10 @@ int main() {
         "Function GameplayAbilities.AbilitySystemComponent.ServerTryActivateAbilityWithEventData",
         "Function Engine.Character.ServerMove",
         "Function Engine.Character.ClientAdjustPosition",
+        "Function monsterpart_bpc.monsterpart_bpc_C.AuthHandleBreak",
+        "Function monsterpart_bpc.monsterpart_bpc_C.OnRep_CurrentBreakStage",
+        "Function monsterpart_bpc.monsterpart_bpc_C.OnRep_PartSevered",
+        "Function Archon.MonsterPartActor.OnRep_Health",
         "Function Other.ArchonPlayerController.ServerCheat",
         "", "ServerCheat"
     }) assert(!IsBlockedServerRpc(name));
