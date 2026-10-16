@@ -6,6 +6,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parsePerformance, readPerformance } from './dashboard-performance.mjs';
 
+test('optional IP bans use backend observations, ignore submitted IPs, and fail closed without an observation',async()=>{
+  const key='test-ip-moderation-owner';const writes=[];let address='203.0.113.20';
+  const server=await startDashboard({key,port:0,backend:'http://127.0.0.1:61000',fetcher:async(url,opts)=>{
+    if(opts?.method==='POST'){writes.push(JSON.parse(opts.body));return {status:200,json:async()=>({})};}
+    if(url.pathname.startsWith('/undaunted/api/Moderation/'))return {status:200,json:async()=>({addresses:address?[{address}]:[]})};
+    return {ok:true,json:async()=>({Users:[],players:[],instances:[],playersOnline:0})};
+  }});
+  try{
+    const base=`http://127.0.0.1:${server.address().port}`;
+    const send=body=>fetch(base+'/api/moderation',{method:'POST',headers:{'x-dashboard-key':key,'content-type':'application/json',origin:base},body:JSON.stringify({accountId:'UID-test',reason:'verified test',active:true,address:'198.51.100.99',...body})});
+    assert.equal((await send({})).status,200);assert.equal(writes.at(-1).address,null);
+    assert.equal((await send({includeIp:true})).status,200);assert.equal(writes.at(-1).address,address);assert.equal(writes.at(-1).durationHours,168);assert.equal(writes.at(-1).includeIp,undefined);
+    address=null;assert.equal((await send({includeIp:true})).status,409);assert.equal(writes.length,2);
+    assert.equal((await send({includeIp:true,active:false})).status,200);assert.equal(writes.at(-1).address,null);
+  }finally{await new Promise(resolve=>server.close(resolve));}
+});
+
 test('moderation history requires owner auth and bounded pagination',async()=>{
   const key='test-history-owner-key';let reads=0;
   const server=await startDashboard({key,port:0,backend:'http://127.0.0.1:61000',fetcher:async(url,opts)=>{

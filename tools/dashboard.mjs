@@ -128,9 +128,18 @@ export async function startDashboard({key, backend, port = 61110, logs = {}, ser
           if(req.headers['content-type'] !== 'application/json'){res.writeHead(415).end();return;}
           let text='';for await(const chunk of req){text+=chunk.toString('utf8');if(Buffer.byteLength(text)>2048){res.writeHead(413).end();return;}}
           body=JSON.parse(text);
-          // Dashboard suspensions are account-only and default to seven days.
+          // Resolve optional IP scope from trusted backend observations, never from request input.
           body.address=null;
-          if(body.active===true)body.durationHours??=168;
+          if(body.active===true){
+            body.durationHours??=168;
+            if(body.includeIp===true){
+              const observed=await fetcher(new URL(`/undaunted/api/Moderation/${encodeURIComponent(body.accountId)}`,target),{headers:{'x-undaunted-user-api-key':key},signal:AbortSignal.timeout(10000),redirect:'error'});
+              const info=await observed.json();
+              if(observed.status!==200 || !info.addresses?.[0]?.address){res.writeHead(409).end(JSON.stringify({error:'No recently observed player IP. Use an account-only ban.'}));return;}
+              body.address=info.addresses[0].address;
+            }
+          }
+          delete body.includeIp;
         }
         const id=new URL(req.url,'http://localhost').searchParams.get('accountId');
         if(!moderate && (!id || !/^UID-[A-Za-z0-9-]{1,100}$/.test(id))){res.writeHead(400).end();return;}

@@ -34,7 +34,7 @@ export function SetAccountBan(accountId:unknown,reason:unknown,active:unknown,ad
     if(typeof accountId!=='string' || typeof reason!=='string' || !reason.trim() || reason.length>500 || typeof active!=='boolean') throw Error('invalid_ban');
     const ip=address == null || address==='' ? null : NormalizeAddress(address);
     if(address && (!ip || IsLoopbackAddress(ip))) throw Error('invalid_address');
-    if(durationHours!==undefined && (typeof durationHours!=='number' || !Number.isInteger(durationHours) || durationHours<1 || durationHours>720 || ip)) throw Error('invalid_duration');
+    if(durationHours!==undefined && (typeof durationHours!=='number' || !Number.isInteger(durationHours) || durationHours<1 || durationHours>720)) throw Error('invalid_duration');
     const expiresAt=active && typeof durationHours==='number' ? Date.now()+durationHours*3600000 : null;
     const db=GetDb().$client;
     return db.transaction(()=>{

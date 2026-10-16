@@ -2,7 +2,11 @@
 
 The dashboard defaults to seven days (168 hours), permits 1–720 hours, requires
 a reason, and supports revocation. These are operator-issued account suspensions,
-not automatic cheat detections. No IP is attached to dashboard suspensions.
+not automatic cheat detections. Account-only is the default. The optional IP
+checkbox resolves the account's recently observed address from the backend,
+ignoring submitted addresses; the backend revalidates the observation at write
+time. Missing or expired observations reject the IP request. IP restrictions
+share the account row's expiry/revocation and can affect unrelated shared-IP users.
 They block backend authentication/access while active; they do not forcibly
 disconnect an already-running native hunt.
 
@@ -34,15 +38,34 @@ Native RPC hardening is documented separately in anticheat-2026-10-15.md.
 
 ## October 15 rollout status
 
-Source is pushed; production files and schema are unchanged. The live database
+The initial online attempt was unsuccessful. The live database
 was approximately 20 GB. An online backup did not finish; a full-step retry
 coincided with backend health timeouts. Both backup helpers were stopped, health
 returned HTTP 200, and only their incomplete destination files were removed.
 Do not retry an unbounded full-step backup during active play. A maintenance
-pause and verified backup are required before applying this staged update.
+pause and verified backup were used for the subsequent successful deployment.
 
 The live migration journal ended at `0027_us_region`, unlike this checkout's
 `0028_us_region`. The staged patch preserves the live journal and appends only
 the expiry-column migration; replacing the whole journal would risk replaying
 incompatible migrations. The live dashboard also has newer fleet changes, so
 the staged patch replaces only its moderation sections.
+
+The maintenance backup passed integrity verification and the expiry migration
+and dashboard were deployed. Backend HTTP 200, authenticated history HTTP 200,
+unauthenticated history HTTP 401, no-store responses and seven-day default were
+verified. Maintenance flag was removed and the supervisor resumed.
+
+Optional IP scope was subsequently deployed as four targeted runtime files,
+preserving the live fleet UI and requiring no new migration. Prior files and
+configuration are in `backups/ipban-20261015`; the verified database recovery
+point is `backups/softban-20261015`. Only metagame and dashboard were restarted;
+game processes were retained. Focused validation: 25 backend moderation/access
+tests, 13 dashboard tests and backend build passed. IP expiry tests failed before
+the change and passed afterward. No real player was banned to test deployment.
+
+HWID enforcement is intentionally omitted by operator choice. The native login
+still exchanges a reusable account key directly, so a launcher-only fingerprint
+header would be bypassable. See `UndauntedMetagame/src/routes/eos.ts` and
+`UndauntedLauncher/src/main/launch.ts`; adding a fingerprint alone would provide
+no hardware-backed identity assurance.

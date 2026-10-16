@@ -2,7 +2,7 @@
 
 ## Scope and deployment status
 
-Local implementation only. This is a deny-list for ten explicit developer/debug
+Built and staged, not activated. This is a deny-list for ten explicit developer/debug
 server RPCs, not a verified fix for attack-speed, infinite-stamina, movement-speed
 or monster-freeze cheats. The supplied videos were inaccessible; the cheat
 behaviors come from the operator's description. No automatic bans are enabled.
@@ -57,3 +57,12 @@ Inspect current movement-manager defaults before evaluating Unreal's native
 time-discrepancy resolution under packet loss, server hitches and fall recovery.
 Account sanctions additionally require authenticated originating-connection and
 session binding; do not give game DLLs the dashboard administrator credential.
+
+## October 15 staging
+
+Candidate SHA-256:
+`87AECD7BEBA33F479F6EF3F335E90E20DCD32FDDD31EBD3A23D6BD542B1156A0`.
+Uploaded as `staging/Anticheat-Candidate.dll` beneath main, US, Germany and
+new EU game-host roots; all four remote hashes match. Running game DLLs were
+not replaced. The standalone guard test passed again. Isolated gameplay and
+network-RPC validation remain outstanding; staging is not active protection.

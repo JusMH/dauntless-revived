@@ -18,7 +18,7 @@ test('temporary account-only bans expire, preserve history and reject invalid du
   assert.equal(BanFor('UID-unrelated','203.0.113.9'),undefined);
   assert.ok(ModerationLog('bans').rows.some((r:any)=>r.account_id==='UID-temp-ban'));
   for(const hours of [0,-1,721,1.5,NaN,'168'])assert.throws(()=>SetAccountBan('UID-temp-ban','reason',true,null,'owner',hours),/invalid_duration/);
-  assert.throws(()=>SetAccountBan('UID-temp-ban','reason',true,'203.0.113.9','owner',168),/invalid_duration/);
+  assert.throws(()=>SetAccountBan('UID-temp-ban','reason',true,'203.0.113.9','owner',168),/address_not_observed/);
   db.$client.prepare('UPDATE account_bans SET expires_at=? WHERE account_id=?').run(Date.now()-1,'UID-temp-ban');
   assert.equal(BanFor('UID-temp-ban'),undefined);
   assert.equal((ModerationInfo('UID-temp-ban').ban as any).active,0);
@@ -28,6 +28,31 @@ test('temporary account-only bans expire, preserve history and reject invalid du
   SetAccountBan('UID-temp-ban','Verified again',true,null,'owner',168);
   SetAccountBan('UID-temp-ban','Appeal accepted',false,null,'owner');
   assert.equal(BanFor('UID-temp-ban'),undefined);
+});
+test('temporary observed-IP bans expire and revoke with the account sanction',()=>{
+  const db=GetDb(),account='UID-temp-ip-ban',address='203.0.113.123';
+  db.insert(users).values({userId:account,name:'TemporaryIP',notes:0}).run();
+  const request:any={socket:{remoteAddress:address},headers:{}};
+  assert.throws(()=>SetAccountBan(account,'Verified evidence',true,address,'owner',168),/address_not_observed/);
+  assert.equal(ModerationInfo(account).ban,null);
+  RecordPlayingAddress(request,account,Date.now()-90001);
+  assert.throws(()=>SetAccountBan(account,'Verified evidence',true,address,'owner',168),/address_not_observed/);
+  RecordPlayingAddress(request,account);
+  const now=Date.now();
+  SetAccountBan(account,'Verified evidence',true,address,'owner',168);
+  const ban=ModerationInfo(account).ban as any;
+  assert.ok(ban.expires_at>=now+7*86400000 && ban.expires_at<=Date.now()+7*86400000);
+  assert.equal(BanFor(account)?.reason,'Verified evidence');
+  assert.equal(BanFor('UID-unrelated',address)?.reason,'Verified evidence');
+  assert.equal(BanFor('UID-unrelated','203.0.113.124'),undefined);
+  db.$client.prepare('UPDATE account_bans SET expires_at=? WHERE account_id=?').run(Date.now()-1,account);
+  assert.equal(BanFor(account),undefined);
+  assert.equal(BanFor('UID-unrelated',address),undefined);
+  SetAccountBan(account,'Verified again',true,address,'owner',168);
+  EndPlayingAddress(account);
+  SetAccountBan(account,'Appeal accepted',false,null,'owner');
+  assert.equal(BanFor(account),undefined);
+  assert.equal(BanFor('UID-unrelated',address),undefined);
 });
 test('trusted IP logging, account/IP bans, required reasons, JWT revocation and unban',async()=>{
   const db=GetDb();
