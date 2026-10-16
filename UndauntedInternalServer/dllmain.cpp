@@ -1,4 +1,5 @@
 #include "CityIdlePolicy.h"
+#include "ServerRpcGuard.h"
 #include <filesystem>
 #include <fstream>
 #include "HuntIdlePolicy.h"
@@ -842,6 +843,22 @@ bool DidDoTravelReset = false;
 void* OrigProcessEvent = nullptr;
 
 void ProcessEventHook(UObject* Object, UFunction* Function, void* Parms) {
+    // This hook is installed only in game servers. Never inspect RPC arguments
+    // or infer bans from timing, movement corrections, or server-side calls.
+    if (Function && (Function->FunctionFlags & static_cast<uint32_t>(EFunctionFlags::NetServer))) {
+        static thread_local std::map<UFunction*, bool> GuardDecisions;
+        auto [Entry, Inserted] = GuardDecisions.try_emplace(Function, false);
+        if (Inserted) {
+            const auto Name = Function->GetFullName();
+            Entry->second = IsBlockedServerRpc(Name);
+            if (Entry->second) {
+                // At most once per denied function/thread; no arguments or identities.
+                const auto Line = "security_rpc_blocked function=" + Name + "\n";
+                DR_WriteDiagnostic(Line.c_str(), static_cast<DWORD>(Line.size()));
+            }
+        }
+        if (Entry->second) return;
+    }
     static UFunction* ServerTryActivateAbilityWithEventData = nullptr;
     static UFunction* ServerTryActivateAbility = nullptr;
 

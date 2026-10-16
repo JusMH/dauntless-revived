@@ -5,9 +5,30 @@ import assert from 'node:assert/strict';
 import {GetDb} from '../src/db';
 import {users,userapikeys} from '../src/db/schema';
 import {HashUserAPIKey,SignMetagameJWTForUid,ValidateMetagameJWTAndGetPayload} from '../src/controllers/auth';
-import {BanFor,CheckPlayerAccess,ModerationInfo,SetAccountBan,RecordPlayingAddress,EndPlayingAddress,ExpirePlayingAddresses} from '../src/controllers/moderation';
+import {BanFor,CheckPlayerAccess,ModerationInfo,SetAccountBan,RecordPlayingAddress,EndPlayingAddress,ExpirePlayingAddresses,ModerationLog} from '../src/controllers/moderation';
 import {app} from '../src/app';
 after(()=>RemoveTestDb(()=>GetDb().$client.close()));
+
+test('temporary account-only bans expire, preserve history and reject invalid durations',()=>{
+  const db=GetDb();db.insert(users).values({userId:'UID-temp-ban',name:'Temporary',notes:0}).run();
+  const now=Date.now();SetAccountBan('UID-temp-ban','Verified evidence',true,null,'owner',168);
+  const ban=ModerationInfo('UID-temp-ban').ban as any;
+  assert.ok(ban.expires_at>=now+7*86400000 && ban.expires_at<=Date.now()+7*86400000);
+  assert.equal(BanFor('UID-temp-ban')?.reason,'Verified evidence');
+  assert.equal(BanFor('UID-unrelated','203.0.113.9'),undefined);
+  assert.ok(ModerationLog('bans').rows.some((r:any)=>r.account_id==='UID-temp-ban'));
+  for(const hours of [0,-1,721,1.5,NaN,'168'])assert.throws(()=>SetAccountBan('UID-temp-ban','reason',true,null,'owner',hours),/invalid_duration/);
+  assert.throws(()=>SetAccountBan('UID-temp-ban','reason',true,'203.0.113.9','owner',168),/invalid_duration/);
+  db.$client.prepare('UPDATE account_bans SET expires_at=? WHERE account_id=?').run(Date.now()-1,'UID-temp-ban');
+  assert.equal(BanFor('UID-temp-ban'),undefined);
+  assert.equal((ModerationInfo('UID-temp-ban').ban as any).active,0);
+  assert.ok(!ModerationLog('bans').rows.some((r:any)=>r.account_id==='UID-temp-ban'));
+  assert.ok(ModerationLog('events').rows.some((r:any)=>r.account_id==='UID-temp-ban'&&r.expires_at===ban.expires_at));
+  assert.throws(()=>ModerationLog('events',-1),/invalid_offset/);
+  SetAccountBan('UID-temp-ban','Verified again',true,null,'owner',168);
+  SetAccountBan('UID-temp-ban','Appeal accepted',false,null,'owner');
+  assert.equal(BanFor('UID-temp-ban'),undefined);
+});
 test('trusted IP logging, account/IP bans, required reasons, JWT revocation and unban',async()=>{
   const db=GetDb();
   db.insert(users).values([{userId:'UID-ban-test',name:'BanTest',notes:0},{userId:'UID-admin-test',name:'AdminTest',notes:0,isAdmin:true}]).run();
@@ -44,6 +65,9 @@ test('trusted IP logging, account/IP bans, required reasons, JWT revocation and 
   const port=(server.address() as any).port;
   try {
     const request=async(path:string,k:string,body?:unknown)=>fetch(`http://127.0.0.1:${port}${path}`,{method:body?'POST':'GET',headers:{'x-undaunted-user-api-key':k,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
+    assert.equal((await request('/undaunted/api/ModerationLog?kind=events',key)).status,403);
+    assert.equal((await request('/undaunted/api/ModerationLog?kind=events',admin)).status,200);
+    assert.equal((await request('/undaunted/api/ModerationLog?kind=bans&offset=-1',admin)).status,400);
     const reply=await request('/undaunted/api/GetUserInfo',key);assert.equal(reply.status,403);assert.deepEqual(await reply.json(),{error:'account_banned',reason:'Repeated harassment'});
     assert.equal((await request('/undaunted/api/Moderation/UID-ban-test',key)).status,403);
     assert.equal((await request('/undaunted/api/Moderation',admin,{accountId:'UID-ban-test',reason:'Appeal accepted',active:false})).status,200);

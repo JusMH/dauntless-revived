@@ -10,7 +10,7 @@ import { DeleteInviteCode, GetAllUserIds, GetInviteCodes, GetRecentPlayerData, I
 import { HasUndauntedUserApiKey } from "../middleware/HasUndauntedUserApiKey";
 import { HasUndauntedAdminApiKey } from "../middleware/HasUndauntedAdminApiKey";
 import { SignMetagameJWTForUid } from "../controllers/auth";
-import {ModerationInfo,SetAccountBan,EndPlayingAddress} from '../controllers/moderation';
+import {ModerationInfo,SetAccountBan,EndPlayingAddress,ModerationLog} from '../controllers/moderation';
 import { GetCharacterIdsForUserId, GetSaveHistory, RollbackCharacter, RollbackError, RollbackLoadout } from "../controllers/savehistory";
 import { GetObjectiveRecords, GetSelectedHuntPass, GetTrackRecords, SeedProgression } from "../controllers/realprogression";
 import { IsRealProgressionAccount } from "../controllers/progressionmode";
@@ -36,13 +36,13 @@ export const undauntedApiRouter = Router();
 
 undauntedApiRouter.get('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
-    res.json({region:GetHuntRegion((req as any).UndauntedUserInfo.UserId), enabled:process.env.AUS_REGION === '1', probes:RegionProbes()});
+    res.json({region:GetHuntRegion((req as any).UndauntedUserInfo.UserId), enabled:process.env.US_REGION === '1' || process.env.GERMANY_REGION === '1', probes:RegionProbes()});
 });
 undauntedApiRouter.post('/HuntRegion', HasUndauntedUserApiKey, (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     const region = req.body?.region;
     if (region !== 'main' && region !== 'aus' && region !== 'ger' && region !== 'us') { res.status(400).json({error:'invalid_region'}); return; }
-    if (region === 'aus' && process.env.AUS_REGION !== '1') { res.status(503).json({error:'region_unavailable'}); return; }
+    if (region === 'aus') { res.status(410).json({error:'region_retired', replacement:'us'}); return; }
     if (region === 'ger' && process.env.GERMANY_REGION !== '1') { res.status(503).json({error:'region_unavailable'}); return; }
     if (region === 'us' && process.env.US_REGION !== '1') { res.status(503).json({error:'region_unavailable'}); return; }
     SaveHuntRegion((req as any).UndauntedUserInfo.UserId, region);
@@ -98,9 +98,15 @@ undauntedApiRouter.get('/Moderation/:accountId', HasUndauntedAdminApiKey, (req,r
     res.setHeader('Cache-Control','no-store');
     res.json(ModerationInfo(String(req.params.accountId)));
 });
+undauntedApiRouter.get('/ModerationLog', HasUndauntedAdminApiKey, (req,res)=>{
+    res.setHeader('Cache-Control','no-store');
+    if(req.query.kind!=='bans' && req.query.kind!=='events'){res.status(400).json({error:'invalid_kind'});return;}
+    try {res.json(ModerationLog(req.query.kind,Number(req.query.offset??0)));}
+    catch {res.status(400).json({error:'invalid_offset'});}
+});
 undauntedApiRouter.post('/Moderation', HasUndauntedAdminApiKey, (req:any,res)=>{
-    try {res.json(SetAccountBan(req.body.accountId,req.body.reason,req.body.active,req.body.address,req.UndauntedUserInfo.UserId));}
-    catch(e){const message=e instanceof Error?e.message:'';res.status(400).json({error:['invalid_ban','invalid_address','account_not_found','admin_account_protected','address_not_observed'].includes(message)?message:'moderation_failed'});}
+    try {res.json(SetAccountBan(req.body.accountId,req.body.reason,req.body.active,req.body.address,req.UndauntedUserInfo.UserId,req.body.durationHours));}
+    catch(e){const message=e instanceof Error?e.message:'';res.status(400).json({error:['invalid_ban','invalid_address','invalid_duration','account_not_found','admin_account_protected','address_not_observed'].includes(message)?message:'moderation_failed'});}
 });
 
 function StatusForRollbackError(Error: RollbackError){

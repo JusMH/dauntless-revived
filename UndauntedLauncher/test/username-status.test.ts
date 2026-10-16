@@ -182,3 +182,10 @@ test("news and branding parsing", () => {
   assert.equal(sniffImage(Buffer.from([0xff, 0xd8, 0xff, 0xe0])), "image/jpeg");
   assert.equal(sniffImage(Buffer.from("<svg onload=alert(1)>")), null);
 });
+
+test("retired OCE settings migrate to US without losing the account", () => {
+  const slot="a".repeat(24);
+  const saved=sanitizeSettings({huntRegion:"aus",usernames:{[slot]:"MiauStyleZzツ"}},"en");
+  assert.equal(saved.huntRegion,"us");
+  assert.equal(saved.usernames[slot],"MiauStyleZzツ");
+});

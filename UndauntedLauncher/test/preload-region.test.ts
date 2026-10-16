@@ -9,7 +9,7 @@ import { SettingsStore } from "../src/main/settings";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 
-test("the actual preload bridge forwards OCE and Main settings across IPC", async () => {
+test("the actual preload bridge forwards US and EU settings across IPC", async () => {
   const root = path.resolve(__dirname, "../..");
   const source = readFileSync(path.join(root, "src/preload.ts"), "utf8");
   const js = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
@@ -26,7 +26,7 @@ test("the actual preload bridge forwards OCE and Main settings across IPC", asyn
   const dir = mkdtempSync(path.join(os.tmpdir(), "dr-region-"));
   try {
     const store = new SettingsStore(dir, "en");
-    for (const region of ["auto", "aus", "main", "ger"] as const) {
+    for (const region of ["auto", "us", "main", "ger"] as const) {
       const patch = await api!.setSettings({ huntRegion: region, unexpected: "discard" });
       assert.equal(JSON.stringify(calls.at(-1)), JSON.stringify([IPC.setSettings, { huntRegion: region }]));
       await store.update(s => Object.assign(s, patch));

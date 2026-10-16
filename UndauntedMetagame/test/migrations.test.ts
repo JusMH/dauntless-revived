@@ -122,6 +122,13 @@ describe("migrations after the last release (0013_guilds)", () => {
             // SQLite CHECK constraints require a table rebuild; covered with seeded rows below.
             if (['0022_germany_region','0028_us_region'].includes(Entry.tag)) continue;
             const Sql = fs.readFileSync(path.join(MIGRATIONS, `${Entry.tag}.sql`), "utf8");
+            if(Entry.tag === '0029_temporary_bans'){
+                assert.deepEqual(Sql.split('--> statement-breakpoint').map(s=>s.trim()),[
+                    'ALTER TABLE account_bans ADD COLUMN expires_at integer;',
+                    'ALTER TABLE moderation_events ADD COLUMN expires_at integer;'
+                ]);
+                continue;
+            }
 
             // Explicit retention change: only legacy address observations may be deleted.
             if(Entry.tag === '0024_ephemeral_addresses'){

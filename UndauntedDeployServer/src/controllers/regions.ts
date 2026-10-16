@@ -5,6 +5,8 @@ export type RegionChoice = 'main' | 'aus' | 'ger' | 'us' | 'mixed';
 type Request = Parameters<typeof RemoteLaunch>[1];
 type Load = {running:number,pending:number,limit:number|null};
 export function AusUrl(region: 'aus' | 'ger' | 'us' = 'aus') {
+    // Retired permanently, including when an old environment file is restored.
+    if (region === 'aus') return undefined;
     const setting = region === 'us' ? 'US_DEPLOYSERVER_URL' : region === 'ger' ? 'GERMANY_DEPLOYSERVER_URL' : 'AUS_DEPLOYSERVER_URL';
     if (!process.env[setting]) return undefined;
     const url = new URL(process.env[setting]!);
@@ -55,12 +57,11 @@ export class RegionalRouter {
                 throw error;
             }
         };
-        const oce = AusUrl();
-        if (choice === 'aus' && !oce) throw new CapacityUnavailable('hunts');
-        const url = oce ?? AusUrl('us');
+        if (choice === 'aus') throw new CapacityUnavailable('hunts');
+        const url = AusUrl('us');
         if (!['ISLAND','CITY','SHARED'].includes(body.GameMode)) return main();
-        if (!url) { if (choice === 'aus') throw new CapacityUnavailable('hunts'); return main(); }
-        let ausFirst = choice === 'aus';
+        if (!url) return main();
+        let ausFirst = false;
         if (choice === 'mixed') {
             try {
                 const [primary, aus] = await Promise.all([this.mainLoad(), this.ausLoad(url)]);
@@ -70,19 +71,16 @@ export class RegionalRouter {
         if (ausFirst) {
             const connection = await this.remote(url, body);
             if (connection) {
-                if (choice === 'aus' && process.env.AUS_PUBLIC_HOST && connection.host !== process.env.AUS_PUBLIC_HOST)
-                    throw new Error('AUS worker returned a destination outside the selected region');
                 return connection;
             }
-            if (choice === 'aus') throw new CapacityUnavailable('hunts');
             return main();
         }
         try { return await main(); }
         catch (error) {
             if (!(error instanceof CapacityUnavailable)) throw error;
-            // EU overflow must leave slots for players who explicitly selected OCE.
-            const reserve=Number(process.env[oce ? 'AUS_RESERVED_HUNTS' : 'US_RESERVED_HUNTS']??0);
-            if(!Number.isSafeInteger(reserve)||reserve<0)throw new Error('Invalid AUS_RESERVED_HUNTS');
+            // Overflow must leave slots for players who explicitly selected US.
+            const reserve=Number(process.env.US_RESERVED_HUNTS??0);
+            if(!Number.isSafeInteger(reserve)||reserve<0)throw new Error('Invalid US_RESERVED_HUNTS');
             if(reserve>0 && body.GameMode==='ISLAND') {
                 try {const load=await this.ausLoad(url);if(load.limit===null||load.limit-load.running-load.pending<=reserve)throw error;}
                 catch {throw error;}

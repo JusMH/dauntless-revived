@@ -31,11 +31,11 @@ export const playeraddresses = sqliteTable('player_addresses', {
 },t=>[primaryKey({columns:[t.accountId,t.address]})]);
 export const accountbans = sqliteTable('account_bans', {
     accountId:text('account_id').notNull().primaryKey(),reason:text('reason').notNull(),address:text('address'),
-    active:integer('active').notNull(),updatedAt:integer('updated_at').notNull(),actor:text('actor').notNull()
+    active:integer('active').notNull(),updatedAt:integer('updated_at').notNull(),actor:text('actor').notNull(),expiresAt:integer('expires_at')
 },t=>[index('active_ban_address').on(t.address,t.active)]);
 export const moderationevents = sqliteTable('moderation_events', {
     id:integer('id').primaryKey({autoIncrement:true}),accountId:text('account_id').notNull(),reason:text('reason').notNull(),
-    address:text('address'),active:integer('active').notNull(),createdAt:integer('created_at').notNull(),actor:text('actor').notNull()
+    address:text('address'),active:integer('active').notNull(),createdAt:integer('created_at').notNull(),actor:text('actor').notNull(),expiresAt:integer('expires_at')
 });
 
 export const discordlinks = sqliteTable('discordlinks', {

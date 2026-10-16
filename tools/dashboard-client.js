@@ -175,14 +175,38 @@
     if(!accountId || !reason){el('moderationStatus').textContent='Account ID and reason are required.';return;}
     el('banAccount').disabled=el('unbanAccount').disabled=true;
     try {
-      const response=await fetch('/api/moderation',{method:'POST',headers:{'x-dashboard-key':key,'content-type':'application/json'},body:JSON.stringify({accountId,reason,active,address:active?el('banAddress').value.trim():null}),signal:AbortSignal.timeout(15000)});
+      const response=await fetch('/api/moderation',{method:'POST',headers:{'x-dashboard-key':key,'content-type':'application/json'},body:JSON.stringify({accountId,reason,active,address:null,...(active?{durationHours:Number(el('banDuration').value)}:{})}),signal:AbortSignal.timeout(15000)});
       const result=await response.json();if(!response.ok)throw Error(result.error || 'Moderation failed');
       el('moderationInfo').textContent=JSON.stringify(result,null,2);el('moderationStatus').textContent=active?'Player banned. Reason will appear in the launcher.':'Player unbanned.';
+      void loadModerationLog('bans');void loadModerationLog('events');
     }catch(error){el('moderationStatus').textContent=error.message;}
     finally{el('banAccount').disabled=el('unbanAccount').disabled=false;}
   }
   el('banAccount').onclick=()=>moderate(true);
   el('unbanAccount').onclick=()=>moderate(false);
+  const moderationOffsets={bans:null,events:null};
+  async function loadModerationLog(kind,append=false){
+    const tbody=el(kind==='bans'?'banRows':'moderationRows'),more=el(kind==='bans'?'moreBans':'moreModerationLog');
+    more.disabled=true;
+    try {
+      const result=await get(`/api/moderation-log?kind=${kind}&offset=${append?(moderationOffsets[kind]??0):0}`);
+      if(!append)tbody.replaceChildren();
+      for(const row of result.rows){
+        const tr=document.createElement('tr');
+        const expires=row.expires_at?new Date(row.expires_at).toLocaleString():'Permanent';
+        const values=kind==='bans'?[`${row.username??'Unknown'} / ${row.account_id}`,row.reason,expires]:[new Date(row.created_at).toLocaleString(),`${row.username??'Unknown'} / ${row.account_id}`,row.active?'Ban issued':'Ban revoked',row.reason,row.active?expires:'—',row.actor];
+        for(const value of values){const td=document.createElement('td');td.textContent=value;tr.append(td);}
+        if(kind==='bans'){const td=document.createElement('td'),button=document.createElement('button');button.textContent='Select for review / revoke';button.onclick=()=>{el('moderationAccount').value=row.account_id;el('loadModeration').click();};td.append(button);tr.append(td);}
+        tbody.append(tr);
+      }
+      moderationOffsets[kind]=result.nextOffset;more.disabled=result.nextOffset===null;
+      el('moderationListStatus').textContent='Moderation records loaded. Expired suspensions no longer block login.';
+    }catch(error){el('moderationListStatus').textContent=error.message;}
+  }
+  el('refreshBans').onclick=()=>loadModerationLog('bans');
+  el('refreshModerationLog').onclick=()=>loadModerationLog('events');
+  el('moreBans').onclick=()=>loadModerationLog('bans',true);
+  el('moreModerationLog').onclick=()=>loadModerationLog('events',true);
   el('refreshAccounts').onclick = loadAccounts;
   el('nextAccounts').onclick = () => { if (!accountsBusy && nextOffset !== null) { accountOffset = nextOffset; loadAccounts(); } };
   el('previousAccounts').onclick = () => { if (!accountsBusy) { accountOffset = Math.max(0, accountOffset - 100); loadAccounts(); } };

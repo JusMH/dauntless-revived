@@ -6,10 +6,25 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parsePerformance, readPerformance } from './dashboard-performance.mjs';
 
+test('moderation history requires owner auth and bounded pagination',async()=>{
+  const key='test-history-owner-key';let reads=0;
+  const server=await startDashboard({key,port:0,backend:'http://127.0.0.1:61000',fetcher:async(url,opts)=>{
+    if(url.pathname==='/undaunted/api/ModerationLog'){reads++;assert.equal(opts.headers['x-undaunted-user-api-key'],key);return {status:200,json:async()=>({rows:[],nextOffset:null})};}
+    return {ok:true,json:async()=>({Users:[],players:[],instances:[],playersOnline:0})};
+  }});
+  try {
+    const base=`http://127.0.0.1:${server.address().port}`;
+    assert.equal((await fetch(base+'/api/moderation-log?kind=events')).status,401);
+    assert.equal((await fetch(base+'/api/moderation-log?kind=events&offset=-1',{headers:{'x-dashboard-key':key}})).status,400);
+    const response=await fetch(base+'/api/moderation-log?kind=events&offset=0',{headers:{'x-dashboard-key':key}});
+    assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');assert.equal(reads,1);
+  }finally{await new Promise(resolve=>server.close(resolve));}
+});
+
 test('moderation writes require owner authentication and same origin and never retry',async()=>{
   const key='test-moderation-owner-key';let writes=0;
   const server=await startDashboard({key,port:0,backend:'http://127.0.0.1:61000',fetcher:async(url,opts)=>{
-    if(opts?.method==='POST'){writes++;assert.equal(url.pathname,'/undaunted/api/Moderation');return {status:200,json:async()=>({ban:{active:1},addresses:[]})};}
+    if(opts?.method==='POST'){writes++;assert.equal(url.pathname,'/undaunted/api/Moderation');const body=JSON.parse(opts.body);assert.equal(body.durationHours,168);assert.equal(body.address,null);return {status:200,json:async()=>({ban:{active:1},addresses:[]})};}
     return {ok:true,json:async()=>({Users:[],players:[],instances:[],playersOnline:0})};
   }});
   try{

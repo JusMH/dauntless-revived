@@ -1,10 +1,10 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {payload, Publisher, sampleBackend, webhookUrl} from './discord-status.mjs';
-import {sampleFleet} from './discord-status.mjs';
+import {sampleFleet, sampleLocalCapacity, applyLocalCapacity} from './discord-status.mjs';
 
 test('four-server fleet remains visible when one monitor is stale', async () => {
- const row={online:true,cpu:50,ramUsedMB:1024,ramTotalMB:4096,hunts:2};
+ const row={at:new Date().toISOString(),online:true,cpu:50,ramUsedMB:1024,ramTotalMB:4096,hunts:2};
  const f=await sampleFleet('http://127.0.0.1:61110','test',async()=>Response.json({fleet:{rows:[row,{...row,cpu:5},{...row,online:false,cpu:null,hunts:null},row]}}));
  assert.equal(f.servers,4);assert.equal(f.online,3);assert.equal(f.hunts,null);assert.equal(f.knownHunts,6);
  assert.equal(f.meanCpu,35);assert.equal(f.ramUsedMB,3072);
@@ -67,12 +67,44 @@ test('existing message recovers after rejection without replacement',async()=>{
 
 test('fleet status projects metrics and public embed never includes host labels, addresses or secrets',async()=>{
  const {sampleFleet}=await import('./discord-status.mjs');
- const row={name:'SECRET_NAME',host:'192.0.2.44',online:true,cpu:25,ramUsedMB:1024,ramTotalMB:8192,hunts:2,token:'SECRET_TOKEN'};
+ const row={at:new Date().toISOString(),name:'SECRET_NAME',host:'192.0.2.44',online:true,cpu:25,ramUsedMB:1024,ramTotalMB:8192,hunts:2,token:'SECRET_TOKEN'};
  const fleet=await sampleFleet('http://127.0.0.1:61110','test',async()=>Response.json({fleet:{rows:[row,row,row]}}));
  assert.equal(fleet.hunts,6);assert.equal(fleet.online,3);
  const message=JSON.stringify(payload({players:4,uptime:30,ms:1},Date.now(),fleet));
- assert.ok(message.includes('Australia (OCE)'));assert.ok(message.includes('25.0%'));
+ assert.ok(message.includes('US (NA)'));assert.ok(message.includes('25.0%'));assert.ok(!message.includes('OCE'));
  assert.ok(!message.includes('SECRET'));assert.ok(!message.includes('192.0.2.44'));
  assert.equal(await sampleFleet('http://127.0.0.1:61110','test',async()=>new Response('',{status:503})),null);
  await assert.rejects(sampleFleet('https://example.com','test'));
+});
+
+test('five-host fleet is accepted and names remain stable when a host is omitted',async()=>{
+ const at=new Date().toISOString();
+ const rows=[1,2,3,4,5].map(id=>({name:`Server #${id} · private`,at,online:true,cpu:10,ramUsedMB:1024,ramTotalMB:8192,hunts:2}));
+ const read=rows=>sampleFleet('http://127.0.0.1:61110','test',async()=>Response.json({fleet:{rows}}));
+ const fleet=await read(rows);
+ assert.equal(fleet.online,5);assert.equal(fleet.hunts,10);
+ const body=JSON.stringify(payload({players:4,uptime:30,ms:1},Date.now(),fleet));
+ assert.ok(body.includes('Server #5 · EU overflow'));assert.ok(!body.includes('private'));
+ const partial=await read([rows[0],rows[2],rows[4]]);
+ assert.deepEqual(partial.rows.map(r=>r.id),[1,3,5]);
+ assert.ok(JSON.stringify(payload(null,Date.now(),partial)).includes('Server #3 · US (NA)'));
+});
+
+test('stale timestamps cannot claim healthy hosts or complete hunt totals',async()=>{
+ const now=Date.now();
+ const rows=[{name:'Server #1',online:true,at:new Date(now-31000).toISOString(),cpu:80,hunts:8},
+ {name:'Server #5',online:true,at:new Date(now).toISOString(),huntSampleAt:new Date(now-151000).toISOString(),cpu:10,hunts:4}];
+ const f=await sampleFleet('http://127.0.0.1:61110','test',async()=>Response.json({fleet:{rows}}),now);
+ assert.equal(f.online,1);assert.equal(f.hunts,null);assert.equal(f.knownHunts,0);
+ assert.equal(f.rows[0].cpu,null);assert.equal(f.rows[1].hunts,null);
+});
+
+test('main hunt count comes from local admission, never the aggregated fleet list',async()=>{
+ const c=await sampleLocalCapacity('http://127.0.0.1:61001',async()=>Response.json({capacity:{running:4,pending:1,limit:10,cpu:{blocked:true}},servers:Array(80).fill({kind:'hunt'})}));
+ assert.deepEqual(c,{running:4,pending:1,limit:10,blocked:true});
+ const f={rows:[{id:1,online:true,hunts:null},{id:5,online:true,hunts:30}]};
+ applyLocalCapacity(f,c);assert.equal(f.hunts,34);assert.equal(f.knownHunts,34);
+ f.rows[1].online=false;applyLocalCapacity(f,c);assert.equal(f.hunts,null);assert.equal(f.knownHunts,4);
+ assert.equal(await sampleLocalCapacity('http://127.0.0.1:61001',async()=>Response.json({capacity:{running:-1,pending:0,limit:10}})),null);
+ await assert.rejects(sampleLocalCapacity('https://example.com'));
 });

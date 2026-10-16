@@ -17,11 +17,13 @@ export function payload(sample, now = Date.now(), fleet = null) {
     {name:'🌐 Fleet availability',value:fleet?`${fleet.online} / ${fleet.servers} hosts reporting`:'Monitoring unavailable',inline:true},
     {name:'⚔️ Active hunts',value:Number.isInteger(fleet?.hunts)?String(fleet.hunts):fleet?`${fleet.knownHunts} reported · partial`:'Unknown',inline:true}
   ];
-  for(const [i,name] of ['Server #1 · EU','Server #2 · EU overflow','Server #3 · Australia (OCE)','Server #4 · Germany'].entries()){
-    const r=fleet?.rows?.[i];
+  const names={1:'EU',2:'Key bot',3:'US (NA)',4:'Germany',5:'EU overflow'};
+  for(const r of fleet?.rows ?? []){
+    const name=`Server #${r.id} · ${names[r.id] ?? 'Worker'}`;
+    const age=r.at===null?'No sample':`Sample <t:${Math.floor(r.at/1000)}:R>`;
     fields.push({name,inline:true,value:r?.online
-      ? `🟢 Online\nHunts: ${Number.isInteger(r.hunts)?r.hunts:'Unknown'}\nCPU: ${num(r.cpu,'%')}\nRAM: ${num(r.ramUsedMB===null?null:r.ramUsedMB/1024)} / ${num(r.ramTotalMB===null?null:r.ramTotalMB/1024)} GB`
-      : '🟠 Monitoring unavailable'});
+      ? `🟢 Reporting\nHunts: ${Number.isInteger(r.hunts)?r.hunts:'Unknown'}${r.capacity?` / ${r.capacity.limit??'auto'} · starting ${r.capacity.pending}\nAdmission: ${r.capacity.blocked?'waiting for CPU headroom':'accepting within limits'}`:''}\nCPU: ${num(r.cpu,'%')}\nRAM: ${num(r.ramUsedMB===null?null:r.ramUsedMB/1024)} / ${num(r.ramTotalMB===null?null:r.ramTotalMB/1024)} GB\n${age}${r.hunts===null?'\nHunt telemetry unavailable':''}`
+      : `🟠 Monitoring unavailable\n${age}\nGame availability unknown`});
   }
   if(fleet){
     fields.push({name:'📊 Reporting hosts combined',value:`Mean CPU: ${num(fleet.meanCpu,'%')}\nRAM: ${num(fleet.ramUsedMB/1024)} / ${num(fleet.ramTotalMB/1024)} GB\n${fleet.online}/${fleet.servers} hosts reporting; unavailable hosts excluded.`});
@@ -30,11 +32,11 @@ export function payload(sample, now = Date.now(), fleet = null) {
     const seconds=Math.floor(sample.uptime);
     fields.push({name:'Shared backend',value:`🟢 Online · ${Math.round(sample.ms)} ms local check\nUptime: ${Math.floor(seconds/86400)}d ${Math.floor(seconds%86400/3600)}h ${Math.floor(seconds%3600/60)}m\nStarted <t:${at-seconds}:R>`});
   }
-  fields.push({name:'Region guide',value:'Main is now EU. Choose EU, Germany or Australia (OCE) in launcher Settings, then relaunch. EU uses its overflow workers. Germany and OCE stay in their selected region unless joining a party led elsewhere. Parties follow their leader; invitations work across regions.'});
-  fields.push({name:'📥 Launcher 0.1.31 · Developer tags',value:'Update your launcher for direct Cloudflare game downloads, resume support and verified files. Existing verified installs need no redownload. Includes the Trials, Lady Luck and Middleman DLL. [Download / release notes](https://github.com/mixutin/dauntless-revived/releases/tag/launcher-v0.1.31)'});
+  fields.push({name:'Region guide',value:'Choose EU, Germany or US (NA) in launcher Settings. EU has an additional overflow worker. Parties follow their leader across regions. Hunt capacity and server readiness determine when a hunt can start.'});
+  fields.push({name:'📥 Launcher · Cloudflare downloads',value:'[Latest launcher / release notes](https://github.com/mixutin/dauntless-revived/releases/latest). Game downloads use Cloudflare with resume support and file verification.'});
   fields.push({name:'Last checked',value:`<t:${at}:F> (<t:${at}:R>)`});
   return {allowed_mentions:{parse:[]},embeds:[{title:'Dauntless Revived · Live realm status',
-    description:online?'**Clear skies, Slayers.** Shared accounts and progression across EU, Germany and OCE.':'The shared backend is currently unavailable. Please check again shortly.',
+    description:online?'Shared accounts and progression across **EU, Germany and US (NA)**.':'The shared backend check failed. Please check again shortly.',
     color:online&&fleet?.servers>0&&fleet.online===fleet.servers?0x35bc84:0xe1a349,fields,
     footer:{text:'Host health and backend activity, not player ping or proof of hunt completion. Stale readings are unknown.'}}]};
 }
@@ -125,12 +127,36 @@ async function main() {
   if (publisher.disabled) console.error('Status delivery paused: review persisted initial-message state.');
   while (true) {
     try {
-      const sample = await sampleBackend(process.env.STATUS_BACKEND || 'http://127.0.0.1:61000', key);
-      const fleet = await sampleFleet(process.env.STATUS_DASHBOARD || 'http://127.0.0.1:61110', key);
+      const [sample,fleet,capacity] = await Promise.all([
+        sampleBackend(process.env.STATUS_BACKEND || 'http://127.0.0.1:61000', key),
+        sampleFleet(process.env.STATUS_DASHBOARD || 'http://127.0.0.1:61110', key),
+        sampleLocalCapacity(process.env.STATUS_DEPLOY || 'http://127.0.0.1:61001')
+      ]);
+      applyLocalCapacity(fleet,capacity);
       await publisher.send(payload(sample, Date.now(), fleet));
     } catch { console.error('Status cycle failed; retrying without creating another message.'); }
     await new Promise(resolve => setTimeout(resolve, 5000));
   }
+}
+
+export async function sampleLocalCapacity(deploy,fetcher=fetch) {
+  const url=new URL(deploy);
+  if(url.protocol!=='http:'||url.hostname!=='127.0.0.1'||url.username||url.password)throw new Error('Deploy must use loopback HTTP');
+  try {
+    const response=await fetcher(new URL('/gameservers',url),{signal:AbortSignal.timeout(8000),redirect:'error'});
+    if(!response.ok)return null;
+    const {capacity:c}=await response.json();
+    if(!c||![c.running,c.pending].every(n=>Number.isSafeInteger(n)&&n>=0)||!(c.limit===null||Number.isSafeInteger(c.limit)&&c.limit>=0))return null;
+    return {running:c.running,pending:c.pending,limit:c.limit,blocked:c.cpu?.blocked===true};
+  }catch{return null;}
+}
+
+export function applyLocalCapacity(fleet,capacity) {
+  const main=fleet?.rows.find(r=>r.id===1);
+  if(!main?.online||!capacity)return;
+  main.hunts=capacity.running;main.capacity=capacity;
+  fleet.knownHunts=fleet.rows.filter(r=>r.online).reduce((n,r)=>n+(r.hunts??0),0);
+  fleet.hunts=fleet.rows.every(r=>r.online&&r.hunts!==null)?fleet.knownHunts:null;
 }
 let logChain = Promise.resolve();
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -138,16 +164,24 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
 }
 
 // Project only numeric fleet telemetry; no addresses, player names, keys or raw errors leave the host.
-export async function sampleFleet(dashboard, key, fetcher=fetch) {
+export async function sampleFleet(dashboard, key, fetcher=fetch, now=Date.now()) {
   const url=new URL(dashboard);
   if(url.protocol!=='http:' || url.hostname!=='127.0.0.1' || url.username || url.password)throw new Error('Dashboard must use loopback HTTP');
   try {
     const r=await fetcher(new URL('/api/status',url),{headers:{'x-dashboard-key':key},signal:AbortSignal.timeout(8000),redirect:'error'});
     if(!r.ok)return null;
     const data=await r.json(), f=data.fleet;
-    if(!Array.isArray(f?.rows) || f.rows.length<3 || f.rows.length>4)return null;
+    if(!Array.isArray(f?.rows) || f.rows.length<1 || f.rows.length>16)return null;
     const n=v=>Number.isFinite(v)&&v>=0?v:null;
-    const rows=f.rows.map(row=>({online:row.online===true,cpu:n(row.cpu),ramUsedMB:n(row.ramUsedMB),ramTotalMB:n(row.ramTotalMB),hunts:Number.isInteger(row.hunts)&&row.hunts>=0?row.hunts:null}));
+    const rows=f.rows.map((row,i)=>{
+      const id=Number(/^Server #(\d+)(?:\D|$)/.exec(row.name??'')?.[1]??i+1);
+      const at=Date.parse(row.at),huntAt=Date.parse(row.huntSampleAt??row.at);
+      const fresh=t=>Number.isFinite(t)&&now-t<=30000&&t<=now+60000;
+      const online=row.online===true&&fresh(at);
+      return {id,at:Number.isFinite(at)?at:null,online,
+        cpu:online?n(row.cpu):null,ramUsedMB:online?n(row.ramUsedMB):null,ramTotalMB:online?n(row.ramTotalMB):null,
+        hunts:online&&Number.isFinite(huntAt)&&now-huntAt<=150000&&huntAt<=now+60000&&Number.isInteger(row.hunts)&&row.hunts>=0?row.hunts:null};
+    });
     const reporting=rows.filter(r=>r.online), cpus=reporting.filter(r=>r.cpu!==null);
     return {rows,online:reporting.length,servers:rows.length,
       knownHunts:reporting.reduce((v,r)=>v+(r.hunts??0),0),

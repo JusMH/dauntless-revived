@@ -32,16 +32,17 @@ type Player = { UserId: string, Key: string, Token: string, CharacterId: string 
 const Players: Record<string, Player> = {};
 
 it('hunt region changes require the account key and cannot target another account', async () => {
-    process.env.AUS_REGION='1';
+    process.env.US_REGION='1';
     try {
-        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{body:{region:'aus'}})).status,401);
+        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{body:{region:'us'}})).status,401);
         assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'remote'}})).status,400);
-        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'aus',userId:B}})).status,200);
-        assert.equal((await Call('GET','/undaunted/api/HuntRegion',{key:Players[A].Key})).json.region,'aus');
+        assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'us',userId:B}})).status,200);
+        assert.equal((await Call('GET','/undaunted/api/HuntRegion',{key:Players[A].Key})).json.region,'us');
         assert.equal((await Call('GET','/undaunted/api/HuntRegion',{key:Players[B].Key})).json.region,'main');
         assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'main'}})).status,200);
-    } finally { delete process.env.AUS_REGION; }
-    assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'aus'}})).status,503);
+    } finally { delete process.env.US_REGION; }
+    assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'us'}})).status,503);
+    assert.equal((await Call('POST','/undaunted/api/HuntRegion',{key:Players[A].Key,body:{region:'aus'}})).status,410);
 });
 
 it('dashboard account directory exposes names and short fingerprints, never login keys or full hashes', async () => {
@@ -320,6 +321,7 @@ const EXPECTED_ROUTES = [
     "GET /undaunted/api/DashboardAccounts [HasUndauntedAdminApiKey]",
     "POST /undaunted/api/PlayingEnded [HasUndauntedUserApiKey]",
     "GET /undaunted/api/Moderation/:accountId [HasUndauntedAdminApiKey]",
+    "GET /undaunted/api/ModerationLog [HasUndauntedAdminApiKey]",
     "POST /undaunted/api/Moderation [HasUndauntedAdminApiKey]",
     "GET /undaunted/api/RegistrationStatus []",
     "POST /undaunted/api/RegistrationStatus [HasUndauntedAdminApiKey]",
@@ -507,6 +509,7 @@ const ADMIN_ROUTES = (): [string, string, unknown][] => [
     ["GET", "/undaunted/api/DashboardAccounts", undefined],
     ["GET", "/undaunted/api/AccountRecovery/UID-example", undefined],
     ["GET", `/undaunted/api/Moderation/${C}`, undefined],
+    ["GET", "/undaunted/api/ModerationLog?kind=events", undefined],
     ["POST", "/undaunted/api/Moderation", {accountId:C,reason:'test',active:false}],
     ["POST", "/undaunted/api/RegisterInviteCode", { NewInviteCode: "PERM-TEST-CODE", Uses: 1 }],
     ["DELETE", "/undaunted/api/InviteCode/PERM-TEST-CODE", undefined],
