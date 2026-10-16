@@ -31,3 +31,18 @@ so the reversal is audited.
 
 Validation: 758 backend tests, 12 dashboard tests, and backend build passed.
 Native RPC hardening is documented separately in anticheat-2026-10-15.md.
+
+## October 15 rollout status
+
+Source is pushed; production files and schema are unchanged. The live database
+was approximately 20 GB. An online backup did not finish; a full-step retry
+coincided with backend health timeouts. Both backup helpers were stopped, health
+returned HTTP 200, and only their incomplete destination files were removed.
+Do not retry an unbounded full-step backup during active play. A maintenance
+pause and verified backup are required before applying this staged update.
+
+The live migration journal ended at `0027_us_region`, unlike this checkout's
+`0028_us_region`. The staged patch preserves the live journal and appends only
+the expiry-column migration; replacing the whole journal would risk replaying
+incompatible migrations. The live dashboard also has newer fleet changes, so
+the staged patch replaces only its moderation sections.
