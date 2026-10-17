@@ -8,6 +8,27 @@ import { parsePerformance, readPerformance } from './dashboard-performance.mjs';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 
+test('chart inspection selects timestamps, preserves selection on refresh and handles missing samples', async () => {
+  const source = await readFile(new URL('./dashboard-client.js', import.meta.url), 'utf8');
+  const renderer = source.slice(source.indexOf('  function graph('), source.indexOf('  function renderDiscord('));
+  const labels=[];
+  const ctx=new Proxy({measureText:()=>({width:50}),fillText:text=>labels.push(text)}, {get:(target,key)=>target[key]??(()=>{})});
+  const canvas={clientWidth:300,style:{},dataset:{},parentElement:{querySelector:()=>({textContent:'CPU · %'})},getContext:()=>ctx,setAttribute:()=>{},getBoundingClientRect:()=>({left:0})};
+  const history=[{at:'2026-10-17T01:00:00Z',cpu:12},{at:'2026-10-17T01:00:05Z',cpu:null},{at:'2026-10-17T01:00:10Z',cpu:24}];
+  const scope={el:()=>canvas,window:{devicePixelRatio:1},history};
+  runInNewContext(renderer+"\ngraph('cpu',history);",scope);
+  canvas.onpointermove({clientX:150});
+  assert.equal(canvas.dataset.selectedAt,history[1].at);
+  assert.match(labels.at(-1),/Unavailable/);
+  canvas.onkeydown({key:'ArrowRight',preventDefault(){}});
+  assert.equal(canvas.dataset.selectedAt,history[2].at);
+  runInNewContext("graph('cpu',history);",scope);
+  assert.match(labels.at(-1),/24/);
+  canvas.onkeydown({key:'Escape'});
+  assert.equal(canvas.dataset.selectedAt,undefined);
+  assert.match(labels.at(-1),/Current 24/);
+});
+
 test('fleet host without a detail panel does not interrupt dashboard unlock', async () => {
   const source = await readFile(new URL('./dashboard-client.js', import.meta.url), 'utf8');
   const renderer = source.slice(source.indexOf('  function renderWorker('), source.indexOf('\n  function list('));

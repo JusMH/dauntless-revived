@@ -3,6 +3,11 @@
   const el = id => document.getElementById(id);
   const number = (n, suffix = '') => Number.isFinite(n) ? `${n.toFixed(1)}${suffix}` : '—';
   const duration = seconds => Number.isFinite(seconds) && seconds >= 0 ? `${Math.floor(seconds / 86400)}d ${Math.floor(seconds / 3600) % 24}h ${Math.floor(seconds / 60) % 60}m` : '—';
+
+  const polish=document.createElement('style');
+  polish.textContent='body{background:radial-gradient(ellipse at top left,#182d3b 0,transparent 45%),#0b1118}.card{background:linear-gradient(135deg,#182633,#121d28);box-shadow:0 8px 24px #0002;border-color:#2b4051;border-radius:16px}button{transition:background .15s,border-color .15s,box-shadow .15s}button:hover{box-shadow:0 0 0 2px #65dac822}nav{padding:6px;background:#0c1620;border:1px solid #26394a;border-radius:12px}nav button{border-color:transparent}tbody tr:hover{background:#65dac80a}.metric strong{font-variant-numeric:tabular-nums}canvas{cursor:crosshair;border-radius:8px}canvas:focus-visible{outline:2px solid #65dac8;outline-offset:4px}@media(prefers-reduced-motion:reduce){button{transition:none}}';
+  document.head.append(polish);
+
   const fleetHistory=[];
   const fleetCharts=['fleetCpuChart','fleetRamChart','fleetHuntChart'];
   const charts = ['cpu', 'ramUsedMB', 'players', 'backendMs', 'requestsPerSecond', 'errorPercent', 'eventLoopP95Ms', 'backendRssMB', 'backendHeapMB'];
@@ -13,17 +18,51 @@
     return response.json();
   }
   function graph(id, history) {
-    const canvas = el(id), ctx = canvas.getContext('2d');
-    if (!canvas.clientWidth) return;
-    canvas.width = Math.max(200, canvas.clientWidth * devicePixelRatio); canvas.height = 140 * devicePixelRatio;
+    const canvas = el(id);
+    if (!canvas || !canvas.clientWidth) return;
+    const ctx = canvas.getContext('2d'), ratio = window.devicePixelRatio || 1;
+    const width = canvas.clientWidth, height = 180, left = 12, right = width - 12, top = 32, bottom = 150;
+    canvas.width = width * ratio; canvas.height = height * ratio;
+    canvas.style.height = height + 'px';
+    ctx.scale(ratio, ratio);
     const values = history.map(row => row[id]);
-    const peak = Math.max(0, ...values.filter(value => Number.isFinite(value)));
-    const max = Math.max(1, peak);
-    ctx.strokeStyle = '#49d4d0'; ctx.lineWidth = 2 * devicePixelRatio; ctx.beginPath();
-    let gap = true;
-    values.forEach((value, i) => { if (value === null) { gap = true; return; } const x = i * canvas.width / Math.max(1, values.length - 1), y = canvas.height - 20 - value / max * (canvas.height - 40); if (gap) ctx.moveTo(x, y); else ctx.lineTo(x, y); gap = false; });
-    ctx.stroke(); ctx.fillStyle = '#e4eef5'; ctx.font = `${12 * devicePixelRatio}px system-ui`; ctx.fillText(`Current: ${values.at(-1) == null ? 'unavailable' : Number(values.at(-1)).toFixed(1)} · peak: ${values.some(v => v != null) ? peak.toFixed(1) : 'unavailable'}`, 4, 16 * devicePixelRatio);
+    const finite = values.filter(Number.isFinite), peak = Math.max(0, ...finite), max = Math.max(1, peak);
+    const x = i => left + i / Math.max(1, values.length - 1) * (right - left);
+    const y = v => bottom - v / max * (bottom - top);
+    const time = i => Number.isFinite(Date.parse(history[i]?.at)) ? new Date(history[i].at).toLocaleTimeString() : 'Time unavailable';
+    const value = v => Number.isFinite(v) ? v.toLocaleString(undefined, {maximumFractionDigits:2}) : 'Unavailable';
+    const label = canvas.parentElement.querySelector('h2,h3')?.textContent || id;
+    canvas.tabIndex = 0; canvas.setAttribute('role','img');
+    canvas.setAttribute('aria-label', label + '. Hover to inspect; arrow keys select a sample; Escape returns to live.');
+    canvas.title = 'Hover or touch to inspect · ← → browse samples · Escape to return to live';
+    const selectedAt = canvas.dataset.selectedAt;
+    let selected = selectedAt ? history.findIndex(row => String(row.at) === selectedAt) : -1;
+    function draw() {
+      ctx.clearRect(0,0,width,height);
+      ctx.font = '12px system-ui'; ctx.lineWidth = 1;
+      for (let n=0;n<=3;n++) {
+        const line = top + n*(bottom-top)/3;
+        ctx.strokeStyle = '#26394a'; ctx.beginPath();ctx.moveTo(left,line);ctx.lineTo(right,line);ctx.stroke();
+      }
+      ctx.strokeStyle = '#65dac8';ctx.lineWidth=2;ctx.beginPath();
+      let gap=true;
+      values.forEach((v,i)=>{if(!Number.isFinite(v)){gap=true;return;} if(gap)ctx.moveTo(x(i),y(v));else ctx.lineTo(x(i),y(v));gap=false;});ctx.stroke();
+      ctx.fillStyle='#9aafc0';ctx.fillText(time(0),left,174);
+      const end=time(history.length-1);ctx.fillText(end,Math.max(left,right-ctx.measureText(end).width),174);
+      ctx.fillStyle='#edf3f8';
+      ctx.fillText(selected<0 ? `Current ${value(values.at(-1))} · Peak ${finite.length?value(peak):'Unavailable'}` : `${time(selected)} · ${value(values[selected])}`,left,18);
+      if(selected>=0 && selected<values.length){
+        ctx.strokeStyle='#edf3f8';ctx.lineWidth=1;ctx.setLineDash([3,3]);ctx.beginPath();ctx.moveTo(x(selected),top);ctx.lineTo(x(selected),bottom);ctx.stroke();ctx.setLineDash([]);
+        if(Number.isFinite(values[selected])){ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x(selected),y(values[selected]),4,0,Math.PI*2);ctx.fill();}
+      }
+    }
+    function select(index){selected=index; if(index>=0)canvas.dataset.selectedAt=String(history[index].at);else delete canvas.dataset.selectedAt;draw();}
+    canvas.onpointermove=event=>{if(!values.length)return;const pos=event.clientX-canvas.getBoundingClientRect().left;select(Math.max(0,Math.min(values.length-1,Math.round((pos-left)/(right-left)*(values.length-1)))));};
+    canvas.onpointerleave=()=>select(-1);
+    canvas.onkeydown=event=>{if(event.key==='Escape'){select(-1);return;}if(!values.length||!['ArrowLeft','ArrowRight'].includes(event.key))return;event.preventDefault();select(Math.max(0,Math.min(values.length-1,(selected<0?values.length-1:selected)+(event.key==='ArrowLeft'?-1:1))));};
+    draw();
   }
+
   function renderDiscord(stats) {
     const fields={botLinked:stats?.linkedAccounts,botIssued:stats?.bot?.issued,botUnused:stats?.bot?.unused,botRedeemed:stats?.bot?.redeemed,botPending:stats?.bot?.pending,botRevoked:stats?.bot?.revoked};
     for(const [id,value] of Object.entries(fields)) el(id).textContent=Number.isSafeInteger(value)&&value>=0 ? value : '—';
@@ -35,7 +74,7 @@
     if (!fleet) return;
     table('fleetRows',fleet.rows.map(s=>[s.name,s.online?'Online':'Unavailable / stale',s.hunts ?? '—',number(s.cpu,'%'),`${number(s.ramUsedMB===null?null:s.ramUsedMB/1024)} / ${number(s.ramTotalMB===null?null:s.ramTotalMB/1024)} GB`,s.huntSampleAt ? new Date(s.huntSampleAt).toLocaleTimeString() : '—']));
     const t=fleet.totals;
-    fleetHistory.push({fleetCpuChart:t.meanCpu,fleetRamChart:t.ramUsedMB,fleetHuntChart:t.hunts});
+    fleetHistory.push({at:new Date().toISOString(),fleetCpuChart:t.meanCpu,fleetRamChart:t.ramUsedMB,fleetHuntChart:t.hunts});
     if(fleetHistory.length>720)fleetHistory.shift();
     for(const id of fleetCharts)graph(id,fleetHistory);
     el('fleetOnline').textContent=`${t.online} / ${t.servers}`;
