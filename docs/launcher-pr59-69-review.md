@@ -33,3 +33,5 @@ The packaged portable-save smoke verifies separate offline account credentials a
 Local diagnostic distributables are not release artifacts. GitHub CI rebuilds the committed source before publication.
 
 Packaged native smoke also passed: actual client launch, authenticated local account, Ramsgate allocation on 127.0.0.1:8777, graceful client close, and complete owned service/native process cleanup. This verifies startup and allocation, not manual combat or physical controller behavior.
+
+Windows launcher CI uses windows-2022: the locked Electron node-gyp rejects Visual Studio18 on windows-latest (CI39006447213, unsupported version18), while local VS2022 builds and packaged offline native ABI checks pass. Revisit this pin when the Electron rebuild dependency supports the newer compiler. Both CI and manual-release build jobs must use the same runner.
