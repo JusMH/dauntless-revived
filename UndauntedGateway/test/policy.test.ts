@@ -4,6 +4,13 @@ import { CanonicalPath, CheckPath, Classify, HasBearer } from "../src/policy";
 import { IsPublicRoute, UndauntedApiRoutes } from "./helpers";
 
 describe("the /undaunted/api routes", () => {
+    it("allows only POST device checks; upstream still decides authentication and bans", () => {
+        assert.equal(Classify("POST", "/undaunted/api/DeviceSignals", {}, false).action,"proxy");
+        for(const method of ["GET","HEAD","PUT","DELETE"]){
+            const result=Classify(method,"/undaunted/api/DeviceSignals",{},false);
+            assert.ok(result.action==="reject" && result.status===403);
+        }
+    });
     const Routes = UndauntedApiRoutes();
 
     it("the metagame source still has the routes this gateway knows about", () => {
@@ -122,7 +129,7 @@ describe("path helpers", () => {
         for(const Good of ["/", "/heartbeat", "/progression/UID-00000000-0000-4000-8000-00000000f609", "/inventory/x/dauntlessrel-1.4.4:239827", "/motd/", "/a.b/c..d/.e"]){
             assert.equal(CheckPath(Good), "ok", Good);
         }
-        for(const Bad of ["/a/../b", "/a/./b", "/..", "/a/..", "/a\\b", "/a b", "/a\tb", "/a%2Fb", "/a%5cb", "/a%00", "/a/%2e%2e/b", "/a/%2E/b"]){
+        for(const Bad of ["/a/../b", "/a/./b", "/..", "/a/..", "/a\\b", "/a\u0000b", "/a\tb", "/a%2Fb", "/a%5cb", "/a%00", "/a/%2e%2e/b", "/a/%2E/b"]){
             assert.equal(CheckPath(Bad), "bad_path", Bad);
         }
     });
