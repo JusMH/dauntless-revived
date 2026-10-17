@@ -7,7 +7,7 @@ import { GetHeldCurrencies, GetNotesForUser, OverlayHeldCurrencies } from "../co
 import { PlayerTokenOnly } from "../middleware/PlayerAuth";
 import { CreateStorePurchase, GetStoreOffer, IsAnyStoreEnabled, IsKnownStoreTag, IsStoreSkuEnabled, IsStoreTagEnabled, ListStoreOffers, RedeemStorePurchase, StoreError } from "../controllers/freestore";
 import { BalanceFromInventory } from "../features";
-import { PlayerMutationRateLimit } from "../middleware/RateLimits";
+import { PlayerMutationRateLimit, StoreImageRateLimit } from "../middleware/RateLimits";
 import { RamsWireOffer, RamsWireCurrency } from "../controllers/ramspricing";
 import StoreCatalog from '../vendor/store_catalog.json';
 
@@ -196,17 +196,17 @@ function WithStoreImage(req: any, Offer: any){
     return {...Offer, images: {...(Offer.images ?? {}), standard: Url, feature: Url}};
 }
 
-storeRouter.get("/store-images/:file", (req, res) => {
+storeRouter.get("/store-images/:file", StoreImageRateLimit, (req, res) => {
     const File = req.params.file;
 
-    if(!/^[a-z0-9_]+\.png$/.test(File) || !StoreImageFor({items: [{catalogId: File.slice(0, -4)}]})){
+    if(typeof File !== "string" || !/^[a-z0-9_]+\.png$/.test(File) || !StoreImageFor({items: [{catalogId: File.slice(0, -4)}]})){
         res.status(404);
         res.send();
         return;
     }
 
     res.set("Cache-Control", "public, max-age=86400");
-    res.sendFile(path.join(STORE_IMAGES_DIR, File));
+    res.sendFile(File, {root: STORE_IMAGES_DIR, dotfiles: 'deny'});
 });
 
 // StoreGetItemByTagEndpoint: a bare array of offers
@@ -290,3 +290,4 @@ storeRouter.get("/product/skus/public", HasUndauntedMetagameAuth, async (req: an
         message: "The store is not available on Dauntless Revived yet."
     });
 });
+

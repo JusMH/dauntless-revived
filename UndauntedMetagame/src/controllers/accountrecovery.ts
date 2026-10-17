@@ -9,6 +9,10 @@ function encryptionKey() {
 export function RememberAccountKey(userId:string, key:string) {
     if(process.env.ACCOUNT_KEY_RECOVERY !== '1') return;
     const db=GetDb().$client;
+    // Equality fingerprint for the existing userapikeys join, not password storage.
+    // Issued UUKs contain 24 random bytes (registration) or 32 (rotation); keep
+    // this digest byte-compatible with HashUserAPIKey. Imported weak keys do
+    // not inherit that entropy guarantee and must be rotated, not slow-hashed here.
     const hash=createHash('sha256').update(key).digest('hex');
     const existing=db.prepare('SELECT keyHash FROM accountkeyrecovery WHERE userId=?').get(userId) as {keyHash:string}|undefined;
     if(existing?.keyHash===hash) return;

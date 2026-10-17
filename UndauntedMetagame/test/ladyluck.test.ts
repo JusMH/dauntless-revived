@@ -8,6 +8,7 @@ import { GetDb } from "../src/db";
 import { inventory } from "../src/db/schema";
 import { CreateStorePurchase, GetStoreOffer, GrantKind, ListStoreOffers, RedeemStorePurchase } from "../src/controllers/freestore";
 import { MakePlayer, StackQuantity } from "./helpers";
+import { StoreImageRateLimit } from "../src/middleware/RateLimits";
 
 before(async () => {
     await StartApp();
@@ -167,4 +168,16 @@ describe("Lady Luck Trials store", () => {
         assert.throws(() => GetStoreOffer(A.UserId, "ladyluck_weapon_strikers_normal"), {Status: 404});
         assert.throws(() => CreateStorePurchase(A.UserId, "marksgilded", "ladyluck_weapon_strikers_normal"), {Status: 404});
     });
+});
+
+it('store images reject encoded path escapes and enforce their independent request budget', async () => {
+    StoreImageRateLimit.resetKey('127.0.0.1');
+    try {
+        for(const value of ['..%2Fpackage.json','..%5Cpackage.json','%252e%252e%252fpackage.json','C%3A%5CWindows%5Cwin.ini']) {
+            assert.equal((await Call('GET','/store-images/'+value)).status,404);
+        }
+        StoreImageRateLimit.resetKey('127.0.0.1');
+        for(let i=0;i<600;i++) assert.equal((await Call('GET','/store-images/not_an_item.png')).status,404);
+        assert.equal((await Call('GET','/store-images/not_an_item.png')).status,429);
+    } finally { StoreImageRateLimit.resetKey('127.0.0.1'); }
 });

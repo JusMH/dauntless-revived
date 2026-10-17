@@ -5,6 +5,7 @@ import {IsDirectLocalRequest} from '../middleware/RequestOrigin';
 import {IsValidGameserverAPIKey} from '../controllers/apikeys';
 import {GetDb} from '../db';
 import {logger} from '../logger';
+import {rateLimit} from 'express-rate-limit';
 
 type Options = {
     root: () => string | undefined;
@@ -15,6 +16,13 @@ type Options = {
 export function CreateBackupRouter(options: Options) {
     const router = Router();
     let active = false;
+    // Backups are expensive writes, not a polling endpoint. Share one host-wide
+    // budget across valid keys; rejected callers cannot consume it.
+    const BackupRateLimit = rateLimit({
+        windowMs: 60 * 60 * 1000, limit: 6, keyGenerator: () => 'local-backup',
+        standardHeaders: 'draft-8', legacyHeaders: false,
+        message: {error: 'rate_limited', message: 'Too many backup requests; try again later.'}
+    });
     const LocalBackupAuth: RequestHandler = async function LocalBackupAuth(req, res, next) {
         if (!IsDirectLocalRequest(req)) { res.sendStatus(403); return; }
         const root = options.root();
@@ -23,7 +31,7 @@ export function CreateBackupRouter(options: Options) {
         if (typeof key !== 'string' || !await options.validKey(key)) { res.sendStatus(403); return; }
         next();
     };
-    router.post('/internal/backup', LocalBackupAuth, async (req, res) => {
+    router.post('/internal/backup', LocalBackupAuth, BackupRateLimit, async (req, res) => {
         const root = options.root()!;
         const name = req.body?.name;
         if (typeof name !== 'string' || !/^\d{4}-\d{2}-\d{2}_\d{6}$/.test(name)) { res.sendStatus(400); return; }

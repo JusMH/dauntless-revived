@@ -40,6 +40,32 @@ test('live backup refuses proxy callers, wrong keys, traversal, duplicate copies
     }
 });
 
+test('backup budget limits authenticated copies before filesystem work, not rejected callers',async()=>{
+    const root=await mkdtemp(path.join(os.tmpdir(),'dr-backup-limit-'));
+    let copies=0;
+    const app=express();app.use(express.json());
+    app.use(CreateBackupRouter({root:()=>root,validKey:async(k:string)=>k==='test-key',copy:async()=>{copies++;}}));
+    const server=app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
+    const port=(server.address() as {port:number}).port;
+    const post=(name:string,key='test-key')=>fetch(`http://127.0.0.1:${port}/internal/backup`,{method:'POST',headers:{'content-type':'application/json','x-undaunted-gameserver-apikey':key},body:JSON.stringify({name})});
+    try{
+        for(let i=0;i<8;i++)assert.equal((await post('2026-10-05_120000','wrong')).status,403);
+        for(let i=0;i<6;i++){
+            const name=`2026-10-05_12000${i}`;await mkdir(path.join(root,name));
+            assert.equal((await post(name)).status,200);
+        }
+        // This directory does not exist: 429 proves limiting precedes realpath/copy.
+        const blocked=await post('2026-10-05_120006');
+        assert.equal(blocked.status,429);
+        assert.ok(Number(blocked.headers.get('retry-after'))>0);
+        assert.equal((await blocked.json() as any).error,'rate_limited');
+        assert.equal(copies,6);
+    }finally{
+        server.closeAllConnections();await new Promise<void>(r=>server.close(()=>r()));
+        await rm(root,{recursive:true,force:true});
+    }
+});
+
 test('writer-connection backup finishes while saves continue', {timeout:10000}, async () => {
     const root=await mkdtemp(path.join(os.tmpdir(),'dr-backup-writer-'));
     const db=new Database(path.join(root,'source.db'));
