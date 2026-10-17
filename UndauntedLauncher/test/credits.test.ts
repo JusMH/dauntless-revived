@@ -23,6 +23,9 @@ test("the credits name every contributor, in order, with their role", () => {
   assert.equal(PROJECT_PEOPLE[0].github, "mixutin", "the maintainer comes first");
   assert.equal(person(PROJECT_PEOPLE, "mixutin").role, "maintainer");
   assert.equal(person(PROJECT_PEOPLE, "mixutin").name, "mixutin");
+  assert.match(person(PROJECT_PEOPLE, "LupesHk").note.en, /Brazilian Portuguese/);
+  assert.match(person(PROJECT_PEOPLE, "JusMH").note.en, /Offline play runtime/);
+  assert.match(person(PROJECT_PEOPLE, "anxo0").note.en, /DualSense/);
   assert.equal(person(PROJECT_PEOPLE, "Vvoidddd").role, "contributor");
   assert.match(person(PROJECT_PEOPLE, "Vvoidddd").note.en, /airship/);
   assert.match(person(PROJECT_PEOPLE, "Vvoidddd").note.en, /console windows/);

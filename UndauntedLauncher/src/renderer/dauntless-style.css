@@ -801,7 +801,6 @@
   overflow-x: hidden;
 }
 
-<<<<<<< HEAD
 /* The "settings are locked" notice: a dark plate with a gold warning edge, like the game's alerts. */
 :root[data-style="dauntless"] .settings-locked {
   border-radius: 2px;
@@ -813,7 +812,8 @@
 
 :root[data-style="dauntless"] .settings-locked .icon {
   color: var(--dl-gold);
-=======
+}
+
 /* ------------------------------------------------------------------ offline play */
 
 /* PLAY's arrow, built into the gold plate's right end; the menu in a steel frame. */
@@ -953,5 +953,4 @@
 
 :root[data-style="dauntless"] .offline-step.is-done .icon {
   color: var(--dl-cyan);
->>>>>>> 37a5d89
 }
