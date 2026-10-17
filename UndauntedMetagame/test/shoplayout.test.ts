@@ -5,6 +5,32 @@ import {WithEnv} from './appenv';
 import catalog from '../src/vendor/store_catalog.json';
 import type {StoreOffer} from '../src/controllers/freestore';
 
+test('every sufficiently stocked category changes all three offers each week',()=>WithEnv({STORE_RAMS:'1',STORE_WEEKLY_ROTATION:'1',STORE_ROTATION_SEED:'weekly'},()=>{
+    const offers=catalog.webstore as StoreOffer[];
+    const a=ShopLayout(offers,'player',new Date('2026-10-17T00:00:00Z'));
+    const b=ShopLayout(offers,'player',new Date('2026-10-19T00:00:00Z'));
+    const category=(o:StoreOffer)=>o.tags.find(t=>/^(skin_|social_|dye_|personality_|supplies_)/.test(t)) ?? 'other';
+    for(const c of new Set(a.map(category))){
+        if(offers.filter(o=>category(o)===c).length<6)continue;
+        const prior=new Set(a.filter(o=>category(o)===c).map(o=>o.id));
+        assert.ok(b.filter(o=>category(o)===c).every(o=>!prior.has(o.id)),c);
+    }
+}));
+
+test('manual seed refresh changes stock and retains automatic weekly rotation',()=>WithEnv({STORE_RAMS:'1',STORE_WEEKLY_ROTATION:'1',STORE_ROTATION_SEED:''},()=>{
+    const offers=catalog.webstore as StoreOffer[];
+    const now=new Date('2026-10-17T04:00:00Z');
+    const previous=ShopLayout(offers,'player',now);
+    WithEnv({STORE_ROTATION_SEED:'refresh-20261017'},()=>{
+        const fresh=ShopLayout(offers,'player',now);
+        assert.notDeepEqual(fresh,previous);
+        assert.deepEqual(fresh,ShopLayout(offers,'another-player',now));
+        assert.deepEqual(fresh,ShopLayout(offers,'player',new Date('2026-10-18T23:59:59Z')));
+        assert.notDeepEqual(fresh,ShopLayout(offers,'player',new Date('2026-10-19T00:00:00Z')));
+        assert.ok(fresh.every(o=>offers.some(original=>original.id===o.id)));
+    });
+}));
+
 test('weekly stock is stable, rotates, preserves prices and corrects category tags',()=>WithEnv({STORE_RAMS_TEST_ACCOUNT:'pilot',STORE_WEEKLY_ROTATION:'1'},()=>{
     const offers=catalog.webstore as StoreOffer[];
     const day=new Date('2026-10-17T00:00:00Z');
