@@ -1620,6 +1620,7 @@ const es: Record<StringKey, string> = {
 };
 
 const de: Record<StringKey, string> = {
+  ...en, // New offline controls fall back until translated.
   set_locked_game: en.set_locked_game,
   set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
@@ -2086,6 +2087,7 @@ const de: Record<StringKey, string> = {
 };
 
 const fr: Record<StringKey, string> = {
+  ...en, // New offline controls fall back until translated.
   set_locked_game: en.set_locked_game,
   set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
@@ -2552,6 +2554,7 @@ const fr: Record<StringKey, string> = {
 };
 
 const it: Record<StringKey, string> = {
+  ...en, // New offline controls fall back until translated.
   set_locked_game: en.set_locked_game,
   set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
@@ -3018,6 +3021,7 @@ const it: Record<StringKey, string> = {
 };
 
 const ja: Record<StringKey, string> = {
+  ...en, // New offline controls fall back until translated.
   set_locked_game: en.set_locked_game,
   set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
@@ -3484,6 +3488,7 @@ const ja: Record<StringKey, string> = {
 };
 
 const pt: Record<StringKey, string> = {
+  ...en, // New offline controls fall back until translated.
   set_locked_game: en.set_locked_game,
   set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
@@ -3950,6 +3955,7 @@ const pt: Record<StringKey, string> = {
 };
 
 const ru: Record<StringKey, string> = {
+  ...en, // New offline controls fall back until translated.
   set_locked_game: en.set_locked_game,
   set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
