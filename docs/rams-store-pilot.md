@@ -19,7 +19,10 @@ STORE=free
 STORE_RAMS=1
 STORE_RAMS_EVENT_TRANSPORT=1
 STORE_WEEKLY_ROTATION=1
+STORE_CATALOG_PROFILE=full
 ```
+
+The retired `curated30` profile restricts the candidate pool before rotation and can make a refresh appear unchanged. Removing it increased verified live stock from 29 to 45 offers. `STORE_ROTATION_SEED=refresh-20261017` refreshes the current selection; keep the seed stable for subsequent weekly rotation. Categories use consecutive three-offer windows, avoiding adjacent-week repeats where at least six eligible offers exist.
 
 The updated client supplies `shop_protocol=rams-v1`. Main-shop list, item-detail and token requests without that marker receive HTTP 426 and an update instruction. The marker is a compatibility signal, not authentication; account ownership, prices and funds remain server-validated. Other vendor requests retain their existing behavior. For an isolated account pilot instead of global activation, leave `STORE_RAMS` unset and set `STORE_RAMS_TEST_ACCOUNT` to the disposable account UID.
 
