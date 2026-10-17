@@ -47,6 +47,8 @@
   }
 
   function renderWorker(worker, prefix='worker') {
+    // Fleet rows may include hosts without a dedicated detail panel.
+    if (!document.getElementById(prefix+'Connection')) return;
     if(prefix==='worker')lastWorker=worker;else if(prefix==='aus')lastAus=worker;else lastGermany=worker;
     const el=id=>document.getElementById(id.replace(/^worker/,prefix));
     const s=worker?.sample;

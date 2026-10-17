@@ -5,6 +5,16 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parsePerformance, readPerformance } from './dashboard-performance.mjs';
+import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
+
+test('fleet host without a detail panel does not interrupt dashboard unlock', async () => {
+  const source = await readFile(new URL('./dashboard-client.js', import.meta.url), 'utf8');
+  const renderer = source.slice(source.indexOf('  function renderWorker('), source.indexOf('\n  function list('));
+  assert.doesNotThrow(() => runInNewContext(renderer + "\nrenderWorker({online:true}, 'eu2');", {
+    document: {getElementById: () => null},
+  }));
+});
 
 test('optional IP bans use backend observations, ignore submitted IPs, and fail closed without an observation',async()=>{
   const key='test-ip-moderation-owner';const writes=[];let address='203.0.113.20';
