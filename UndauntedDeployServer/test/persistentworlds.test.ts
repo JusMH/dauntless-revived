@@ -8,7 +8,7 @@ import type { Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
     CleanupServer, GameserverStateForTests, Gameservers, GetRamsgateConnectionDetails, GetTrainingDojoConnectionDetails, ResetGameserversForTests,
-    Startup, StartupAndReportFailure, StartupGameserverWithArgs, UseProcessFunctionsForTests
+    Startup, StartupAndReportFailure, StartupGameserverWithArgs, UseProcessFunctionsForTests, ShutdownGameservers,
 } from "../src/controllers/gameservers";
 import { HandleMatchmakingRequest } from "../src/controllers/matchmaker";
 import { RunWatchdog } from "../src/controllers/watchdog";
@@ -27,17 +27,39 @@ const HUNT_POOL = [8770, 8771, 8772, 8773, 8774, 8775];
 
 let NextPid = 41000;
 const Alive = new Set<number>();
-const Spawned: { Command: string, Args: string[], Pid: number | undefined }[] = [];
+const Spawned: { Command: string, Args: string[], Pid: number | undefined, windowsHide?: boolean, console?: string }[] = [];
 
 // A game process that starts and runs until the test "kills" it (takes its pid out of Alive)
-function FakeSpawn(Command: string, Args: string[]): ChildProcess {
+function FakeSpawn(Command: string, Args: string[], Options?: { windowsHide?: boolean, env?: NodeJS.ProcessEnv }): ChildProcess {
     const Child = new EventEmitter() as any;
     Child.pid = NextPid++;
     Child.unref = () => {};
     Alive.add(Child.pid);
+    Spawned.push({ Command, Args, Pid: Child.pid, windowsHide: Options?.windowsHide, console: Options?.env?.DR_SHOW_CONSOLE });
+    return Child as ChildProcess;
+}
+
+function KillableFakeSpawn(Command: string, Args: string[]): ChildProcess {
+    const Child = new EventEmitter() as any;
+    Child.pid = NextPid++;
+    Child.exitCode = null;
+    Child.signalCode = null;
+    Child.killed = false;
+    Child.unref = () => {};
+    Child.kill = (Signal = "SIGTERM") => {
+        if(Child.exitCode !== null || Child.signalCode !== null)return false;
+        Child.killed = true;
+        Child.signalCode = Signal;
+        Alive.delete(Child.pid);
+        process.nextTick(() => Child.emit("exit", null, Signal));
+        return true;
+    };
+    Alive.add(Child.pid);
     Spawned.push({ Command, Args, Pid: Child.pid });
     return Child as ChildProcess;
 }
+
+
 
 // What Node does for a binary that is not there: no pid, and an "error" event right after
 function FailingSpawn(Command: string, Args: string[]): ChildProcess {
@@ -89,6 +111,29 @@ after(() => {
 });
 
 describe("Ramsgate", () => {
+    it('preserves legacy server visibility unless Deploy explicitly hides or shows consoles', async () => {
+        const original = process.env.DR_SHOW_CONSOLE;
+        try {
+            for (const diagnostic of [undefined, '0', '1', 'invalid']) {
+                if (diagnostic === undefined) delete process.env.DR_SHOW_CONSOLE;
+                else process.env.DR_SHOW_CONSOLE = diagnostic;
+                ResetGameserversForTests();
+                Spawned.length = 0;
+                await Startup();
+                await GetTrainingDojoConnectionDetails();
+                await StartupGameserverWithArgs(TUTORIAL_ARGS);
+                assert.equal(Spawned.length, 3);
+                for (const [index, child] of Spawned.entries()) {
+                    const expected = diagnostic === '0' ? true : diagnostic === '1' ? false : index === 2;
+                    assert.equal(child.windowsHide, expected);
+                    assert.equal(child.console, diagnostic);
+                }
+            }
+        } finally {
+            if (original === undefined) delete process.env.DR_SHOW_CONSOLE;
+            else process.env.DR_SHOW_CONSOLE = original;
+        }
+    });
     it('hard primary capacity excludes Ramsgate and dojo and admits only one concurrent last slot', async()=>{
         await Startup(); await GetTrainingDojoConnectionDetails();
         process.env.MAX_LOCAL_HUNTS='1';
@@ -367,6 +412,81 @@ describe("a game binary that cannot be started", () => {
         finally{
             Listening.closeAllConnections();
             await new Promise<void>((Resolve) => Listening.close(() => Resolve()));
+        }
+    });
+
+});
+
+describe("shutdown", () => {
+    it("shutdown stops Deploy-owned game servers without restarting Ramsgate", async () => {
+        UseProcessFunctionsForTests({ Spawn: KillableFakeSpawn, IsAlive, IsPortBound: async () => false });
+        process.env.RAMSGATE_POOL = "1";
+
+        try {
+            await Startup();
+            await GetRamsgateConnectionDetails();
+            await StartupGameserverWithArgs(TUTORIAL_ARGS);
+
+            const Pids = Gameservers.map(Server => Server.processId);
+            const SpawnCount = Spawned.length;
+
+            assert.equal(Pids.length, 2);
+            assert.ok(Pids.every(Pid => Alive.has(Pid)));
+
+            await ShutdownGameservers();
+
+            assert.ok(Pids.every(Pid => !Alive.has(Pid)));
+            assert.equal(Gameservers.length, 0);
+            assert.equal(Spawned.length, SpawnCount, "shutdown must not restart Ramsgate");
+        } finally {
+            process.env.RAMSGATE_POOL = "0";
+        }
+    });
+
+    it("shutdown interrupts an in-flight startup and prevents new game servers", async () => {
+        UseProcessFunctionsForTests({
+            Spawn: KillableFakeSpawn,
+            IsAlive,
+            IsPortBound: async () => false
+        });
+
+        process.env.RAMSGATE_POOL = "0";
+
+        const PreviousExitCode = process.exitCode;
+        process.env.GAMESERVER_STARTUP_GRACE_MS = "5000";
+
+        try {
+            const Boot = StartupAndReportFailure();
+
+            await WaitFor(() => Spawned.length === 1);
+
+            const RamsgatePid = Spawned[0].Pid!;
+            assert.ok(Alive.has(RamsgatePid), "Ramsgate is still starting");
+
+            await ShutdownGameservers();
+            await Boot;
+
+            assert.equal(Alive.has(RamsgatePid), false);
+            assert.equal(Gameservers.length, 0);
+            assert.equal(
+                process.exitCode,
+                PreviousExitCode,
+                "an intentional shutdown is not a startup failure",
+            );
+
+            await assert.rejects(
+                StartupGameserverWithArgs(TUTORIAL_ARGS),
+                /Deploy service is shutting down/,
+            );
+
+            assert.equal(
+                Spawned.length,
+                1,
+                "no game server may spawn after shutdown begins",
+            );
+        } finally {
+            process.env.GAMESERVER_STARTUP_GRACE_MS = "0";
+            process.env.RAMSGATE_POOL = "0";
         }
     });
 });

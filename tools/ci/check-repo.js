@@ -39,6 +39,7 @@ const ALLOWED_CONTENT = {
     // A made-up token (its signature part reads "signature-not-real-...") for the gateway's redaction tests.
     "UndauntedGateway/test/gateway.test.ts": ["jwt"],
     "UndauntedGateway/test/redact-ratelimit-config.test.ts": ["jwt"],
+    "UndauntedLauncher/scripts/portable-save-smoke.cjs": ["private-key"],
 };
 
 // The only DLLs the repository may hold: Undaunted's prebuilt server DLLs, which the launcher ships and the

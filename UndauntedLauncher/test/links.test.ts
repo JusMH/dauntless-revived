@@ -147,6 +147,7 @@ function controller(): { c: Controller; opened: string[] } {
     },
     openPath: async () => undefined,
     emitSnapshot: () => undefined,
+    emitOfflineStatus: () => {},
     emitProgress: () => undefined,
     findTailscale: () => null,
     findRunningClients: async () => [],

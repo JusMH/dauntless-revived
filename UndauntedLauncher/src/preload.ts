@@ -3,13 +3,14 @@
 // towards the page.
 
 import { contextBridge, ipcRenderer } from "electron";
-import { IPC } from "./shared/types";
+import {IPC} from "./shared/types";
 import type {
   ActionResult,
   Branding,
   ExternalTarget,
   InviteCheck,
   NewsItem,
+  OfflineStatus,
   RegisterOutcome,
   Settings,
   Snapshot,
@@ -40,6 +41,9 @@ const api = {
   cancelTask: (): Promise<void> => ipcRenderer.invoke(IPC.cancelTask),
   repair: (): Promise<ActionResult> => ipcRenderer.invoke(IPC.repair),
   play: (): Promise<ActionResult> => ipcRenderer.invoke(IPC.play),
+  startOffline: (username?: string): Promise<ActionResult> => ipcRenderer.invoke(IPC.startOffline, username === undefined ? undefined : String(username),),
+  stopOffline: (): Promise<ActionResult> => ipcRenderer.invoke(IPC.stopOffline),
+  offlineStatus: (): Promise<OfflineStatus> => ipcRenderer.invoke(IPC.offlineStatus),
   setSettings: (patch: Partial<Settings>): Promise<Settings> =>
     ipcRenderer.invoke(IPC.setSettings, {
       ...(patch.graphics !== undefined ? { graphics: patch.graphics } : {}),
@@ -65,6 +69,8 @@ const api = {
   toggleMaximize: (): Promise<boolean> => ipcRenderer.invoke(IPC.windowMaximize),
   close: (): Promise<void> => ipcRenderer.invoke(IPC.windowClose),
   takeInviteLink: (): Promise<string | null> => ipcRenderer.invoke(IPC.takeInviteLink),
+  exportOfflineSave: (): Promise<ActionResult> => ipcRenderer.invoke(IPC.offlineExportSave),
+  importOfflineSave: (): Promise<ActionResult> => ipcRenderer.invoke(IPC.offlineImportSave),
   onSnapshot: (fn: (s: Snapshot) => void): void => {
     ipcRenderer.on(IPC.snapshot, (_e, s: Snapshot) => fn(s));
   },
@@ -76,6 +82,9 @@ const api = {
   },
   onWindowState: (fn: (maximized: boolean) => void): void => {
     ipcRenderer.on(IPC.windowState, (_e, maximized: unknown) => fn(maximized === true));
+  },
+  onOfflineStatus: (fn: (status: OfflineStatus) => void): void => {
+    ipcRenderer.on(IPC.offlineStatusChanged, (_e, status: OfflineStatus) => fn(status),);
   },
 };
 

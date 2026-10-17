@@ -15,6 +15,8 @@ import { createHash } from "node:crypto";
 import { promises as fsp, existsSync } from "node:fs";
 import path from "node:path";
 import { missingDirectX, gameExitDetail } from './windows-runtime';
+import { hasOfflineMemory, OFFLINE_REQUIRED_AVAILABLE_MIB } from "./offline-memory";
+import { OFFLINE_KEY_SLOT, type OfflineSaveRuntime } from "./offline-save";
 
 import { parseInvite, isLoopbackHost, type Invite } from "../shared/invite";
 import { checkUsername, extractAccountKey } from "../shared/username";
@@ -39,6 +41,7 @@ import type {
   Settings,
   Snapshot,
   TaskProgress,
+  OfflineStatus,
 } from "../shared/types";
 import { EXPOSURE_MODES, GAME_LANGUAGES, GRAPHICS_PRESETS, LANGUAGES } from "../shared/types";
 import type { Endpoint } from "./http";
@@ -83,6 +86,8 @@ export interface Platform {
   documentsDir?: string;
   resourcesDir: string;
   runtimeFilesExist?: (file: string) => boolean;
+  offlineFreeMemory?(): number;
+  offlineSave?: OfflineSaveRuntime;
 
   defaultInstallDir: string;
   hostPlatform?: NodeJS.Platform;
@@ -106,11 +111,20 @@ export interface Platform {
   openPath(dir: string): Promise<void>;
   emitSnapshot(s: Snapshot): void;
   emitProgress(p: TaskProgress): void;
+  emitOfflineStatus(s: OfflineStatus): void;
   findTailscale(): string | null;
   findRunningClients(): Promise<number[]>;
   prepareGameLaunch?(): Promise<{ runtime: LaunchRuntime; configDir: string; runtimeName: string } | null>;
+
+// Starts the launcher-owned local services without exposing their Electron implementation here.
+  startOfflineStack?(onPhase: (phase: "starting-metagame" | "starting-deploy") => void,): Promise<OfflineStackSession | null>;
   spawn?: SpawnFn;
   installUpdate?(): void;
+}
+
+export interface OfflineStackSession {
+  endpoint: Endpoint;
+  stop(): Promise<void>;
 }
 
 interface InstallInfo {
@@ -119,6 +133,17 @@ interface InstallInfo {
   partFiles: number;
   dllsOk: boolean;
 }
+
+type OfflineReadyAccount = { kind: "ready"; key: string; username: string };
+
+type OfflineAccountResult =
+    | OfflineReadyAccount
+    | { kind: "register" }
+    | { kind: "error"; error: LauncherError };
+
+type OfflineRegistrationResult =
+    | OfflineReadyAccount
+    | { kind: "error"; error: LauncherError };
 
 const err = (code: ErrorCode, detail?: string): { ok: false; error: LauncherError } => ({ ok: false, error: detail ? { code, detail } : { code } });
 const OK: ActionResult = { ok: true };
@@ -130,8 +155,15 @@ export function endpointFor(sv: StoredServer): Endpoint {
 export class Controller {
   private readonly settings: SettingsStore;
   private readonly keys: KeyStore;
+  private readonly offlineKeys: KeyStore;
   private readonly game: GameProcess;
   private endPlayingSession: (()=>Promise<void>) | null = null;
+  private offlineSession: OfflineStackSession | null = null;
+  private offlineStarting = false;
+  private offlineCancelRequested = false;
+  private offlineStartTask: Promise<ActionResult> | null = null;
+  private saveTask: Promise<ActionResult> | null = null;
+  private shuttingDown = false;
   private readonly verified: VerifiedCache;
 
   private reachable: boolean | null = null;
@@ -166,10 +198,13 @@ export class Controller {
   private art = new Map<string, { file: string; type: string }>();
   private relay: Relay | null = null;
   private phase: Phase = "loading";
+  private offline: OfflineStatus = { phase: "stopped" };
 
   constructor(private readonly p: Platform) {
     this.settings = new SettingsStore(p.userDataDir, p.defaultLanguage, p.hostPlatform ?? process.platform);
     this.keys = new KeyStore(path.join(p.userDataDir, "keys"), p.encryptor, p.documentsDir ? path.join(p.documentsDir, "Dauntless Revived", "Account Keys") : undefined);
+    // Local identity stays in userData; online account recovery in Documents is unchanged.
+    this.offlineKeys = new KeyStore(path.join(p.userDataDir, "keys"), p.encryptor);
     this.game = new GameProcess(p.spawn);
     this.verified = new VerifiedCache(path.join(p.userDataDir, "verified-files.json"));
     this.game.onChange((running, code) => {
@@ -205,6 +240,10 @@ export class Controller {
     return this.relay !== null && this.relay.running;
   }
 
+  get offlineGameActive(): boolean {
+    return (this.offlineSession !== null && (this.game.running || this.offline.phase === "launching-game"));
+  }
+
   get gameRunning(): boolean {
     return this.game.running;
   }
@@ -235,6 +274,7 @@ export class Controller {
   }
 
   async init(): Promise<void> {
+    if (this.p.offlineSave) await this.withBusy(() => this.p.offlineSave!.recover());
     await this.refreshKeyFlag();
     await this.inspectInstall();
     this.publish();
@@ -312,6 +352,15 @@ export class Controller {
 
   private publish(): void {
     this.p.emitSnapshot(this.snapshot());
+  }
+
+  offlineStatus(): OfflineStatus {
+    return { ...this.offline };
+  }
+
+  private setOfflineStatus(status: OfflineStatus): void {
+    this.offline = status;
+    this.p.emitOfflineStatus(status);
   }
 
   private fail(code: ErrorCode, detail?: string): { ok: false; error: LauncherError } {
@@ -671,6 +720,47 @@ export class Controller {
   }
 
   // ------------------------------------------------------------------ account
+
+  private async offlineAccount(ep: Endpoint): Promise<OfflineAccountResult> {
+    let key: string | null;
+    try {
+      key = await this.offlineKeys.load(OFFLINE_KEY_SLOT);
+    } catch (e) {
+      log.error(`could not load the offline account key: ${describeError(e)}`);
+      return { kind: "error", error: { code: "key_storage_unavailable" } };
+    }
+
+    if (!key) return { kind: "register" };
+
+    const info = await fetchUserInfo(ep, key);
+    if (info.ok) return { kind: "ready", key, username: info.info.username };
+
+    // Keep the rejected key until a replacement account has actually been created.
+    if (info.error === "key_rejected") return { kind: "register" };
+
+    return { kind: "error", error: { code: info.error, ...(info.detail ? { detail: info.detail } : {}) } };
+  }
+
+  private async registerOfflineAccount(ep: Endpoint, username: unknown,): Promise<OfflineRegistrationResult> {
+    const check = checkUsername(username);
+    if (check !== "ok") return { kind: "error", error: { code: "username_invalid", detail: check } };
+
+    const res = await registerAccount(ep, username as string, "");
+    if (!res.ok) {
+      log.warn(`offline registration refused: ${res.error}`);
+      return { kind: "error", error: { code: res.error } };
+    }
+
+    try {
+      await this.offlineKeys.save(OFFLINE_KEY_SLOT, res.key);
+    } catch (e) {
+      log.error(`could not store the offline account key: ${describeError(e)}`);
+      return { kind: "error", error: { code: "key_storage_unavailable" } };
+    }
+
+    log.info(`registered offline account as ${username as string}`);
+    return { kind: "ready", key: res.key, username: username as string };
+  }
 
   async register(username: unknown): Promise<RegisterOutcome> {
     if (this.busy || this.task) return err("busy");
@@ -1111,18 +1201,242 @@ export class Controller {
 
   // ------------------------------------------------------------------ play
 
+  private async releaseOfflineSession(): Promise<void> {
+    const session = this.offlineSession;
+    this.offlineSession = null;
+
+    if (session) {
+      await session.stop();
+    }
+  }
+
+  private async finishOfflineCancellation(): Promise<ActionResult | null> {
+    if (!this.offlineCancelRequested) return null;
+
+    this.offlineCancelRequested = false;
+
+    try {
+      await this.releaseOfflineSession();
+      this.setOfflineStatus({ phase: "stopped" });
+      return OK;
+    } catch (e) {
+      log.error(`local stack could not stop after cancellation: ${describeError(e)}`);
+      const failed = this.fail("offline_unavailable");
+      this.setOfflineStatus({ phase: "error", error: failed.error });
+      return failed;
+    }
+  }
+
+  async startOffline(username?: unknown): Promise<ActionResult> {
+    if (this.busy || this.task || this.shuttingDown) return err("busy");
+    if (this.game.running) return this.fail("already_running");
+
+    const startOfflineStack = this.p.startOfflineStack;
+    if (!startOfflineStack) {
+      const failed = this.fail("offline_unavailable");
+      this.setOfflineStatus({ phase: "error", error: failed.error });
+      return failed;
+    }
+
+    this.offlineStarting = true;
+    this.offlineCancelRequested = false;
+
+    const task = this.withBusy(async () => {
+      this.setOfflineStatus({ phase: "preparing" });
+
+      try { if (!this.offlineSession) await this.p.offlineSave?.recover(); }
+      catch {
+        const failed = this.fail("offline_unavailable");
+        this.setOfflineStatus({ phase: "error", error: failed.error });
+        return failed;
+      }
+
+      const environment = await this.checkGameLaunchEnvironment();
+      const cancelledAfterEnvironment = await this.finishOfflineCancellation();
+      if (cancelledAfterEnvironment) return cancelledAfterEnvironment;
+      if (!environment.ok) {
+        this.setOfflineStatus({ phase: "error", error: environment.error });
+        return environment;
+      }
+
+      if (!this.offlineSession) {
+        if (this.p.offlineFreeMemory) {
+          let available = NaN;
+          try { available = this.p.offlineFreeMemory(); }
+          catch { log.warn("Offline free memory could not be queried"); }
+          if (!hasOfflineMemory(available)) {
+            const failed = this.fail("offline_insufficient_memory", String(OFFLINE_REQUIRED_AVAILABLE_MIB));
+            this.setOfflineStatus({ phase: "error", error: failed.error });
+            return failed;
+          }
+        }
+        try {
+          this.offlineSession = await startOfflineStack((phase) => {
+            if (!this.offlineCancelRequested) {
+              this.setOfflineStatus({ phase });
+            }
+          });
+        } catch (e) {
+          const cancelledDuringStart = await this.finishOfflineCancellation();
+          if (cancelledDuringStart) return cancelledDuringStart;
+          log.error(`local stack could not start: ${describeError(e)}`);
+          const failed = this.fail("offline_unavailable");
+          this.setOfflineStatus({ phase: "error", error: failed.error });
+          return failed;
+        }
+
+        if (!this.offlineSession) {
+          const failed = this.fail("offline_unavailable");
+          this.setOfflineStatus({ phase: "error", error: failed.error });
+          return failed;
+        }
+      }
+      const cancelledAfterStack = await this.finishOfflineCancellation();
+      if (cancelledAfterStack) return cancelledAfterStack;
+      const offlineSession = this.offlineSession;
+      let account = await this.offlineAccount(offlineSession.endpoint);
+      const cancelledAfterAccount = await this.finishOfflineCancellation();
+      if (cancelledAfterAccount) return cancelledAfterAccount;
+
+      if (account.kind === "register") {
+        if (username === undefined) {
+          this.setOfflineStatus({ phase: "needs-username" });
+          return OK;
+        }
+
+        account = await this.registerOfflineAccount(
+            offlineSession.endpoint,
+            username,
+        );
+        const cancelledAfterRegistration = await this.finishOfflineCancellation();
+        if (cancelledAfterRegistration) return cancelledAfterRegistration;
+      }
+
+        if (
+            account.kind === "error" &&
+            (account.error.code === "username_invalid" ||
+                account.error.code === "username_taken")
+        ) {
+          const failed = err(account.error.code, account.error.detail);
+
+          this.setOfflineStatus({
+            phase: "needs-username",
+            error: failed.error,
+          });
+
+          return failed;
+        }
+
+      if (account.kind === "error") {
+        const failed = this.fail(account.error.code, account.error.detail);
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({ phase: "error", error: failed.error });
+        return failed;
+      }
+
+      const installReady = await this.prepareGameInstall();
+
+      const cancelledAfterInstall = await this.finishOfflineCancellation();
+      if (cancelledAfterInstall) return cancelledAfterInstall;
+
+      if (!installReady.ok) {
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({
+          phase: "error",
+          error: installReady.error,
+        });
+        return installReady;
+      }
+
+      const ep = offlineSession.endpoint;
+      const key = account.key;
+
+      this.setOfflineStatus({ phase: "launching-game" });
+
+      const result = await this.launchGame(
+          ep.host,
+          ep.port,
+          XMPP_PORT,
+          key,
+          async () => {
+            this.setOfflineStatus({ phase: "stopping" });
+
+            try {
+              await endPlaying(ep, key);
+            } finally {
+              await this.releaseOfflineSession();
+              this.setOfflineStatus({ phase: "stopped" });
+            }
+          },
+          " (offline)",
+      );
+
+      if (!result.ok) {
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({ phase: "error", error: result.error });
+        return result;
+      }
+
+      if (!this.game.running) {
+        return OK;
+      }
+
+      this.setOfflineStatus({ phase: "running" });
+      return OK;
+    });
+    this.offlineStartTask = task;
+    try {
+      return await task;
+    } finally {
+      if (this.offlineStartTask === task) {
+        this.offlineStartTask = null;
+      }
+
+      this.offlineStarting = false;
+    }
+  }
+
+  async stopOffline(): Promise<ActionResult> {
+    if (this.game.running || this.offline.phase === "launching-game") {
+      return err("busy");
+    }
+
+    if (this.offlineStarting) {
+      this.offlineCancelRequested = true;
+      this.setOfflineStatus({ phase: "stopping" });
+      return OK;
+    }
+
+    if (!this.offlineSession) {
+      this.setOfflineStatus({ phase: "stopped" });
+      return OK;
+    }
+
+    this.setOfflineStatus({ phase: "stopping" });
+
+    try {
+      await this.releaseOfflineSession();
+      this.setOfflineStatus({ phase: "stopped" });
+      return OK;
+    } catch (e) {
+      log.error(`local stack could not stop: ${describeError(e)}`);
+      const failed = this.fail("offline_unavailable");
+      this.setOfflineStatus({ phase: "error", error: failed.error });
+      return failed;
+    }
+  }
+
   async play(): Promise<ActionResult> {
-    if (this.busy || this.task) return err("busy");
+    if (this.busy || this.task || this.shuttingDown) return err("busy");
+    if (this.offlineSession || this.offlineStarting) return err("busy");
     if (this.game.running) return this.fail("already_running");
     const sv = this.s.server;
     const slot = this.slot();
     if (!sv || !slot) return this.fail("server_unreachable");
     return this.withBusy(async () => {
-      const missing = [...missingVcRuntime(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform), ...missingDirectX(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform)];
-      if (missing.length) return this.fail('windows_runtime_missing', missing.join(', '));
+      const environment = await this.checkGameLaunchEnvironment();
+      if (!environment.ok) return environment;
 
-      const others = await this.p.findRunningClients();
-      if (others.length > 0) return this.fail("already_running");
       const key = await this.keys.load(slot).catch(() => null);
       if (!key) return this.fail("key_invalid");
       const ep = this.endpoint();
@@ -1142,27 +1456,8 @@ export class Controller {
           if (!await saveHuntRegion(ep,key,chosenRegion)) return this.fail('server_error','The selected hunt region is unavailable. Choose Main in Settings or try again later.');
         } catch { return this.fail('server_unreachable'); }
       }
-      const dir = this.installDir;
-      await this.inspectInstall();
-      if (this.install.missing.length > 0) return this.fail("game_files_invalid", String(this.install.missing.length));
-      // Same checks as play.ps1 on every launch: the exe and both DLLs by hash.
-      const exePin = this.p.exePin ?? { relativePath: EXE_RELATIVE_PATH, sha256: PINNED_EXE_SHA256 };
-      let exeHash = "";
-      try {
-        exeHash = await hashFile(resolveInside(dir, exePin.relativePath));
-      } catch {
-        exeHash = "";
-      }
-      if (exeHash !== exePin.sha256) return this.fail("game_files_invalid", exePin.relativePath);
-      if (!this.install.dllsOk) {
-        try {
-          await installPinnedDlls(this.p.resourcesDir, dir);
-        } catch (e) {
-          log.error(`DLL repair before launch failed: ${describeError(e)}`);
-          return this.fail("dll_failed");
-        }
-      }
-      await this.installMods(dir);
+      const installReady = await this.prepareGameInstall();
+      if (!installReady.ok) return installReady;
 
       // Where the game connects. Public mode: the local relay, started before the game.
       let gameHost = sv.host;
@@ -1177,53 +1472,136 @@ export class Controller {
       }
 
       let launched = false;
+
       try {
-        let prepared: { runtime: LaunchRuntime; configDir: string; runtimeName: string } | null = null;
-        if (this.p.prepareGameLaunch) {
-          try {
-            prepared = await this.p.prepareGameLaunch();
-          } catch (e) {
-            log.error(`compatibility runtime preparation failed: ${describeError(e)}`);
-            return this.fail("launch_failed");
-          }
-          if (this.hostPlatform === "linux" && prepared === null) return this.fail("compat_runtime_missing");
-        }
-        let displayRepaired = false;
-
-        try {
-          const config = await applyGameConfig({
-            host: gameHost,
+        const result = await this.launchGame(
+            gameHost,
+            gamePort,
             xmppPort,
-            graphics: this.s.graphics,
-            exposure: this.s.exposure,
-            safeWindow: this.s.windowed,
+            key,
+            () => endPlaying(ep, key),
+            sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : "",
+        );
 
-            configDir: prepared?.configDir ?? this.p.gameConfigDir,
-          });
-          displayRepaired = config.displayRepaired;
-
-          if (this.s.exposure !== "game") log.info(`game config: auto exposure ${this.s.exposure}`);
-        } catch (e) {
-          log.error(`could not write the game config: ${describeError(e)}`);
-          return this.fail("config_failed");
-        }
-        const args = buildLaunchArgs({ host: gameHost, port: gamePort, key, windowed: this.s.windowed || displayRepaired, gameLocale: gameLocale(this.s.gameLanguage, this.p.systemLocale ?? "en-US") });
-        const via = prepared ? ` via ${prepared.runtimeName}` : "";
-        log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${sv.mode === "public" ? ` (relay to ${sv.host}:${sv.port})` : ""}`);
-        try {
-          this.endPlayingSession=()=>endPlaying(ep,key);
-          await this.game.start(win64Dir(dir), args, prepared?.runtime, this.s.showConsole ? { DR_SHOW_CONSOLE: "1" } : undefined);
-        } catch (e) {
-          this.endPlayingSession=null;
-          log.error(`launch failed: ${describeError(e)}`);
-          return this.fail("launch_failed");
-        }
-        launched = true;
-        return OK;
+        launched = result.ok;
+        return result;
       } finally {
         if (!launched) await this.stopRelay();
       }
     });
+  }
+
+  private async checkGameLaunchEnvironment(): Promise<ActionResult> {
+    const missing = [
+      ...missingVcRuntime(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform),
+      ...missingDirectX(process.env, this.p.runtimeFilesExist ?? existsSync, this.hostPlatform),
+    ];
+    if (missing.length) return this.fail("windows_runtime_missing", missing.join(", "));
+
+    const others = await this.p.findRunningClients();
+    if (others.length > 0) return this.fail("already_running");
+
+    return OK;
+  }
+
+  private async prepareGameInstall(): Promise<ActionResult> {
+    const dir = this.installDir;
+
+    await this.inspectInstall();
+    if (this.install.missing.length > 0) return this.fail("game_files_invalid", String(this.install.missing.length));
+
+    // Same checks as play.ps1 on every launch: the exe and both DLLs by hash.
+    const exePin = this.p.exePin ?? { relativePath: EXE_RELATIVE_PATH, sha256: PINNED_EXE_SHA256 };
+    let exeHash = "";
+
+    try {
+      exeHash = await hashFile(resolveInside(dir, exePin.relativePath));
+    } catch {
+      exeHash = "";
+    }
+
+    if (exeHash !== exePin.sha256) return this.fail("game_files_invalid", exePin.relativePath);
+
+    if (!this.install.dllsOk) {
+      try {
+        await installPinnedDlls(this.p.resourcesDir, dir);
+      } catch (e) {
+        log.error(`DLL repair before launch failed: ${describeError(e)}`);
+        return this.fail("dll_failed");
+      }
+    }
+
+    await this.installMods(dir);
+    return OK;
+  }
+
+  private async launchGame(
+      gameHost: string,
+      gamePort: number,
+      xmppPort: number,
+      key: string,
+      onExit: () => Promise<void>,
+      logSuffix = "",
+  ): Promise<ActionResult> {
+    let prepared: { runtime: LaunchRuntime; configDir: string; runtimeName: string } | null = null;
+
+    if (this.p.prepareGameLaunch) {
+      try {
+        prepared = await this.p.prepareGameLaunch();
+      } catch (e) {
+        log.error(`compatibility runtime preparation failed: ${describeError(e)}`);
+        return this.fail("launch_failed");
+      }
+
+      if (this.hostPlatform === "linux" && prepared === null) return this.fail("compat_runtime_missing");
+    }
+
+    let displayRepaired = false;
+
+    try {
+      const config = await applyGameConfig({
+        host: gameHost,
+        xmppPort,
+        graphics: this.s.graphics,
+        exposure: this.s.exposure,
+        safeWindow: this.s.windowed,
+        configDir: prepared?.configDir ?? this.p.gameConfigDir,
+      });
+
+      displayRepaired = config.displayRepaired;
+
+      if (this.s.exposure !== "game") log.info(`game config: auto exposure ${this.s.exposure}`);
+    } catch (e) {
+      log.error(`could not write the game config: ${describeError(e)}`);
+      return this.fail("config_failed");
+    }
+
+    const args = buildLaunchArgs({
+      host: gameHost,
+      port: gamePort,
+      key,
+      windowed: this.s.windowed || displayRepaired,
+      gameLocale: gameLocale(this.s.gameLanguage, this.p.systemLocale ?? "en-US"),
+    });
+
+    const via = prepared ? ` via ${prepared.runtimeName}` : "";
+    log.info(`starting ${describeLaunch(EXE_NAME, args)}${via}${logSuffix}`);
+
+    try {
+      this.endPlayingSession = onExit;
+      await this.game.start(
+          win64Dir(this.installDir),
+          args,
+          prepared?.runtime,
+          this.s.showConsole ? { DR_SHOW_CONSOLE: "1" } : undefined,
+      );
+    } catch (e) {
+      this.endPlayingSession = null;
+      log.error(`launch failed: ${describeError(e)}`);
+      return this.fail("launch_failed");
+    }
+
+    return OK;
   }
 
   private async startRelay(sv: StoredServer): Promise<ActionResult> {
@@ -1297,9 +1675,60 @@ export class Controller {
   }
 
   async shutdown(): Promise<void> {
+    this.shuttingDown = true;
+    await this.saveTask?.catch(() => undefined);
     this.setStatusPolling(false);
     this.job?.cancel();
     this.taskAbort?.abort();
+
+    const offlineStartTask = this.offlineStartTask;
+
+    if (offlineStartTask) {
+      this.offlineCancelRequested = true;
+
+      if (!this.game.running && this.offline.phase !== "launching-game") {
+        this.setOfflineStatus({ phase: "stopping" });
+      }
+
+      await offlineStartTask.catch(() => undefined);
+    }
+
+    if (this.offlineSession) {
+      this.setOfflineStatus({ phase: "stopping" });
+
+      try {
+        await this.releaseOfflineSession();
+        this.setOfflineStatus({ phase: "stopped" });
+      } catch (e) {
+        log.error(`local stack could not stop during shutdown: ${describeError(e)}`);
+      }
+    }
+
     await this.stopRelay();
+  }
+
+  exportOfflineSave(file: string): Promise<ActionResult> {
+    return this.offlineSaveOperation("exportSave", file);
+  }
+
+  importOfflineSave(file: string): Promise<ActionResult> {
+    return this.offlineSaveOperation("importSave", file);
+  }
+
+  private async offlineSaveOperation(method: "exportSave" | "importSave", file: string): Promise<ActionResult> {
+    if (this.busy || this.task || this.game.running || this.offlineSession || this.offlineStarting ||
+        this.offline.phase === "stopping" || this.shuttingDown) return err("busy");
+    if (!this.p.offlineSave) return err("offline_unavailable");
+    const task = this.withBusy(async () => {
+      // Protect against another launcher-owned game and interrupted restore journals.
+      try {
+        if ((await this.p.findRunningClients()).length) return err("busy");
+        return await this.p.offlineSave![method](file);
+      }
+      catch { return err("unknown"); }
+    });
+    this.saveTask = task;
+    try { return await task; }
+    finally { this.saveTask = null; }
   }
 }

@@ -4,6 +4,7 @@
 #include <fstream>
 #include "HuntIdlePolicy.h"
 #include "NativeDiagnostics.h"
+#include "ConsoleVisibility.h"
 #include "ConnectedPlayerSnapshot.h"
 
 
@@ -1237,10 +1238,7 @@ void Init() {
         }
 
         if (Globals::EnableLogging) {
-            AllocConsole();
-            FILE* Dummy;
-            freopen_s(&Dummy, "CONOUT$", "w", stdout);
-            freopen_s(&Dummy, "CONIN$", "r", stdin);
+            InitServerConsole();
 
             std::cout << "Welcome to Undaunted v" << UNDAUNTED_INTERNAL_VERSION << "!" << std::endl;
             std::cout << "prod. gwog :3" << std::endl;
