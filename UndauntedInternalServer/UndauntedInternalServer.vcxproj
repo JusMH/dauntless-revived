@@ -147,6 +147,9 @@
     <ClInclude Include="CellFusionTime.h" />
     <ClInclude Include="VendorTabs.h" />
     <ClInclude Include="NoPlatinumPrice.h" />
+    <ClInclude Include="RamsStorePilot.h" />
+    <ClInclude Include="RamsStoreProtocol.h" />
+    <ClInclude Include="StoreCategoryFix.h" />
     <ClInclude Include="DataTables.h" />
     <ClInclude Include="FallRecoveryPolicy.h" />
   </ItemGroup>

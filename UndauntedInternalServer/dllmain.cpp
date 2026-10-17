@@ -35,6 +35,7 @@
 #include "CellFusionTime.h"
 #include "VendorTabs.h"
 #include "NoPlatinumPrice.h"
+#include "RamsStorePilot.h"
 #include "DeveloperStyle.h"
 
 #include "SDK/GameplayAbilities_parameters.hpp"
@@ -812,6 +813,7 @@ static bool IsPotionPurchaseQuestOpen() {
 }
 
 void ProcessEventClientHook(UObject* Object, UFunction* Function, void* Parms) {
+    RamsStorePilot::Scope RamsScope(Object, Function, Parms);
     reinterpret_cast<void(*)(UObject*, UFunction*, void*)>(OrigProcessEventClient)(Object, Function, Parms);
 
     TrialsSchedule::Tick();
@@ -891,7 +893,9 @@ bool ConfigCacheInitGetStringHook(void* a1, const wchar_t* Section, const wchar_
     EvalEndpointMap();
 
     if (EndpointMap.contains(Key)) {
-        *Value = FString(EndpointMap.at(Key).c_str());
+        auto& Endpoint=EndpointMap.at(Key);
+        RamsStoreProtocol::Mark(Key,Endpoint,RamsStorePilot::Enabled);
+        *Value = FString(Endpoint.c_str());
 
         return true;
     }
@@ -960,6 +964,7 @@ void EACClientInitHook(void* a1) {
 
 void InitClientHooks() {
     MH_Initialize();
+    RamsStorePilot::Install(Globals::BaseAddress);
 
 #if DR_SKIP_EAC_CLIENT_INIT
     MH_CreateHook((void*)(Globals::BaseAddress + 0xEF2440), EACClientInitHook, &OrigEACClientInit);
