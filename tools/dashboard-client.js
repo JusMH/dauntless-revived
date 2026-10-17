@@ -7,7 +7,8 @@
   const polish=document.createElement('style');
   polish.textContent=`
   :root{--bg:#08090b;--panel:#101114;--line:#25262b;--muted:#91939e;--accent:#f0f0f3;color-scheme:dark}
-  body{background:radial-gradient(ellipse at 65% -30%,#252630 0,transparent 55%),#08090b;color:#f1f1f4;font:14px/1.6 'Segoe UI',system-ui,sans-serif;letter-spacing:.1px}
+  html{min-height:100%;background:#08090b}
+  body{min-height:100vh;background-repeat:no-repeat;background-attachment:fixed;background:radial-gradient(ellipse at 65% -30%,#252630 0,transparent 55%),#08090b;background-repeat:no-repeat;background-attachment:fixed;color:#f1f1f4;font:14px/1.6 'Segoe UI',system-ui,sans-serif;letter-spacing:.1px}
   header{height:88px;padding:22px 36px;background:#0b0c0ee8;border-bottom:1px solid #ffffff0d;backdrop-filter:blur(20px)}
   header h1{font-size:20px;letter-spacing:-.7px;font-weight:650}.eyebrow{color:#8f929d;font-size:10px;letter-spacing:2px}.badge{color:#b6cfc2;background:#92d9ac08;border-color:#92d9ac22}
   main{max-width:none;padding:32px 40px}.login{max-width:480px;margin:10vh auto;padding:36px!important}.login h2{font-size:28px;letter-spacing:-1px}
