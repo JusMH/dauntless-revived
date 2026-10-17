@@ -25,6 +25,7 @@
 
 #include "framework.h"
 #include "SDK.hpp"
+#include "ServerLocale.h"
 #include "MinHook/MinHook.h"
 #include "constants.h"
 #include "Networking.h"
@@ -437,7 +438,7 @@ FString* GetGameDefaultMap(FString* a1) {
 void* OrigGetCommandLine = nullptr;
 
 const wchar_t* GetCommandLineHook() {
-    return L"Dauntless-Win64-Shipping.exe -server -unattended -nullrhi -nosound -EpicPortal -RepDriverDisable";
+    return ServerCommandLine;
 }
 
 void* OrigServerBootCrash = nullptr;
@@ -1249,6 +1250,12 @@ void Init() {
         }
 
         DR_InitDiagnostics();
+        ConfigureServerLocale();
+        const char* NumericLocale = setlocale(LC_NUMERIC, nullptr);
+        if (NumericLocale && strcmp(NumericLocale, "C") == 0) {
+            constexpr char LocaleReady[] = "server_locale numeric=C commandline_culture=en-US\n";
+            DR_WriteDiagnostic(LocaleReady, sizeof(LocaleReady) - 1);
+        }
         InitServerHooks();
     }
     else {
