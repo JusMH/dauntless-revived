@@ -238,6 +238,7 @@ function IsRepeatable(Offer: StoreOffer){
 }
 
 function IsListed(Offer: StoreOffer){
+    if (Offer.id.startsWith("single_dye_sheen_") || Offer.entitlements?.some(Grant => Grant.name.startsWith("ent_dye_sheen_"))) return false;
     const LadyLuckOffer = LADY_LUCK_IDS.has(Offer.id);
     const MiddlemanOffer = MIDDLEMAN_VENDOR_IDS.has(Offer.id) || MIDDLEMAN_OFFER_IDS.has(Offer.id);
 
@@ -274,7 +275,7 @@ function FindOffer(SkuId: string, AccountId: string){
     const Middleman = MiddlemanStore() ? SelectWeeklyMiddlemanOffers().find((Offer) => Offer.id === SkuId) : undefined;
     if(Middleman != undefined) return Middleman;
     if(MIDDLEMAN_OFFER_IDS.has(SkuId)) return undefined;
-    const Offer = AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer)) ?? ExtraOffersForTests.find((Offer) => Offer.id === SkuId);
+    const Offer = AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer)) ?? ExtraOffersForTests.find((Offer) => Offer.id === SkuId && IsListed(Offer));
     if(Offer?.tags.includes('webstore') && (Catalog.webstore as StoreOffer[]).some(Entry=>Entry.id===SkuId)){
         const Active=ShopLayout((Catalog.webstore as StoreOffer[]).filter(IsListed),AccountId).find(Entry=>Entry.id===SkuId);
         return Active ? PriceInRams(Active,AccountId) : undefined;
