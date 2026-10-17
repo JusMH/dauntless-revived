@@ -20,6 +20,7 @@ const ROOT = path.resolve(__dirname, "..", "..");
 // Records over the union types: the compiler fails this file if a new code is added without text.
 const ERROR_CODES: Record<ErrorCode, true> = {
   account_banned: true,
+  offline_save_invalid: true,
   invite_invalid_format: true,
   invite_invalid: true,
   username_invalid: true,
@@ -49,6 +50,8 @@ const ERROR_CODES: Record<ErrorCode, true> = {
   windows_runtime_missing: true,
   compat_runtime_missing: true,
   config_failed: true,
+  offline_unavailable: true,
+  offline_insufficient_memory: true,
   busy: true,
   cancelled: true,
   cert_mismatch: true,
@@ -57,6 +60,7 @@ const ERROR_CODES: Record<ErrorCode, true> = {
   relay_port_busy: true,
   relay_failed: true,
   unknown: true,
+
 };
 const INVITE_ERRORS: Record<InviteError, true> = {
   empty: true,
@@ -97,7 +101,10 @@ test("the language picker offers every language, and the system locale picks one
   assert.equal(systemLanguage("es-419"), "es");
   assert.equal(systemLanguage("fi"), "fi");
   assert.equal(systemLanguage("en-US"), "en");
-  assert.equal(systemLanguage("de-DE"), "en");
+  assert.equal(systemLanguage("de-DE"), "de");
+  assert.equal(systemLanguage("pt-BR"), "pt");
+  assert.equal(systemLanguage("ja"), "ja");
+  assert.equal(systemLanguage("sv-SE"), "en");
 });
 
 test("every dynamic key family is complete", () => {

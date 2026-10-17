@@ -23,6 +23,9 @@ test("the credits name every contributor, in order, with their role", () => {
   assert.equal(PROJECT_PEOPLE[0].github, "mixutin", "the maintainer comes first");
   assert.equal(person(PROJECT_PEOPLE, "mixutin").role, "maintainer");
   assert.equal(person(PROJECT_PEOPLE, "mixutin").name, "mixutin");
+  assert.match(person(PROJECT_PEOPLE, "LupesHk").note.en, /Brazilian Portuguese/);
+  assert.match(person(PROJECT_PEOPLE, "JusMH").note.en, /Offline play runtime/);
+  assert.match(person(PROJECT_PEOPLE, "anxo0").note.en, /DualSense/);
   assert.equal(person(PROJECT_PEOPLE, "Vvoidddd").role, "contributor");
   assert.match(person(PROJECT_PEOPLE, "Vvoidddd").note.en, /airship/);
   assert.match(person(PROJECT_PEOPLE, "Vvoidddd").note.en, /console windows/);
@@ -136,7 +139,8 @@ test("every package the launcher bundles is credited and its license text ships"
 
 test("THIRD-PARTY-NOTICES.txt ships with the launcher and has the Octicons, MinHook and Electron notices", () => {
   const forge = readFileSync(path.join(ROOT, "forge.config.ts"), "utf8");
-  assert.match(forge, /extraResource:\s*\[[^\]]*"THIRD-PARTY-NOTICES\.txt"/);
+  assert.match(forge, /const launcherResources\s*=\s*\[[^\]]*"THIRD-PARTY-NOTICES\.txt"/);
+  assert.match(forge, /extraResource:\s*launcherResources/);
   assert.match(NOTICES, /^\d+\. GitHub Octicons$/m);
   assert.match(NOTICES, /https:\/\/github\.com\/primer\/octicons/);
   assert.match(NOTICES, /Copyright \(c\) \d{4} GitHub Inc\.\n\nPermission is hereby granted, free of charge/);
