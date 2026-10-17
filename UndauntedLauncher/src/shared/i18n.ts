@@ -1482,6 +1482,8 @@ const es: Record<StringKey, string> = {
 };
 
 const de: Record<StringKey, string> = {
+  set_locked_game: en.set_locked_game,
+  set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
   window_minimize: "Minimieren",
   window_close: "Schließen",
@@ -1724,7 +1726,6 @@ const de: Record<StringKey, string> = {
   set_region_text: "Automatisch misst die verfügbaren Regionen, wenn du Spielen drückst. Du kannst jede Region auch selbst wählen. Eine Gruppe folgt der Region ihres Anführers; Einladungen funktionieren regionsübergreifend. Ist OCE voll, wartet die Spielersuche, statt dich nach Main zu verschieben.",
   region_auto: "Automatisch (nächste Region)",
   region_main: "EU",
-  region_aus: "Australien (OCE)",
   region_ger: "Deutschland",
   region_us: "Nordamerika (US)",
   set_folder: "Installationsordner",
@@ -1947,6 +1948,8 @@ const de: Record<StringKey, string> = {
 };
 
 const fr: Record<StringKey, string> = {
+  set_locked_game: en.set_locked_game,
+  set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
   window_minimize: "Réduire",
   window_close: "Fermer",
@@ -2189,7 +2192,6 @@ const fr: Record<StringKey, string> = {
   set_region_text: "Automatique mesure les régions disponibles quand vous appuyez sur Jouer. Vous pouvez aussi choisir n'importe quelle région vous-même. Un groupe suit la région de son chef ; les invitations fonctionnent entre régions. Si OCE est plein, la recherche de partie attend au lieu de vous envoyer sur Main.",
   region_auto: "Automatique (région la plus proche)",
   region_main: "EU",
-  region_aus: "Australie (OCE)",
   region_ger: "Allemagne",
   region_us: "Amérique du Nord (US)",
   set_folder: "Dossier d'installation",
@@ -2412,6 +2414,8 @@ const fr: Record<StringKey, string> = {
 };
 
 const it: Record<StringKey, string> = {
+  set_locked_game: en.set_locked_game,
+  set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
   window_minimize: "Riduci a icona",
   window_close: "Chiudi",
@@ -2654,7 +2658,6 @@ const it: Record<StringKey, string> = {
   set_region_text: "Automatico misura le regioni disponibili quando premi Gioca. Puoi anche scegliere tu qualsiasi regione. Un gruppo segue la regione del suo capo; gli inviti funzionano tra regioni. Se OCE è pieno, il matchmaking aspetta invece di spostarti su Main.",
   region_auto: "Automatico (regione più vicina)",
   region_main: "EU",
-  region_aus: "Australia (OCE)",
   region_ger: "Germania",
   region_us: "Nord America (US)",
   set_folder: "Cartella di installazione",
@@ -2877,6 +2880,8 @@ const it: Record<StringKey, string> = {
 };
 
 const ja: Record<StringKey, string> = {
+  set_locked_game: en.set_locked_game,
+  set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
   window_minimize: "最小化",
   window_close: "閉じる",
@@ -3119,7 +3124,6 @@ const ja: Record<StringKey, string> = {
   set_region_text: "自動にすると、「プレイ」を押したときに利用できる地域を計測します。どの地域も自分で選べます。パーティーはリーダーの地域に従い、招待は地域をまたいで使えます。OCE が満員の場合、マッチメイキングは Main に移さずに待機します。",
   region_auto: "自動（最も近い地域）",
   region_main: "EU",
-  region_aus: "オーストラリア（OCE）",
   region_ger: "ドイツ",
   region_us: "北米（US）",
   set_folder: "インストール先フォルダー",
@@ -3342,6 +3346,8 @@ const ja: Record<StringKey, string> = {
 };
 
 const pt: Record<StringKey, string> = {
+  set_locked_game: en.set_locked_game,
+  set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
   window_minimize: "Minimizar",
   window_close: "Fechar",
@@ -3584,7 +3590,6 @@ const pt: Record<StringKey, string> = {
   set_region_text: "Automático mede as regiões disponíveis quando você clica em Jogar. Você também pode escolher qualquer região. Um grupo segue a região do líder; os convites funcionam entre regiões. Se a OCE estiver cheia, o matchmaking espera em vez de te mover para a Main.",
   region_auto: "Automático (região mais próxima)",
   region_main: "EU",
-  region_aus: "Austrália (OCE)",
   region_ger: "Alemanha",
   region_us: "América do Norte (US)",
   set_folder: "Pasta de instalação",
@@ -3807,6 +3812,8 @@ const pt: Record<StringKey, string> = {
 };
 
 const ru: Record<StringKey, string> = {
+  set_locked_game: en.set_locked_game,
+  set_locked_task: en.set_locked_task,
   app_title: "Dauntless Revived Launcher",
   window_minimize: "Свернуть",
   window_close: "Закрыть",
@@ -4049,7 +4056,6 @@ const ru: Record<StringKey, string> = {
   set_region_text: "«Автоматически» измеряет доступные регионы, когда вы нажимаете «Играть». Любой регион можно выбрать и самому. Группа следует за регионом лидера; приглашения работают между регионами. Если OCE заполнен, подбор игроков ждёт, а не переносит вас на Main.",
   region_auto: "Автоматически (ближайший регион)",
   region_main: "EU",
-  region_aus: "Австралия (OCE)",
   region_ger: "Германия",
   region_us: "Северная Америка (US)",
   set_folder: "Папка установки",
