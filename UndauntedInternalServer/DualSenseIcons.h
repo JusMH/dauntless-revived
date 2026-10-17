@@ -127,6 +127,8 @@ struct Swap {
 };
 
 inline std::vector<Swap> Swapped;
+inline SDK::UDataTable* AppliedTable = nullptr;
+inline int32_t AppliedTableIndex = -1;
 // Images given a PS5 icon: object index, the image, and the texture it had.
 struct ImageSwap {
     int32_t Index;
@@ -199,6 +201,8 @@ inline SDK::UDataTable* KeyTable(SDK::UWorld* World) {
 inline void Apply(SDK::UWorld* World) {
     SDK::UDataTable* Table = KeyTable(World);
     if (!Table) return;
+    AppliedTable = Table;
+    AppliedTableIndex = Table->Index;
     LoadAll(World);
     auto& Map = Table->RowMap;
     for (int R = 0; R < Map.NumAllocated(); ++R) {
@@ -302,7 +306,10 @@ inline void Restore() {
     for (const SwitcherSwap& S : SwappedSwitchers)
         if (SDK::UObject::GObjects->GetByIndex(S.Index) == S.Switcher) SetSwitcher(S.Switcher, S.Original);
     SwappedSwitchers.clear();
-    for (const Swap& S : Swapped) std::memcpy(S.Field, S.Original, sizeof(SoftTexture));
+    if (AppliedTable && SDK::UObject::GObjects->GetByIndex(AppliedTableIndex) == AppliedTable)
+        for (const Swap& S : Swapped) std::memcpy(S.Field, S.Original, sizeof(SoftTexture));
+    AppliedTable = nullptr;
+    AppliedTableIndex = -1;
     Swapped.clear();
     for (const ImageSwap& S : SwappedImages)
         if (SDK::UObject::GObjects->GetByIndex(S.Index) == S.Image) SetImage(S.Image, S.Original);
@@ -337,6 +344,7 @@ inline void OnProcessEvent() {
     if (Now < NextCheck) return;
     NextCheck = Now + std::chrono::milliseconds(250);
 
+    if (Applied && KeyTable(SDK::UWorld::GetWorld()) != AppliedTable) Restore();
     const bool Want = DualSense::Read().Connected;
     if (Want && Applied && Now >= NextScan) {
         NextScan = Now + std::chrono::seconds(2);

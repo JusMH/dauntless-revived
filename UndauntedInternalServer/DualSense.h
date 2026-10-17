@@ -53,6 +53,7 @@ struct Fields {
 // one a byte further on. Before the pad switches to 0x31, Bluetooth sends a short 0x01 report with
 // its own order. Returns false for anything else.
 inline bool ParseReport(const uint8_t* Report, size_t Length, Fields& Out) {
+    if (!Report || Length == 0) return false;
     if (Report[0] == 0x01 && Length >= 64) {
         const uint8_t* B = Report + 1;
         Out = { B[0], B[1], B[2], B[3], B[4], B[5], B[7], B[8], B[9] };
@@ -149,6 +150,7 @@ inline bool GameInFront() {
 // Held for a moment: UE4SS polls the keyboard, and a press and release in the same instant is missed.
 inline void TapKey(WORD VirtualKey) {
     std::thread([VirtualKey] {
+        if (!GameInFront()) return;
         INPUT Key{};
         Key.type = INPUT_KEYBOARD;
         Key.ki.wVk = VirtualKey;
@@ -251,7 +253,7 @@ inline uint32_t Crc32(const uint8_t* Data, size_t Length, uint32_t Crc = 0xFFFFF
 }
 
 // Sends the motors with the DualSense's "compatible vibration" (the classic two-motor rumble).
-inline void SendRumble(HANDLE Out, bool Bluetooth, uint8_t Heavy, uint8_t Light, bool MuteLight) {
+inline bool SendRumble(HANDLE Out, bool Bluetooth, uint8_t Heavy, uint8_t Light, bool MuteLight) {
     uint8_t Report[78] = {};
     DWORD Size;
     if (Bluetooth) {
@@ -278,7 +280,7 @@ inline void SendRumble(HANDLE Out, bool Bluetooth, uint8_t Heavy, uint8_t Light,
         Size = 48;
     }
     DWORD Written = 0;
-    WriteFile(Out, Report, Size, &Written, nullptr);
+    return WriteFile(Out, Report, Size, &Written, nullptr) && Written == Size;
 }
 
 inline void RumbleLoop() {
@@ -298,7 +300,10 @@ inline void RumbleLoop() {
             if (Out == INVALID_HANDLE_VALUE) continue;
         }
         const uint32_t Motors = WantedRumble.load();
-        SendRumble(Out, Bluetooth, static_cast<uint8_t>(Motors >> 8), static_cast<uint8_t>(Motors), MenuOpen.load());
+        if (!SendRumble(Out, Bluetooth, static_cast<uint8_t>(Motors >> 8), static_cast<uint8_t>(Motors), MenuOpen.load())) {
+            CloseHandle(Out);
+            Out = INVALID_HANDLE_VALUE;
+        }
     }
 }
 
