@@ -1,5 +1,13 @@
 # Rams shop production candidate
 
+## Live rollout — 2026-10-17
+
+Launcher 0.1.36 and its update feed are published. All game hosts were stopped before installation. The shared backend now enables Rams prices, the transport bridge and weekly rotation. Deployment included `middleware/RateLimits.js` in addition to the four shop modules: the live older module lacked `PlayerMutationRateLimit`, which otherwise prevents Express route registration. The additive module preserves existing limiters.
+
+Live authenticated verification returned HTTP 426 for an old-client request and HTTP 200 for the updated protocol, with 29 offers priced at 500/1,500/5,000/10,000 Rams and matching uppercase balance aliases. No verification purchase was made against a live player's account. Backend health returned 200 after startup; regional deploy tasks were restarted.
+
+Rollback files/config: `C:/DauntlessRevived/backups/rams-shop-20261017-051858`. Restore the backed-up rate-limit module as well when reverting. No database migration or restore was performed. The supervisor starts its own backup even when the outer `Stack.ps1 start` uses `-NoBackup`; that incomplete startup backup was cancelled before exhausting disk. A one-time supervisor skip allowed startup, and the original supervisor script was restored. Final observed free space: 23.02 GB.
+
 This is a reviewed release candidate, **not a record of production deployment**. The isolated player test confirmed the Monk chestpiece and armour kit purchases: 100,000 Rams became 88,500, with matching database receipts. The user then confirmed purchases, balance and a normal vendor with the exact production DLL (SHA256 `1F3B2F7EF3C277EF2A1A8440546539253BCF7FBBC707DBF57BA69EB054500CF9`); the backend subsequently returned 86,000 for both uppercase balance keys.
 
 ## Configuration and compatibility
