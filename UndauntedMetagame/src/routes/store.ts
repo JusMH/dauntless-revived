@@ -8,6 +8,15 @@ import { PlayerTokenOnly } from "../middleware/PlayerAuth";
 import { CreateStorePurchase, GetStoreOffer, IsAnyStoreEnabled, IsKnownStoreTag, IsStoreSkuEnabled, IsStoreTagEnabled, ListStoreOffers, RedeemStorePurchase, StoreError } from "../controllers/freestore";
 import { BalanceFromInventory } from "../features";
 import { PlayerMutationRateLimit } from "../middleware/RateLimits";
+import { RamsWireOffer, RamsWireCurrency } from "../controllers/ramspricing";
+import StoreCatalog from '../vendor/store_catalog.json';
+
+const MainShopSkus = new Set(StoreCatalog.webstore.map(offer=>offer.id));
+function RequireRamsClient(req: any, applies: boolean){
+    if(applies && process.env.STORE_RAMS === '1' && req.query.shop_protocol !== 'rams-v1'){
+        throw new StoreError(426, 'Update the launcher to use the Rams shop');
+    }
+}
 
 export const storeRouter = Router();
 
@@ -121,6 +130,14 @@ storeRouter.get("/balance", HasUndauntedMetagameAuth, async (req: any, res) => {
 
     ApplyHeldCurrencies(UserId, Sheet);
 
+    // The pilot client still indexes its purchase balance by Event01 even when
+    // Rams metadata is displayed. These are wire aliases, never separate funds.
+    if(RamsWireCurrency('event_01', UserId) === 'notes'){
+        const Rams = GetHeldCurrencies(UserId).Held.get('CURRENCY_NOTES') ?? 0;
+        Sheet.CURRENCY_NOTES = Rams;
+        Sheet.CURRENCY_EVENT_01 = Rams;
+    }
+
     res.status(200);
     res.json(Sheet);
 });
@@ -204,6 +221,7 @@ storeRouter.get("/product/skus/public", StoreListOn, HasUndauntedMetagameAuth, P
     }
 
     try{
+        RequireRamsClient(req, RequiredTags === 'webstore');
         const Offers = ListStoreOffers(req.AuthData.userId, RequiredTags);
 
         if(IsKnownStoreTag(RequiredTags)){
@@ -214,7 +232,7 @@ storeRouter.get("/product/skus/public", StoreListOn, HasUndauntedMetagameAuth, P
         }
 
         res.status(200);
-        res.json(Offers.map((Offer: any) => WithStoreImage(req, Offer)));
+        res.json(Offers.map((Offer: any) => WithStoreImage(req, RamsWireOffer(Offer, req.AuthData.userId))));
     }
     catch(error){
         SendStoreError(res, error, `list ${RequiredTags}`);
@@ -225,7 +243,8 @@ storeRouter.get("/product/skus/public", StoreListOn, HasUndauntedMetagameAuth, P
 storeRouter.get("/product/sku/:skuId", StoreSkuOn, HasUndauntedMetagameAuth, PlayerTokenOnly, (req: any, res) => {
     try{
         res.status(200);
-        res.json(WithStoreImage(req, GetStoreOffer(req.AuthData.userId, req.params.skuId)));
+        RequireRamsClient(req, MainShopSkus.has(req.params.skuId));
+        res.json(WithStoreImage(req, RamsWireOffer(GetStoreOffer(req.AuthData.userId, req.params.skuId), req.AuthData.userId)));
     }
     catch(error){
         SendStoreError(res, error, `offer ${req.params.skuId}`);
@@ -236,7 +255,8 @@ storeRouter.get("/product/sku/:skuId", StoreSkuOn, HasUndauntedMetagameAuth, Pla
 storeRouter.get("/token/:currency/:skuId", StoreSkuOn, HasUndauntedMetagameAuth, PlayerTokenOnly, PlayerMutationRateLimit, (req: any, res) => {
     try{
         res.status(200);
-        res.json(CreateStorePurchase(req.AuthData.userId, req.params.currency, req.params.skuId));
+        RequireRamsClient(req, MainShopSkus.has(req.params.skuId));
+        res.json(CreateStorePurchase(req.AuthData.userId, RamsWireCurrency(req.params.currency, req.AuthData.userId), req.params.skuId));
     }
     catch(error){
         SendStoreError(res, error, `token for ${req.params.skuId}`);
@@ -246,7 +266,8 @@ storeRouter.get("/token/:currency/:skuId", StoreSkuOn, HasUndauntedMetagameAuth,
 // StorePurchaseItemConfirmEndpoint: redeems the token; 204, also for a token already redeemed
 storeRouter.post("/notification/:currency", StoreAnyOn, HasUndauntedMetagameAuth, PlayerTokenOnly, PlayerMutationRateLimit, (req: any, res) => {
     try{
-        RedeemStorePurchase(req.AuthData.userId, req.params.currency, req.query.token);
+        RequireRamsClient(req, ['notes','rams','event01','event_01'].includes(req.params.currency.toLowerCase()));
+        RedeemStorePurchase(req.AuthData.userId, RamsWireCurrency(req.params.currency, req.AuthData.userId), req.query.token);
         res.status(204);
         res.send();
     }

@@ -30,6 +30,7 @@ export const FIXED_ARGS = [
   // The pinned 1.4.4 executable explicitly supports this client-mode switch.
   // Private-server launches do not use the original EAC bootstrapper.
   "-NoEAC",
+  "-RamsStore",
 ];
 
 // The -epiclocale for the Game language setting. "auto" takes the operating system's language when

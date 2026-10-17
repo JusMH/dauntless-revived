@@ -17,6 +17,8 @@ import { GrantEntitlementInTx, HasActiveEntitlement } from "./entitlements";
 import { ApplyInventoryTransactionInTx, InventoryErrorOf } from "./inventory";
 import { Tx } from "./savehistory";
 import { FinalizeCompletedTrialWeeks } from "./trials";
+import { PriceInRams } from "./ramspricing";
+import { ShopLayout } from "./shoplayout";
 
 // The free store (roadmap 3.7, STORE=free). The client's flow (0x140b39657, 0x140b55011):
 // - GET /product/skus/public?requiredTags=<tag>: the offers of one tag (the storefront is "webstore"),
@@ -159,6 +161,7 @@ export function SetExtraOffersForTests(Offers?: StoreOffer[]){
 }
 
 const CURRENCY_FIELDS: Record<string, {PriceField: string, CatalogId: string}> = {
+    notes: {PriceField: "notesPrice", CatalogId: "CURRENCY_NOTES"},
     platinum: {PriceField: "platinumPrice", CatalogId: "CURRENCY_PLATINUM_UNIV"},
     celldust: {PriceField: "cellDustPrice", CatalogId: "CURRENCY_CELLDUST"},
     markssteel: {PriceField: "steelMarksPrice", CatalogId: "CURRENCY_MARKS_STEEL"},
@@ -167,6 +170,9 @@ const CURRENCY_FIELDS: Record<string, {PriceField: string, CatalogId: string}> =
 };
 
 const CURRENCY_ALIASES: Record<string, string> = {
+    id_currency_notes: "notes",
+    currency_notes: "notes",
+    rams: "notes",
     // The 1.4.4 store can surface either its service-facing id_currency_* name or the
     // inventory catalogue id that actually holds the balance. Treat both as the same
     // payment currency so Lady Luck and Middleman purchases do not depend on which name
@@ -264,11 +270,16 @@ function FinalizeTrialsForOffer(Offer: StoreOffer | undefined){
     }
 }
 
-function FindOffer(SkuId: string){
+function FindOffer(SkuId: string, AccountId: string){
     const Middleman = MiddlemanStore() ? SelectWeeklyMiddlemanOffers().find((Offer) => Offer.id === SkuId) : undefined;
     if(Middleman != undefined) return Middleman;
     if(MIDDLEMAN_OFFER_IDS.has(SkuId)) return undefined;
-    return AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer)) ?? ExtraOffersForTests.find((Offer) => Offer.id === SkuId);
+    const Offer = AllOffers.find((Offer) => Offer.id === SkuId && IsListed(Offer)) ?? ExtraOffersForTests.find((Offer) => Offer.id === SkuId);
+    if(Offer?.tags.includes('webstore') && (Catalog.webstore as StoreOffer[]).some(Entry=>Entry.id===SkuId)){
+        const Active=ShopLayout((Catalog.webstore as StoreOffer[]).filter(IsListed),AccountId).find(Entry=>Entry.id===SkuId);
+        return Active ? PriceInRams(Active,AccountId) : undefined;
+    }
+    return Offer ? PriceInRams(Offer, AccountId) : undefined;
 }
 
 function ResolveOfferPricing(Offer: StoreOffer){
@@ -288,11 +299,19 @@ function ResolveOfferPricing(Offer: StoreOffer){
     return {Currency, CatalogId: Field.CatalogId, Price};
 }
 
+function ReadStoreInventory(Value: string | undefined): any[]{
+    try{
+        const Items = JSON.parse(Value ?? "[]");
+        if(Array.isArray(Items)) return Items;
+    } catch{}
+    throw new StoreError(409, "Inventory unavailable; purchase was not completed");
+}
+
 function CurrencyBalance(tx: Tx, CharacterId: string, CatalogId: string){
     const Row = tx.select({stackedItems: inventory.stackedItems}).from(inventory).where(eq(inventory.characterId, CharacterId)).get();
 
-    for(const Stack of JSON.parse(Row?.stackedItems ?? "[]") as any[]){
-        if(Stack?.catalogId === CatalogId && Number.isSafeInteger(Number(Stack.quantity))){
+    for(const Stack of ReadStoreInventory(Row?.stackedItems)){
+        if(Stack?.catalogId === CatalogId && Number.isSafeInteger(Number(Stack.quantity)) && Number(Stack.quantity) >= 0){
             return Number(Stack.quantity);
         }
     }
@@ -347,13 +366,13 @@ function HeldCatalogIds(tx: Tx, CharacterId: string | undefined){
 
     const Row = tx.select().from(inventory).where(eq(inventory.characterId, CharacterId)).get();
 
-    for(const Stack of JSON.parse(Row?.stackedItems ?? "[]") as any[]){
+    for(const Stack of ReadStoreInventory(Row?.stackedItems)){
         if(typeof Stack?.catalogId === "string" && Number(Stack.quantity) > 0){
             Held.add(Stack.catalogId);
         }
     }
 
-    for(const Instance of JSON.parse(Row?.instancedItems ?? "[]") as any[]){
+    for(const Instance of ReadStoreInventory(Row?.instancedItems)){
         if(typeof Instance?.catalogId === "string"){
             Held.add(Instance.catalogId);
         }
@@ -405,7 +424,8 @@ export function ListStoreOffers(AccountId: string, Tag: string): StoreOffer[] {
     return GetDb().transaction((tx) => {
         const Held = HeldCatalogIds(tx, GetActiveCharacter(tx, AccountId)?.characterId);
 
-        return ForTag.map((Offer) => WithRemaining(tx, AccountId, Held, Offer));
+        const Offers = ForTag.map((Offer) => WithRemaining(tx, AccountId, Held, PriceInRams(Offer, AccountId)));
+        return Tag === 'webstore' ? ShopLayout(Offers, AccountId) : Offers;
     });
 }
 
@@ -415,7 +435,7 @@ export function IsKnownStoreTag(Tag: string){
 
 // GET /product/sku/<sku>, from any tag (the Elite pass is under season09b_pass)
 export function GetStoreOffer(AccountId: string, SkuId: string): StoreOffer {
-    const Offer = FindOffer(SkuId);
+    const Offer = FindOffer(SkuId, AccountId);
 
     if(Offer == undefined){
         throw new StoreError(404, "Unknown store offer");
@@ -457,7 +477,7 @@ export function PruneExpiredStorePurchases(){
 export function CreateStorePurchase(AccountId: string, Currency: string, SkuId: string){
     Currency = CheckCurrency(Currency);
 
-    const Offer = FindOffer(SkuId);
+    const Offer = FindOffer(SkuId, AccountId);
 
     if(Offer == undefined){
         throw new StoreError(404, "Unknown store offer");
@@ -564,7 +584,7 @@ export function RedeemStorePurchase(AccountId: string, Currency: string, Token: 
             throw new StoreError(410, "Purchase token expired");
         }
 
-        const Offer = FindOffer(Purchase.skuId);
+        const Offer = FindOffer(Purchase.skuId, AccountId);
 
         if(Offer == undefined){
             throw new StoreError(409, "Offer is no longer sold; request a new token");
@@ -594,6 +614,9 @@ export function RedeemStorePurchase(AccountId: string, Currency: string, Token: 
         // Cosmetics are unlocks: something the character already holds is not granted again (overlapping
         // bundles, a second token). The repeatable consumable grants its full quantity every time.
         const Held = HeldCatalogIds(tx, Purchase.characterId);
+        if(Pricing.Price > 0 && WithRemaining(tx, AccountId, Held, Offer).remaining === 0){
+            throw new StoreError(409, "You already own everything this offer grants");
+        }
         const ToGrant = IsRepeatable(Offer) ? (Offer.items ?? []) : (Offer.items ?? []).filter((Item) => !Held.has(Item.catalogId));
 
         const Stacked = ToGrant.filter((Item) => GrantKind(Item.catalogId) === "stacked")

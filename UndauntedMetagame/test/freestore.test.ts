@@ -75,8 +75,161 @@ function ReadInventory(CharacterId: string){
     return { stacked: JSON.parse(Row?.stackedItems ?? "[]") as any[], instanced: JSON.parse(Row?.instancedItems ?? "[]") as any[] };
 }
 
+it('paid competing SKUs recheck funds and overlapping bundles never duplicate cosmetics',async()=>{
+    const A=await MakePlayer();
+    await WithEnv({STORE_RAMS_TEST_ACCOUNT:A.UserId,STORE_WEEKLY_ROTATION:undefined},()=>{
+        GetDb().insert(inventory).values({characterId:A.CharacterId,instancedItems:'[]',stackedItems:JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity:10000}])}).run();
+        const chest=CreateStorePurchase(A.UserId,'notes','single_armour_monk_chest').purchaseToken;
+        const kit=CreateStorePurchase(A.UserId,'notes','bundle_armour_monk').purchaseToken;
+        RedeemStorePurchase(A.UserId,'notes',chest);
+        assert.throws(()=>RedeemStorePurchase(A.UserId,'notes',kit),{Status:409});
+        assert.equal(StackQuantity(A.CharacterId,'CURRENCY_NOTES'),8500);
+        const held=ReadInventory(A.CharacterId).stacked;
+        held.find(i=>i.catalogId==='CURRENCY_NOTES').quantity=10000;
+        GetDb().update(inventory).set({stackedItems:JSON.stringify(held)}).where(eq(inventory.characterId,A.CharacterId)).run();
+        RedeemStorePurchase(A.UserId,'notes',kit);
+        assert.equal(StackQuantity(A.CharacterId,'CURRENCY_NOTES'),0);
+        const cosmetics=ReadInventory(A.CharacterId).stacked.filter(i=>i.catalogId!=='CURRENCY_NOTES');
+        assert.equal(cosmetics.length,4);
+        assert.ok(cosmetics.every(i=>i.quantity===1));
+        RedeemStorePurchase(A.UserId,'notes',kit);
+        assert.equal(StackQuantity(A.CharacterId,'CURRENCY_NOTES'),0);
+    });
+});
+
+it('missing, corrupt and invalid Rams balances fail closed without repairing player inventory',async()=>{
+    const A=await MakePlayer();
+    await WithEnv({STORE_RAMS_TEST_ACCOUNT:A.UserId,STORE_WEEKLY_ROTATION:undefined},()=>{
+        assert.throws(()=>CreateStorePurchase(A.UserId,'notes',SKU),{Status:409});
+        GetDb().insert(inventory).values({characterId:A.CharacterId,instancedItems:'[]',stackedItems:'[]'}).run();
+        const valid=JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity:10000}]);
+        for(const raw of ['{','null','{}','[]',...[-1,1500.5,'bad',null].map(quantity=>JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity}]))]){
+            GetDb().update(inventory).set({stackedItems:valid}).where(eq(inventory.characterId,A.CharacterId)).run();
+            const token=CreateStorePurchase(A.UserId,'notes',SKU).purchaseToken;
+            GetDb().update(inventory).set({stackedItems:raw}).where(eq(inventory.characterId,A.CharacterId)).run();
+            assert.throws(()=>CreateStorePurchase(A.UserId,'notes',SKU),{Status:409});
+            assert.throws(()=>RedeemStorePurchase(A.UserId,'notes',token),{Status:409});
+            assert.equal(GetDb().select().from(inventory).where(eq(inventory.characterId,A.CharacterId)).get()!.stackedItems,raw);
+        }
+        assert.ok(GetDb().select().from(storepurchases).where(eq(storepurchases.accountId,A.UserId)).all().every(p=>p.redeemedDate===null));
+    });
+});
+
 const EntitlementNames = (UserId: string) => ListEntitlements(UserId).map((Entitlement) => Entitlement.name);
 const NoDefaults = <T>(Body: () => T | Promise<T>) => WithEnv({ ENTITLEMENTS_DEFAULT: "" }, Body);
+
+it('Rams pilot charges only the selected account, rejects wrong currency, replay and duplicate charges', async () => {
+    const A = await MakePlayer(), B = await MakePlayer();
+    await WithEnv({STORE_RAMS_TEST_ACCOUNT:A.UserId}, () => {
+        const db=GetDb();
+        const balance=()=>StackQuantity(A.CharacterId,'CURRENCY_NOTES');
+        assert.equal(GetStoreOffer(A.UserId,SKU).notesPrice,1500);
+        assert.equal(GetStoreOffer(A.UserId,SKU).platinumPrice,undefined);
+        assert.equal(GetStoreOffer(B.UserId,SKU).platinumPrice,0);
+        assert.throws(()=>CreateStorePurchase(A.UserId,'platinum',SKU),{Status:400});
+        db.insert(inventory).values({characterId:A.CharacterId,instancedItems:'[]',stackedItems:JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity:3000}])}).run();
+        const first=CreateStorePurchase(A.UserId,'notes',SKU).purchaseToken;
+        const second=CreateStorePurchase(A.UserId,'notes',SKU).purchaseToken;
+        assert.throws(()=>RedeemStorePurchase(B.UserId,'notes',first),{Status:403});
+        RedeemStorePurchase(A.UserId,'notes',first);
+        assert.equal(balance(),1500);
+        assert.equal(StackQuantity(A.CharacterId,ITEM),1);
+        RedeemStorePurchase(A.UserId,'notes',first);
+        assert.equal(balance(),1500);
+        assert.throws(()=>RedeemStorePurchase(A.UserId,'notes',second),{Status:409});
+        assert.equal(balance(),1500);
+    });
+});
+
+it('native Rams wire purchase charges Rams once and rejects another account using the bridge',async()=>{
+    const A=await MakePlayer(), B=await MakePlayer();
+    await WithEnv({STORE_RAMS_TEST_ACCOUNT:A.UserId,STORE_RAMS_EVENT_TRANSPORT:'1'},async()=>{
+        GetDb().insert(inventory).values({characterId:A.CharacterId,instancedItems:'[]',stackedItems:JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity:3000}])}).run();
+        const offer=await Call('GET',`/product/sku/${SKU}`,{as:A.UserId});
+        assert.equal(offer.json.event01Price,1500);
+        assert.equal(offer.json.notesPrice,undefined);
+        assert.ok(offer.json.tags.includes('rams-store-pilot'));
+        const balance=await Call('GET','/balance',{as:A.UserId});
+        assert.equal(balance.json.CURRENCY_NOTES,3000);
+        assert.equal(balance.json.CURRENCY_EVENT_01,3000);
+        const otherBalance=await Call('GET','/balance',{as:B.UserId});
+        assert.equal(otherBalance.json.CURRENCY_EVENT_01,undefined);
+        assert.equal((await Call('GET',`/token/event01/${SKU}`,{as:B.UserId})).status,400);
+        const issued=await Call('GET',`/token/event_01/${SKU}`,{as:A.UserId});
+        assert.equal(issued.status,200);
+        for(let i=0;i<2;i++) assert.equal((await Call('POST',`/notification/event_01?token=${issued.json.purchaseToken}`,{as:A.UserId})).status,204);
+        assert.equal(StackQuantity(A.CharacterId,'CURRENCY_NOTES'),1500);
+        assert.equal(StackQuantity(A.CharacterId,ITEM),1);
+        assert.equal((await Call('GET','/balance',{as:A.UserId})).json.CURRENCY_EVENT_01,1500);
+    });
+});
+
+it('production Rams shop requires updated clients and charges every account through the native bridge',async()=>{
+    const A=await MakePlayer(), B=await MakePlayer();
+    await WithEnv({STORE_RAMS:'1',STORE_RAMS_TEST_ACCOUNT:undefined,STORE_RAMS_EVENT_TRANSPORT:'1',STORE_WEEKLY_ROTATION:'1'},async()=>{
+        for(const player of [A,B]){
+            GetDb().insert(inventory).values({characterId:player.CharacterId,instancedItems:'[]',stackedItems:JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity:100000}])}).run();
+            for(const path of ['/product/skus/public?requiredTags=webstore',`/product/sku/${SKU}`,`/token/event01/${SKU}`]){
+                assert.equal((await Call('GET',path,{as:player.UserId})).status,426);
+            }
+            assert.notEqual((await Call('GET','/product/skus/public?requiredTags=ladyluckstore',{as:player.UserId})).status,426);
+            const listed=await Call('GET','/product/skus/public?requiredTags=webstore&shop_protocol=rams-v1',{as:player.UserId});
+            assert.equal(listed.status,200);
+            assert.deepEqual(listed.json.map((o:any)=>o.id),ListStoreOffers(player.UserId,'webstore').map(o=>o.id));
+            const offer=listed.json.find((o:any)=>o.event01Price>0 && o.items?.length);
+            assert.ok(offer);
+            const detail=await Call('GET',`/product/sku/${offer.id}?shop_protocol=rams-v1`,{as:player.UserId});
+            assert.equal(detail.status,200);
+            assert.equal(detail.json.event01Price,offer.event01Price);
+            const issued=await Call('GET',`/token/event01/${offer.id}?shop_protocol=rams-v1`,{as:player.UserId});
+            assert.equal(issued.status,200);
+            assert.equal((await Call('POST',`/notification/event01?token=${issued.json.purchaseToken}&shop_protocol=rams-v1`,{as:player.UserId})).status,204);
+            const balance=await Call('GET','/balance',{as:player.UserId});
+            assert.equal(balance.json.CURRENCY_NOTES,100000-offer.event01Price);
+            assert.equal(balance.json.CURRENCY_EVENT_01,100000-offer.event01Price);
+            assert.ok(ReadInventory(player.CharacterId).stacked.some(i=>i.catalogId===offer.items[0].catalogId)
+                || ReadInventory(player.CharacterId).instanced.some(i=>i.catalogId===offer.items[0].catalogId));
+        }
+    });
+});
+
+it('weekly shop rejects inactive offers and outstanding tokens without taking Rams',async()=>{
+    const A=await MakePlayer();
+    await WithEnv({STORE_RAMS_TEST_ACCOUNT:A.UserId},async()=>{
+        GetDb().insert(inventory).values({characterId:A.CharacterId,instancedItems:'[]',stackedItems:JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity:100000}])}).run();
+        const all=ListStoreOffers(A.UserId,'webstore');
+        let hidden='';
+        await WithEnv({STORE_WEEKLY_ROTATION:'1'},()=>{
+            const active=new Set(ListStoreOffers(A.UserId,'webstore').map(o=>o.id));
+            hidden=all.find(o=>typeof o.notesPrice==='number'&&!active.has(o.id))!.id;
+            assert.throws(()=>CreateStorePurchase(A.UserId,'notes',hidden),{Status:404});
+        });
+        const token=CreateStorePurchase(A.UserId,'notes',hidden).purchaseToken;
+        await WithEnv({STORE_WEEKLY_ROTATION:'1'},()=>{
+            assert.throws(()=>RedeemStorePurchase(A.UserId,'notes',token),{Status:409});
+            assert.equal(StackQuantity(A.CharacterId,'CURRENCY_NOTES'),100000);
+        });
+    });
+});
+
+it('Rams pilot checks balance again when redeeming and rejects tokens after pricing changes',async()=>{
+    const A=await MakePlayer();
+    await WithEnv({STORE_RAMS_TEST_ACCOUNT:A.UserId},()=>{
+        GetDb().insert(inventory).values({characterId:A.CharacterId,instancedItems:'[]',stackedItems:'[]'}).run();
+        const setBalance=(quantity:number)=>GetDb().update(inventory).set({stackedItems:JSON.stringify([{catalogId:'CURRENCY_NOTES',quantity}])}).where(eq(inventory.characterId,A.CharacterId)).run();
+        setBalance(1499);
+        assert.throws(()=>CreateStorePurchase(A.UserId,'notes',SKU),{Status:409});
+        setBalance(1500);
+        const token=CreateStorePurchase(A.UserId,'notes',SKU).purchaseToken;
+        setBalance(0);
+        assert.throws(()=>RedeemStorePurchase(A.UserId,'notes',token),{Status:409});
+        assert.equal(StackQuantity(A.CharacterId,ITEM),0);
+        setBalance(1500);
+        delete process.env.STORE_RAMS_TEST_ACCOUNT;
+        assert.throws(()=>RedeemStorePurchase(A.UserId,'notes',token),{Status:409});
+        assert.equal(StackQuantity(A.CharacterId,'CURRENCY_NOTES'),1500);
+    });
+});
 
 describe("purchases (Harmonic's free-store cases)", () => {
     // from Harmonicrain/Undaunted test/free-store.test.js:29, adapted: the second token is issued before the
