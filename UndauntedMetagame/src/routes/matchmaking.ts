@@ -154,7 +154,7 @@ matchmakingRouter.get("/candidate/status", HasUndauntedMetagameAuth, async (req:
                 playerStates: PlayerStatesOf(MatchmakingResult),
                 status: "FAILED",
                 statusDuration: 0.0,
-                statusReason: null
+                statusReason: MatchmakingResult.CapacityReason ? `capacity_${MatchmakingResult.CapacityReason}` : null
             });
         }
         else if(Decision.Kind === "travel"){
@@ -190,7 +190,7 @@ matchmakingRouter.get("/candidate/status", HasUndauntedMetagameAuth, async (req:
                 playerStates: PlayerStatesOf(MatchmakingResult),
                 status : "MATCHING",
                 statusDuration : 0.0,
-                statusReason : null
+                statusReason : MatchmakingResult.CapacityReason ? `capacity_${MatchmakingResult.CapacityReason}` : null
             })
         }
     }

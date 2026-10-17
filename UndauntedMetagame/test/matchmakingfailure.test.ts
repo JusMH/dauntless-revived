@@ -33,6 +33,7 @@ const WORKING: Mode = { Name: "a working deploy server", Reply: Json(200, JSON.s
 const FAILURES: Mode[] = [
     { Name: "an error status (500)", Reply: Json(500, "{}") },
     { Name: "an error status (503)", Reply: Json(503, "{}") },
+    { Name: "an unknown capacity reason", Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'unknown'})) },
     { Name: "a 200 with no host", Reply: Json(200, JSON.stringify({ host: "", port: 0 })) },
     { Name: "a 200 with the port in quotes", Reply: Json(200, JSON.stringify({ host: "127.0.0.1", port: "8790" })) },
     { Name: "a 200 that is not JSON", Reply: Json(200, "not json") },
@@ -154,7 +155,7 @@ async function WaitForStatus(Token: string, Expected: string){
     return Last;
 }
 
-// The three ways a join reaches the deploy server, with the body the 1.4.4 client sends for each
+// Allocation paths, with the body the 1.4.4 client sends for each
 type Path = { Name: string, Players: number, Join: () => unknown };
 
 let Hunts = 0;
@@ -163,7 +164,9 @@ const PATHS: Path[] = [
     { Name: "going to Ramsgate", Players: 1, Join: () => ({ gameMode: "CITY", gameArgs: "", playerHuntId: "ShatteredIsles_ReturnToRamsgate" }) },
     { Name: "the tutorial", Players: 1, Join: () => ({ gameMode: "ISLAND", gameArgs: TUTORIAL_GAME_ARGS, playerHuntId: "" }) },
     // A new hunt each time, so every group gets a queue of its own; the fourth join starts it
-    { Name: "a full hunt queue of 4", Players: 4, Join: () => ({ gameMode: "ISLAND", gameArgs: "", playerHuntId: `CR19_PlayerHunt_Failure_Test_${++Hunts}` }) }
+    { Name: "a full hunt queue of 4", Players: 4, Join: () => ({ gameMode: "ISLAND", gameArgs: "", playerHuntId: `CR19_PlayerHunt_Failure_Test_${++Hunts}` }) },
+    { Name: "going to the Dojo", Players: 1, Join: () => ({ gameMode: "SHARED", gameArgs: "", playerHuntId: "ShatteredIsles_TrainingDojo" }) },
+    { Name: "a private hunt", Players: 1, Join: () => ({ gameMode: "ISLAND", gameArgs: "", playerHuntId: `CR19_PlayerHunt_Private_Test_${++Hunts}`, privateMatch: true }) }
 ];
 
 it('private hunts allocate immediately, poll quickly, and never take a public waiting player', async () => {
@@ -205,6 +208,86 @@ async function JoinAll(ThePath: Path){
 }
 
 describe("matchmaking when the deploy server starts no game server", () => {
+    it('reports the latest recognized capacity reason without replacing the candidate', async () => {
+        const { SetPartyClockForTests } = await import('../src/controllers/party');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            let player: ReturnType<typeof NewPlayer> | undefined;
+            let candidateId: string | undefined;
+            for (const reason of ['memory', 'ports', 'hunts', 'cpu']) {
+                CurrentMode = {Name: reason, Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason}))};
+                if (!player) [player] = await JoinAll(PATHS[1]);
+                else now += 3001;
+                const status = (await Call('GET', '/candidate/status', player.Token)).json;
+                candidateId ??= status.candidateId;
+                assert.equal(status.candidateId, candidateId);
+                assert.equal(status.status, 'MATCHING');
+                assert.equal(status.statusReason, `capacity_${reason}`);
+            }
+            CurrentMode = WORKING;
+            now += 3001;
+            assert.equal((await WaitForStatus(player!.Token, 'IN_PROGRESS')).json.statusReason, null);
+        } finally { SetPartyClockForTests(); }
+    });
+
+    it('a non-capacity failure after a capacity wait clears its reason on every path', async () => {
+        const { SetPartyClockForTests } = await import('../src/controllers/party');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            for (const path of PATHS) {
+                CurrentMode = {Name: 'full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))};
+                const players = await JoinAll(path);
+                for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.statusReason, 'capacity_memory');
+                CurrentMode = FAILURES[0];
+                now += 3001;
+                for (const player of players) assert.equal((await WaitForStatus(player.Token, 'FAILED')).json.statusReason, null);
+            }
+        } finally { SetPartyClockForTests(); }
+    });
+
+    it('party members report capacity, retain it on expiry, and clear it on success or generic failure', async () => {
+        const { SetPartyClockForTests, ResetPartiesForTests, PollParty, InviteToParty, AcceptPartyInvite, TouchPlayer } = await import('../src/controllers/party');
+        const { ResetMatchmakingForTests } = await import('../src/controllers/matchmaking');
+        const { users } = await import('../src/db/schema');
+        let now = Date.now();
+        SetPartyClockForTests(() => now);
+        try {
+            for (const outcome of ['ready', 'expired', 'failed']) {
+                ResetMatchmakingForTests();
+                ResetPartiesForTests();
+                Calls.length = 0;
+                const players = [NewPlayer(), NewPlayer()];
+                for (const player of players) GetDb().insert(users).values({userId: player.UserId, name: player.UserId, notes: 0}).run();
+                const party = await PollParty(players[0].UserId) as {partyId: string};
+                await PollParty(players[1].UserId);
+                assert.equal(InviteToParty(players[0].UserId, players[1].UserId, party.partyId).Status, 200);
+                assert.equal((await AcceptPartyInvite(players[1].UserId, party.partyId)).Status, 200);
+                CurrentMode = {Name: 'full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))};
+                await Call('POST', '/candidate/join', players[0].Token, PATHS[2].Join());
+                await WaitForCalls(1);
+                const candidateIds = [];
+                for (const player of players) {
+                    const status = (await Call('GET', '/candidate/status', player.Token)).json;
+                    assert.equal(status.status, 'MATCHING');
+                    assert.equal(status.statusReason, 'capacity_memory');
+                    candidateIds.push(status.candidateId);
+                }
+                assert.equal(candidateIds[0], candidateIds[1]);
+                CurrentMode = outcome === 'failed' ? FAILURES[0] : WORKING;
+                now += outcome === 'expired' ? 60001 : 3001;
+                for (const player of players) TouchPlayer(player.UserId);
+                for (const player of players) {
+                    const status = (await WaitForStatus(player.Token, outcome === 'ready' ? 'IN_PROGRESS' : 'FAILED')).json;
+                    assert.equal(status.candidateId, candidateIds[0]);
+                    assert.equal(status.statusReason, outcome === 'expired' ? 'capacity_memory' : null);
+                }
+                assert.equal(Calls.length, outcome === 'expired' ? 1 : 2);
+            }
+        } finally { ResetMatchmakingForTests(); ResetPartiesForTests(); SetPartyClockForTests(); }
+    });
+
     it('a cold hunt does not block join/status requests or allocate twice', async () => {
         let Finish!: () => void;
         CurrentMode = {Name: 'cold startup', Reply: res => { Finish = () => WORKING.Reply(res); }};
@@ -233,7 +316,13 @@ describe("matchmaking when the deploy server starts no game server", () => {
                 CurrentMode = {Name: 'memory full', Reply: Json(503, JSON.stringify({error: 'capacity_unavailable', reason: 'memory'}))};
                 const players = await JoinAll(path);
                 await WaitForCalls(1);
-                for (const player of players) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.status, 'MATCHING');
+                const candidates = [];
+                for (const player of players) {
+                    const status = (await Call('GET', '/candidate/status', player.Token)).json;
+                    assert.equal(status.status, 'MATCHING');
+                    assert.equal(status.statusReason, 'capacity_memory');
+                    candidates.push(status.candidateId);
+                }
                 if (path.Players === 4) {
                     const { CancelMatchmaking, HandlePlayerMatchmaking } = await import('../src/controllers/matchmaking');
                     assert.equal(await HandlePlayerMatchmaking('ISLAND', '', Calls[0].HuntId, 'UID-fifth-capacity'), true);
@@ -241,7 +330,11 @@ describe("matchmaking when the deploy server starts no game server", () => {
                 }
                 CurrentMode = WORKING;
                 now += 10001;
-                for (const player of players) assert.equal((await WaitForStatus(player.Token, 'IN_PROGRESS')).json.status, 'IN_PROGRESS');
+                for (const [index, player] of players.entries()) {
+                    const status = (await WaitForStatus(player.Token, 'IN_PROGRESS')).json;
+                    assert.equal(status.candidateId, candidates[index]);
+                    assert.equal(status.statusReason, null);
+                }
                 assert.equal(Calls.length, 2);
             }
         } finally { SetPartyClockForTests(); }
@@ -279,11 +372,15 @@ describe("matchmaking when the deploy server starts no game server", () => {
             await Call('POST', '/candidate/join', late.Token, body);
             Release();
             await new Promise<void>(resolve => setTimeout(resolve, 50));
+            for (const player of [first, late]) assert.equal((await Call('GET', '/candidate/status', player.Token)).json.statusReason, 'capacity_memory');
+            const later = NewPlayer();
+            await Call('POST', '/candidate/join', later.Token, body);
+            assert.equal((await Call('GET', '/candidate/status', later.Token)).json.statusReason, 'capacity_memory');
             CurrentMode = WORKING;
             now += 3001;
-            for (const player of [first, late]) await WaitForStatus(player.Token, 'IN_PROGRESS');
+            for (const player of [first, late, later]) assert.equal((await WaitForStatus(player.Token, 'IN_PROGRESS')).json.statusReason, null);
             assert.equal(Calls.length, 2, 'one server for both, not one each');
-            assert.deepEqual([...Calls[1].ExpectedPlayers].sort(), [first.UserId, late.UserId].sort());
+            assert.deepEqual([...Calls[1].ExpectedPlayers].sort(), [first.UserId, late.UserId, later.UserId].sort());
         } finally { SetPartyClockForTests(); }
     });
     it('a waiting solo candidate can be cancelled without launching when capacity returns', async () => {
@@ -328,7 +425,11 @@ describe("matchmaking when the deploy server starts no game server", () => {
                 const players = await JoinAll(path);
                 await WaitForCalls(1);
                 now += 60001;
-                for (const player of players) assert.equal((await WaitForStatus(player.Token, 'FAILED')).json.status, 'FAILED');
+                for (const player of players) {
+                    const status = (await WaitForStatus(player.Token, 'FAILED')).json;
+                    assert.equal(status.status, 'FAILED');
+                    assert.equal(status.statusReason, 'capacity_memory');
+                }
                 assert.equal(Calls.length, 1);
             }
         } finally { SetPartyClockForTests(); }

@@ -38,11 +38,14 @@ const CapacityOrder = new CapacityTurns(CAPACITY_WAIT_MS);
 // retry usually fits a few seconds later; ten seconds between tries left most of the minute unused
 const CAPACITY_RETRY_MS = 3 * 1000;
 
+type CapacityReason = 'memory' | 'ports' | 'hunts' | 'cpu';
+
 type MatchmakingQueueData = {
     Region: HuntRegion,
     HuntId: string,
     RetryAfter?: number,
     CapacityDeadline?: number,
+    CapacityReason?: CapacityReason,
     Players: string[],
     CandidateIds: Map<string, string>,
     FirstPlayerAddedTime: number,
@@ -58,6 +61,7 @@ export type MatchmakingResult = {
     Host: string,
     Port: number,
     Failed?: boolean,          // no game server could be started: the status poll answers FAILED
+    CapacityReason?: CapacityReason,
     PartyCandidate?: boolean,  // part of a party's candidate (no per-hunt queue behind it)
     PartyMemberIds?: string[], // the candidate's members, for the status reply's playerStates
     ParkedAt?: number,
@@ -72,6 +76,7 @@ export type MatchmakingResult = {
 
 type LaunchResult = {
     capacity?: boolean,
+    capacityReason?: CapacityReason,
     succeeded: boolean,
     readyNow: boolean,
     host: string,
@@ -155,13 +160,14 @@ async function AllocationHealth(entry: MatchmakingResult): Promise<boolean | und
     return snapshot.complete ? false : undefined;
 }
 
-function FailCandidate(candidateId: string, reason: string) {
+function FailCandidate(candidateId: string, reason: string, preserveCapacityReason = false) {
     CapacityWaits.delete(candidateId);
     CapacityOrder.remove(candidateId);
     MatchmakingRoster.cancelCandidate(candidateId);
     for (const [playerId, entry] of MatchmakingResultMap) {
         if (entry.CandidateId !== candidateId) continue;
         entry.Failed = true;
+        if (!preserveCapacityReason) entry.CapacityReason = undefined;
         entry.Ready = false;
         entry.LaunchDeadline = undefined;
         const party = GetPartyOf(playerId);
@@ -202,6 +208,7 @@ function ApplyLaunchResult(playerId: string, entry: MatchmakingResult, game: Lau
     if (MatchmakingResultMap.get(playerId) !== entry || entry.Failed) return;
     entry.LaunchDeadline = undefined;
     if (game.succeeded) {
+        entry.CapacityReason = undefined;
         entry.Host = game.host;
         entry.Port = game.port;
         entry.SessionId = game.sessionId;
@@ -238,7 +245,7 @@ function ParkCapacity(CandidateId: string, retry: () => Promise<boolean>) {
     // No background launches: only an active candidate's status poll can retry.
     for (const [id, wait] of CapacityWaits) {
         const entries = [...MatchmakingResultMap.entries()].filter(([, entry]) => entry.CandidateId === id && !entry.Failed && !entry.Ready);
-        if (wait.deadline < PartyNow()) FailCandidate(id, 'capacity wait expired');
+        if (wait.deadline < PartyNow()) FailCandidate(id, 'capacity wait expired', true);
         if (wait.deadline < PartyNow() || entries.length === 0) CapacityWaits.delete(id);
     }
     if (CapacityWaits.size >= 1000) return false;
@@ -320,7 +327,7 @@ async function LaunchGameOnDeployserverNow(GameMode: string, GameArgs: string, H
         const body = MatchmakingResult.body;
         if (body?.error === 'capacity_unavailable' && ['memory', 'ports', 'hunts', 'cpu'].includes(body.reason)) {
             logger.warn({reason: body.reason, huntId: HuntId, capacityWaitMs: CAPACITY_WAIT_MS}, 'mm: allocation waiting for capacity');
-            return {...Failed, capacity: true};
+            return {...Failed, capacity: true, capacityReason: body.reason};
         }
         return Failed;
     }
@@ -389,10 +396,15 @@ async function PopQueue(HuntId: string, MatchmakingQueue: MatchmakingQueueData |
         : await LaunchGameOnDeployserver("ISLAND", "", HuntId, MatchmakingQueue.Players, MatchmakingQueue.Region);
 
     if (GameOnDeployServer.capacity) {
+        // A local fairness turn has no Deploy reason; retain the last reported one.
+        MatchmakingQueue.CapacityReason = GameOnDeployServer.capacityReason ?? MatchmakingQueue.CapacityReason;
         MatchmakingRoster.releaseAllocation(allocationId);
         for (const {playerId, candidateId} of members) {
             const entry = MatchmakingResultMap.get(playerId);
-            if (entry?.CandidateId === candidateId) entry.LaunchDeadline = undefined;
+            if (entry?.CandidateId === candidateId) {
+                entry.LaunchDeadline = undefined;
+                entry.CapacityReason = MatchmakingQueue.CapacityReason;
+            }
         }
         MatchmakingQueue.CapacityDeadline ??= PartyNow() + CAPACITY_WAIT_MS;
         if (PartyNow() < MatchmakingQueue.CapacityDeadline && MatchmakingQueue.Players.length > 0) {
@@ -411,6 +423,8 @@ async function PopQueue(HuntId: string, MatchmakingQueue: MatchmakingQueueData |
                     if(CandidateId === undefined || MatchmakingQueue.Players.includes(Player)) continue;
                     MatchmakingQueue.Players.push(Player);
                     MatchmakingQueue.CandidateIds.set(Player, CandidateId);
+                    const entry = MatchmakingResultMap.get(Player);
+                    if (entry?.CandidateId === CandidateId) entry.CapacityReason = MatchmakingQueue.CapacityReason;
                     if(PlayerQueueMap.get(Player) === Newer) PlayerQueueMap.set(Player, MatchmakingQueue);
                 }
                 Newer.Players = [];
@@ -433,7 +447,7 @@ async function PopQueue(HuntId: string, MatchmakingQueue: MatchmakingQueueData |
 
         if(PlayerMatchmakingResultToUpdate != undefined && CandidateId !== undefined && PlayerMatchmakingResultToUpdate.CandidateId === CandidateId && !PlayerMatchmakingResultToUpdate.Ready && !PlayerMatchmakingResultToUpdate.PartyCandidate && PlayerMatchmakingResultToUpdate.HuntId === HuntId){
             if (PartyNow() >= deadline || (MatchmakingQueue.CapacityDeadline !== undefined && PartyNow() >= MatchmakingQueue.CapacityDeadline))
-                FailCandidate(CandidateId, 'allocation deadline expired');
+                FailCandidate(CandidateId, 'allocation deadline expired', MatchmakingQueue.CapacityDeadline !== undefined && PartyNow() >= MatchmakingQueue.CapacityDeadline);
             else ApplyLaunchResult(Player, PlayerMatchmakingResultToUpdate, GameOnDeployServer);
         }
 
@@ -470,7 +484,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
     CapacityOrder.touch(queueCandidate ?? PlayerMatchmakingResult.CandidateId, PartyNow());
     if (waiting) {
         if (PartyNow() >= waiting.deadline) {
-            FailCandidate(PlayerMatchmakingResult.CandidateId, 'capacity wait expired');
+            FailCandidate(PlayerMatchmakingResult.CandidateId, 'capacity wait expired', true);
         } else {
             waiting.deadline = PartyNow() + CAPACITY_WAIT_MS;
             if (!waiting.busy && PartyNow() >= waiting.next) {
@@ -493,7 +507,7 @@ export async function CheckAndUpdateQueueStatus(PlayerId: string){
             return PlayerMatchmakingResult;
         }
         if (MatchmakingQueue.CapacityDeadline !== undefined && PartyNow() >= MatchmakingQueue.CapacityDeadline) {
-            for (const candidateId of MatchmakingQueue.CandidateIds.values()) FailCandidate(candidateId, 'capacity wait expired');
+            for (const candidateId of MatchmakingQueue.CandidateIds.values()) FailCandidate(candidateId, 'capacity wait expired', true);
             return MatchmakingResultMap.get(PlayerId);
         }
         if (MatchmakingQueue.CapacityDeadline !== undefined) MatchmakingQueue.CapacityDeadline = PartyNow() + CAPACITY_WAIT_MS;
@@ -554,6 +568,7 @@ async function QueuePlayer(HuntId: string, PlayerId: string, Private = false){
         Port: 0,
         Private,
         Region,
+        CapacityReason: Queue?.CapacityReason,
         QueuedAt: PartyNow()
     });
 
@@ -878,7 +893,7 @@ async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: st
         MatchmakingRoster.beginAllocation(allocationId, Active.map(playerId => ({playerId, candidateId: CandidateId})), deadline);
         const Game = await LaunchGameOnDeployserver(GameMode, '', HuntId, ['ISLAND','CITY'].includes(GameMode) ? Active : undefined, Region);
         if (PartyNow() >= deadline || (CapacityWaits.get(CandidateId)?.deadline ?? Infinity) <= PartyNow()) {
-            FailCandidate(CandidateId, 'allocation deadline expired');
+            FailCandidate(CandidateId, 'allocation deadline expired', (CapacityWaits.get(CandidateId)?.deadline ?? Infinity) <= PartyNow());
             return true;
         }
         if (Game.capacity) {
@@ -886,7 +901,10 @@ async function StartPartyCandidate(TheParty: Party, GameMode: string, HuntId: st
             if (TheParty.Candidate?.CandidateId === CandidateId) TheParty.Candidate.LaunchDeadline = undefined;
             for (const member of Active) {
                 const entry = MatchmakingResultMap.get(member);
-                if (entry?.CandidateId === CandidateId) entry.LaunchDeadline = undefined;
+                if (entry?.CandidateId === CandidateId) {
+                    entry.LaunchDeadline = undefined;
+                    entry.CapacityReason = Game.capacityReason ?? entry.CapacityReason;
+                }
             }
             return false;
         }
@@ -1162,11 +1180,12 @@ async function HandlePlayerMatchmakingOnce(GameMode: string, GameArgs: string, H
                 if (result.capacity) MatchmakingRoster.releaseAllocation(allocationId);
                 if (MatchmakingResultMap.get(PlayerId) !== Entry || Entry.Failed) return true;
                 if (PartyNow() >= deadline || (CapacityWaits.get(Entry.CandidateId)?.deadline ?? Infinity) <= PartyNow()) {
-                    FailCandidate(Entry.CandidateId, 'allocation deadline expired');
+                    FailCandidate(Entry.CandidateId, 'allocation deadline expired', (CapacityWaits.get(Entry.CandidateId)?.deadline ?? Infinity) <= PartyNow());
                     return true;
                 }
                 if (result.capacity) {
                     Entry.LaunchDeadline = undefined;
+                    Entry.CapacityReason = result.capacityReason ?? Entry.CapacityReason;
                     return false;
                 }
                 ApplyLaunchResult(PlayerId, Entry, result);
